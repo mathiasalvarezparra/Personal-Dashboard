@@ -506,61 +506,819 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   flex-shrink: 0;
 }
 
-/* ============== RESUMEN FINANZAS EN HOY ============== */
-.finance-summary-card {
-  cursor: pointer;
-  transition: transform 0.15s;
+/* Contadores del día (pestaña Hoy) */
+.day-counters {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.finance-summary-card:active { transform: scale(0.99); }
-.finance-summary-body {
+.day-counter {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 13px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s, border-color 0.15s;
 }
-.finance-summary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.finance-summary-label {
+.day-counter:active { transform: scale(0.97); }
+.day-counter-label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.day-counter-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--text);
+}
+.day-counter-value .dc-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.day-counter.complete { border-color: var(--accent-green); }
+.day-counter.complete .day-counter-value { color: var(--accent-green); }
+
+/* ============== CIERRES (día y semana) ============== */
+.cd-summary {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.cd-stats { display: flex; gap: 24px; }
+.cd-stat { display: flex; flex-direction: column; gap: 4px; }
+.cd-stat-val {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1;
+}
+.cd-stat-lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
-.finance-summary-value {
+.cd-goals {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  color: var(--accent-green);
+  line-height: 1.5;
+}
+
+.wc-period {
   font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 12px;
 }
-.finance-summary-value.positive { color: var(--accent-green); }
-.finance-summary-value.negative { color: var(--accent-red); }
-.finance-summary-value.neutral { color: var(--text); }
-.finance-summary-alert {
-  display: flex;
-  align-items: center;
+.wc-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  background: rgba(245, 200, 66, 0.08);
-  border: 1px solid rgba(245, 200, 66, 0.25);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--accent-yellow);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 10px;
+  margin-bottom: 18px;
 }
-.finance-summary-alert.is-overdue {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.25);
-  color: var(--accent-red);
+.wc-stat { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.wc-stat-val {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1;
 }
-.finance-summary-empty {
+.wc-stat-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.wc-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
+}
+.wc-goal { margin-bottom: 12px; }
+.wc-goal.done { opacity: 0.6; }
+.wc-goal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.wc-goal-name { font-size: 13px; font-weight: 600; }
+.wc-goal-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.wc-goal-bar {
+  height: 5px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.wc-goal-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange));
+}
+.wc-goal.done .wc-goal-fill { background: var(--accent-green); }
+.wc-empty {
   font-size: 12px;
   color: var(--text-faint);
   font-style: italic;
+  margin-bottom: 12px;
 }
+.week-close-btn { margin-top: 10px; }
+
+/* ============== AJUSTE DE SALDO ============== */
+.balance-adjust-btn { margin-bottom: 20px; }
+.adj-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.adj-current-lbl {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.adj-current-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.adj-diff {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-top: 8px;
+  min-height: 17px;
+}
+.adj-diff.positive { color: var(--accent-green); }
+.adj-diff.negative { color: var(--accent-red); }
+.adj-diff.zero { color: var(--text-faint); font-weight: 600; }
+
+.demo-active {
+  background: rgba(245, 200, 66, 0.1);
+  border: 1px solid rgba(245, 200, 66, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--accent-yellow);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* ============== NAVEGADOR DE MESES (análisis) ============== */
+.mnav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.mnav-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s, border-color 0.15s;
+}
+.mnav-btn:active { transform: scale(0.92); }
+.mnav-btn:disabled { opacity: 0.22; cursor: default; }
+.mnav-center { flex: 1; text-align: center; min-width: 0; }
+.mnav-month {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.mnav-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--accent-yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-height: 13px;
+  margin-top: 2px;
+}
+
+/* Resumen del mes elegido */
+.m-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.ms-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.ms-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+.ms-val.income { color: var(--accent-green); }
+.ms-val.expense { color: var(--accent-red); }
+.ms-val.positive { color: var(--accent-green); }
+.ms-val.negative { color: var(--accent-red); }
+.ms-val.zero { color: var(--text); }
+.ms-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Contraste contra el promedio en la dona */
+.donut-legend-body { flex: 1; min-width: 0; }
+.donut-legend-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.donut-delta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  margin-top: 3px;
+  letter-spacing: 0.2px;
+}
+.donut-delta.over { color: var(--accent-red); }
+.donut-delta.under { color: var(--accent-green); }
+.donut-delta.even { color: var(--text-faint); }
+
+/* ============== ESTADÍSTICAS ============== */
+.stats-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.stats-tab {
+  min-height: 46px;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.stats-tab:active { transform: scale(0.95); }
+.stats-tab.active {
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+.stats-panel { display: none; }
+.stats-panel.active { display: block; animation: fadeIn 0.2s ease; }
+
+/* Tendencia semanal */
+.trend-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.trend-summary-main { display: flex; align-items: baseline; gap: 7px; }
+.trend-summary-val {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.trend-summary-lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.trend-delta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.trend-delta.positive { color: var(--accent-green); }
+.trend-delta.negative { color: var(--accent-red); }
+.trend-delta.zero { color: var(--text-faint); }
+.trend-summary-side {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 140px;
+}
+.trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+.trend-val {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-faint);
+  height: 11px;
+}
+.trend-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: var(--border-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.trend-bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent-yellow), var(--accent-orange));
+  border-radius: 4px;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.trend-col.is-current .trend-bar { background: var(--accent-green); }
+.trend-col.is-current .trend-val { color: var(--accent-green); font-weight: 700; }
+.trend-col.is-empty .trend-bar { background: var(--border); }
+.trend-lbl {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-faint);
+  height: 14px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+/* Metas del período */
+.sg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+.sg-row.is-empty { opacity: 0.4; }
+.sg-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  width: 74px;
+  flex-shrink: 0;
+}
+.sg-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.sg-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange));
+}
+.sg-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Cumplimiento por hábito */
+.sh-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sh-item:last-child { border-bottom: none; }
+.sh-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sh-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sh-trend {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.sh-trend.positive { color: var(--accent-green); }
+.sh-trend.negative { color: var(--accent-red); }
+.sh-trend.zero { color: var(--text-faint); }
+.sh-windows {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.sh-win {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 34px;
+}
+.sh-win-bar {
+  width: 100%;
+  height: 46px;
+  background: var(--border-soft);
+  border-radius: 5px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.sh-win-fill { width: 100%; border-radius: 5px; }
+.sh-win-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.sh-win-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+.sh-streaks {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+.sh-streak { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.sh-streak-val {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.sh-streak-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+/* Bienestar */
+.wb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+.wb-label {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  width: 88px;
+  flex-shrink: 0;
+}
+.wb-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.wb-fill { height: 100%; border-radius: 100px; }
+.wb-val {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  width: 48px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.wb-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+/* Historial de cierres */
+.hist-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.hist-item:last-child { border-bottom: none; }
+.hist-item:active { opacity: 0.55; }
+.hist-icon { font-size: 17px; flex-shrink: 0; }
+.hist-body { flex: 1; min-width: 0; }
+.hist-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.hist-preview {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Cierre dentro del resumen del día */
+.ds-close-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.ds-close-block { margin-top: 10px; }
+.ds-close-lbl {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.ds-close-txt {
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ============== PESTAÑAS DE ENFOQUE ============== */
+.focus-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.focus-tab {
+  min-height: 46px;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.focus-tab-icon { font-size: 16px; line-height: 1; }
+.focus-tab:active { transform: scale(0.95); }
+.focus-tab.active {
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+.focus-panel { display: none; }
+.focus-panel.active { display: block; animation: fadeIn 0.2s ease; }
+
+/* Anillo compacto del día (pestaña Hoy) */
+.today-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 2px 0 20px;
+}
+.today-ring-label {
+  position: absolute;
+  text-align: center;
+  pointer-events: none;
+}
+.today-ring-pct {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+.today-ring-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+/* Botón de ícono en la cabecera de tarjeta (reemplaza "Gestionar →") */
+.section-icon-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.section-icon-btn svg { width: 17px; height: 17px; }
+.section-icon-btn:active { transform: scale(0.92); color: var(--text); }
+
+/* Lista de hábitos (pestaña Hábitos) */
+.hab-ov-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--border);
+  transition: opacity 0.2s;
+}
+.hab-ov-item:last-child { border-bottom: none; }
+.hab-ov-item.done { opacity: 0.5; }
+.hab-ov-item.off-day { opacity: 0.42; }
+.hab-ov-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.hab-ov-icon:active { transform: scale(0.9); }
+.hab-ov-body { flex: 1; min-width: 0; cursor: pointer; }
+.hab-ov-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hab-ov-check { color: var(--accent-green, #4ade80); }
+.hab-ov-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  letter-spacing: 0.2px;
+}
+.hab-ov-bar {
+  height: 5px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.hab-ov-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hab-ov-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.hab-ov-btn {
+  min-width: 42px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.hab-ov-btn.plus {
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+.hab-ov-btn:active { transform: scale(0.92); }
+.hab-ov-btn:disabled { opacity: 0.28; cursor: default; }
 
 /* ============== METAS UNIFICADAS EN HOY ============== */
 .goals-inner-tabs {
@@ -1119,6 +1877,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   border: 1px solid var(--border);
 }
 .close-day-btn:active { background: var(--bg-card-hover); }
+.close-day-btn.is-closed {
+  color: var(--accent-green);
+  border-color: rgba(74, 222, 128, 0.35);
+}
 
 /* ============== TABS ============== */
 .tabs {
@@ -2939,15 +3701,16 @@ label {
 }
 .donut-legend-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 8px;
-  align-items: center;
+  align-items: start;
   font-size: 12px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   background: var(--bg-elev);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
 }
+.donut-legend-row .donut-dot { margin-top: 5px; }
 .donut-dot {
   width: 10px;
   height: 10px;
@@ -3292,11 +4055,7 @@ label {
       <h1 class="today-title">Hoy</h1>
       <div class="today-date" id="today-date-label"></div>
     </div>
-    <div class="today-topbar-right">
-      <button class="topbar-icon" data-go="stats" aria-label="Estadísticas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
-      </button>
-    </div>
+    <div class="today-topbar-right"></div>
   </header>
 
   <!-- Strip semanal Lun-Dom -->
@@ -3308,57 +4067,93 @@ label {
   <!-- Recordatorio de respaldo (se muestra solo si corresponde) -->
   <div id="backup-reminder-slot"></div>
 
-  <!-- Tareas de hoy -->
-  <div class="section-card">
-    <div class="section-head">
-      <div>
-        <div class="section-title">✅ Tareas de hoy</div>
-        <div class="section-subtitle">Pendientes</div>
-      </div>
-      <button class="text-btn" data-go="tasks-manage">Gestionar →</button>
-    </div>
-    <div id="today-tasks"></div>
+  <!-- Pestañas de Enfoque -->
+  <div class="focus-tabs" id="focus-tabs">
+    <button class="focus-tab active" data-focus-tab="hoy">
+      <span class="focus-tab-icon">☀️</span>Hoy
+    </button>
+    <button class="focus-tab" data-focus-tab="habitos">
+      <span class="focus-tab-icon">✨</span>Hábitos
+    </button>
+    <button class="focus-tab" data-focus-tab="metas">
+      <span class="focus-tab-icon">📌</span>Metas
+    </button>
   </div>
 
-  <!-- Hábitos del día (lista plana, sin agrupar) -->
-  <div class="section-card">
-    <div class="section-head">
-      <div>
-        <div class="section-title">✨ Hábitos del día</div>
-        <div class="section-subtitle">Marca lo cumplido</div>
+  <!-- ===== PANEL: HOY ===== -->
+  <div class="focus-panel active" id="focus-panel-hoy">
+    <!-- Anillo de progreso del día -->
+    <div class="today-ring">
+      <svg class="ring-big" viewBox="0 0 220 220" width="152" height="152">
+        <defs>
+          <linearGradient id="ringGradToday" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f5c842"/>
+            <stop offset="100%" stop-color="#fb923c"/>
+          </linearGradient>
+        </defs>
+        <circle cx="110" cy="110" r="92" fill="none" stroke="var(--border)" stroke-width="12"/>
+        <circle cx="110" cy="110" r="92" fill="none" stroke="url(#ringGradToday)" stroke-width="12"
+                stroke-linecap="round" id="ring-fg-today" class="ring-fg"
+                stroke-dasharray="578" stroke-dashoffset="578"
+                transform="rotate(-90 110 110)"/>
+      </svg>
+      <div class="today-ring-label">
+        <div class="today-ring-pct" id="ring-pct-today">0%</div>
+        <div class="today-ring-sub" id="ring-detail-today">— sin actividad</div>
       </div>
-      <button class="text-btn" data-go="habits-manage">Gestionar →</button>
     </div>
-    <div id="habits-by-time"></div>
+
+    <!-- Contadores del día -->
+    <div class="day-counters" id="day-counters"></div>
+
+    <!-- Tareas de hoy -->
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">✅ Tareas de hoy</div>
+          <div class="section-subtitle">Pendientes</div>
+        </div>
+        <button class="section-icon-btn" data-go="tasks-manage" aria-label="Gestionar tareas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
+      </div>
+      <div id="today-tasks"></div>
+    </div>
+
+    <!-- Cierres -->
+    <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
+    <button class="btn-secondary close-day-btn week-close-btn" id="week-close-btn" hidden></button>
   </div>
 
-  <!-- Metas unificadas con pestañas internas -->
-  <div class="section-card">
-    <div class="section-head">
-      <div>
-        <div class="section-title">📌 Metas</div>
-        <div class="section-subtitle" id="week-label"></div>
+  <!-- ===== PANEL: HÁBITOS (panorámica) ===== -->
+  <div class="focus-panel" id="focus-panel-habitos">
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">✨ Mis hábitos</div>
+          <div class="section-subtitle">Cumplimiento · últimos 30 días</div>
+        </div>
+        <button class="section-icon-btn" data-go="habits-manage" aria-label="Gestionar hábitos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
       </div>
-      <button class="text-btn" data-go="goals-manage">Gestionar →</button>
+      <div id="habits-overview-list"></div>
     </div>
-    <div class="goals-inner-tabs" id="goals-inner-tabs">
-      <button class="goals-inner-tab active" data-inner-horizon="week">Semanal</button>
-      <button class="goals-inner-tab" data-inner-horizon="month">Mensual</button>
-      <button class="goals-inner-tab" data-inner-horizon="year">Anual</button>
-    </div>
-    <div id="goals-unified-list"></div>
   </div>
 
-  <!-- Resumen de Finanzas -->
-  <div class="section-card finance-summary-card" id="finance-summary-card" data-go="finance">
-    <div class="section-head">
-      <div>
-        <div class="section-title">💰 Finanzas del mes</div>
-        <div class="section-subtitle" id="finance-summary-subtitle">Balance y pagos pendientes</div>
+  <!-- ===== PANEL: METAS ===== -->
+  <div class="focus-panel" id="focus-panel-metas">
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">📌 Metas</div>
+          <div class="section-subtitle" id="week-label"></div>
+        </div>
+        <button class="section-icon-btn" data-go="goals-manage" aria-label="Gestionar metas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
       </div>
-      <span class="text-btn">Detalles →</span>
+      <div class="goals-inner-tabs" id="goals-inner-tabs">
+        <button class="goals-inner-tab active" data-inner-horizon="week">Semanal</button>
+        <button class="goals-inner-tab" data-inner-horizon="month">Mensual</button>
+        <button class="goals-inner-tab" data-inner-horizon="year">Anual</button>
+      </div>
+      <div id="goals-unified-list"></div>
     </div>
-    <div class="finance-summary-body" id="finance-summary-body"></div>
   </div>
 
   <div class="bottom-spacer"></div>
@@ -3374,36 +4169,85 @@ label {
     <span class="topbar-spacer"></span>
   </header>
 
-  <!-- Anillo grande del día -->
-  <div class="ring-hero">
-    <svg class="ring-big" viewBox="0 0 220 220" width="200" height="200">
-      <defs>
-        <linearGradient id="ringGradStats" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#f5c842"/>
-          <stop offset="100%" stop-color="#fb923c"/>
-        </linearGradient>
-      </defs>
-      <circle cx="110" cy="110" r="92" fill="none" stroke="var(--border)" stroke-width="10"/>
-      <circle cx="110" cy="110" r="92" fill="none" stroke="url(#ringGradStats)" stroke-width="10"
-              stroke-linecap="round" id="ring-fg-stats"
-              stroke-dasharray="578" stroke-dashoffset="578"
-              transform="rotate(-90 110 110)"/>
-    </svg>
-    <div class="ring-hero-label">
-      <div class="ring-hero-pct" id="ring-pct-stats">0%</div>
-      <div class="ring-hero-sub" id="ring-detail-stats">— sin actividad</div>
+  <div class="stats-tabs" id="stats-tabs">
+    <button class="stats-tab active" data-stats-tab="resumen">
+      <span class="focus-tab-icon">📈</span>Resumen
+    </button>
+    <button class="stats-tab" data-stats-tab="habitos">
+      <span class="focus-tab-icon">✨</span>Hábitos
+    </button>
+    <button class="stats-tab" data-stats-tab="cierres">
+      <span class="focus-tab-icon">🌙</span>Cierres
+    </button>
+  </div>
+
+  <!-- ===== PANEL: RESUMEN ===== -->
+  <div class="stats-panel active" id="stats-panel-resumen">
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">📈 Tendencia semanal</div>
+          <div class="section-subtitle">Promedio diario · últimas 12 semanas</div>
+        </div>
+      </div>
+      <div id="stats-trend"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">🎯 Metas del período en curso</div>
+          <div class="section-subtitle">Cerradas sobre el total</div>
+        </div>
+      </div>
+      <div id="stats-goals"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">📊 Últimos 30 días</div>
+          <div class="section-subtitle" id="heatmap-month-label"></div>
+        </div>
+      </div>
+      <div id="heatmap-list"></div>
     </div>
   </div>
 
-  <!-- Heatmap movido aquí -->
-  <div class="section-card">
-    <div class="section-head">
-      <div>
-        <div class="section-title">📊 Últimos 30 días</div>
-        <div class="section-subtitle" id="heatmap-month-label"></div>
+  <!-- ===== PANEL: HÁBITOS ===== -->
+  <div class="stats-panel" id="stats-panel-habitos">
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">✨ Cumplimiento por hábito</div>
+          <div class="section-subtitle">7 · 30 · 90 días</div>
+        </div>
       </div>
+      <div id="stats-habits"></div>
     </div>
-    <div id="heatmap-list"></div>
+  </div>
+
+  <!-- ===== PANEL: CIERRES ===== -->
+  <div class="stats-panel" id="stats-panel-cierres">
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">💤 Bienestar</div>
+          <div class="section-subtitle">Promedio · últimos 30 días</div>
+        </div>
+      </div>
+      <div id="stats-wellbeing"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <div>
+          <div class="section-title">🌙 Historial de cierres</div>
+          <div class="section-subtitle">Toca para releer</div>
+        </div>
+      </div>
+      <div id="stats-history"></div>
+    </div>
   </div>
 
   <div class="bottom-spacer"></div>
@@ -3509,11 +4353,6 @@ label {
   <div class="bottom-spacer"></div>
 </section>
 
-<!-- view-habits: vacía (mantenida por compatibilidad si algún flujo viejo aún la referencia) -->
-<section id="view-habits" class="view">
-  <div class="bottom-spacer"></div>
-</section>
-
 <!-- ===== DETALLE DE HÁBITO ===== -->
 <section id="view-habit-detail" class="view">
   <header class="topbar">
@@ -3575,6 +4414,13 @@ label {
     <button class="btn-secondary" id="open-templates-btn">Ver plantillas</button>
   </div>
 
+  <div class="settings-card">
+    <div class="settings-label">🧪 Datos de prueba</div>
+    <p class="settings-help">Genera un set completo de datos al azar (hábitos con historial, metas, tareas, cierres y finanzas) para revisar todas las funciones. Guarda una copia de tus datos reales antes de reemplazarlos.</p>
+    <div id="demo-status"></div>
+    <button class="btn-secondary" id="demo-btn">🧪 Cargar datos de prueba</button>
+  </div>
+
   <div class="settings-card danger">
     <div class="settings-label">⚠️ Zona peligrosa</div>
     <button class="btn-danger" id="reset-btn">Borrar todos mis datos</button>
@@ -3609,6 +4455,7 @@ label {
 
   <!-- Balance del mes -->
   <div class="finance-balance" id="finance-balance"></div>
+  <button class="btn-secondary balance-adjust-btn" id="balance-adjust-btn">⚖️ Ajustar saldo</button>
 
   <!-- Pagos pendientes (mes en curso + arrastrados de meses anteriores) -->
   <div class="finance-section">
@@ -3645,6 +4492,10 @@ label {
   <button class="nav-btn active" data-go="today">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
     <span>Enfoque</span>
+  </button>
+  <button class="nav-btn" data-go="stats">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+    <span>Estadísticas</span>
   </button>
   <button class="nav-btn" data-go="finance">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -3716,6 +4567,7 @@ const Storage = (() => {
       onboarded: false,
       lastWeekKey: null,
       vacation: null, // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } o null
+      pendingWeekClose: null, // weekKey de una semana terminada sin cerrar
     },
     areas: [
       { id: 'salud',       name: 'Salud',       icon: '💪', color: '#4ade80' },
@@ -3729,9 +4581,10 @@ const Storage = (() => {
     habits: [],
     tasks: [],
     goals: [],
-    moods: {},
     focus: { week: '', updatedAt: null },
     closures: {},
+    // Cierres de semana: { 'YYYY-Www': { worked, blocked, focus, savedAt } }
+    weekClosures: {},
     // Snapshot de % logrado por día (para que el strip semanal mantenga el círculo de días pasados)
     // Formato: { 'YYYY-MM-DD': pct }
     dailySnapshots: {},
@@ -3754,6 +4607,8 @@ const Storage = (() => {
       merged.settings = { ...structuredClone(defaultState.settings), ...(parsed.settings || {}) };
       // Garantizar que las estructuras nuevas existen
       if (!merged.dailySnapshots) merged.dailySnapshots = {};
+      if (!merged.closures) merged.closures = {};
+      if (!merged.weekClosures) merged.weekClosures = {};
       // Migración: todos los hábitos son cuantitativos por defecto (target=1, unit=sesión).
       // Para hábitos ya marcados hoy/historial, infiero dailyProgress[día] = dailyTarget.
       (merged.habits || []).forEach(h => {
@@ -3808,9 +4663,12 @@ const Storage = (() => {
   }
 
   function reset() { state = structuredClone(defaultState); save(); }
+  // Reemplaza el estado completo (memoria + disco). Sin esto, cualquier save()
+  // posterior sobrescribiría el estado nuevo con el viejo que sigue en memoria.
+  function replace(next) { state = next; save(); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
-  return { get: () => state, save, exportJSON, importJSON, reset, uid };
+  return { get: () => state, save, exportJSON, importJSON, reset, replace, uid };
 })();
 
 /* ============================================
@@ -3842,15 +4700,15 @@ const UI = (() => {
       Finance.renderDashboard();
     }
     // Renderizar análisis del mes al entrar a su vista
-    if (view === 'finance-analysis' && typeof Finance !== 'undefined' && Finance.renderAnalysis) {
-      Finance.renderAnalysis();
+    if (view === 'finance-analysis' && typeof Finance !== 'undefined' && Finance.openAnalysis) {
+      Finance.openAnalysis();
     }
     if (view === 'finance-settings' && typeof Finance !== 'undefined' && Finance.render) {
       Finance.render();
     }
     // Renderizar estadísticas (heatmap, ring, mood) al entrar a la vista de stats
-    if (view === 'stats') {
-      if (typeof Habits !== 'undefined' && Habits.renderHeatmap) Habits.renderHeatmap();
+    if (view === 'stats' && typeof Stats !== 'undefined') {
+      Stats.render();
     }
     // Renderizar listas de gestión al entrar
     if (view === 'habits-manage' && typeof Habits !== 'undefined') {
@@ -3861,6 +4719,10 @@ const UI = (() => {
     }
     if (view === 'goals-manage' && typeof Goals !== 'undefined') {
       Goals.renderAll();
+    }
+    // Al volver a Enfoque, refrescar solo el panel activo
+    if (view === 'today' && typeof App !== 'undefined' && App.renderFocusTab) {
+      App.renderFocusTab();
     }
   }
 
@@ -3963,27 +4825,7 @@ const UI = (() => {
       go(b.dataset.go);
       return;
     }
-    const t = e.target.closest('[data-go-tab]');
-    if (t) {
-      // Ir a Sistema y activar el tab indicado
-      go('habits');
-      const tabId = t.dataset.goTab;
-      setTimeout(() => activateTab(tabId), 0);
-    }
   });
-
-  // Activa programáticamente un tab dentro de la vista actual
-  function activateTab(tabId) {
-    const tabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
-    if (!tabBtn) return;
-    const parent = tabBtn.closest('.view');
-    if (!parent) return;
-    parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    tabBtn.classList.add('active');
-    const content = parent.querySelector('#' + tabId);
-    if (content) content.classList.add('active');
-  }
 
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modal-backdrop').addEventListener('click', (e) => {
@@ -3997,12 +4839,23 @@ const UI = (() => {
     });
   });
 
-  return { go, goBack, activateTab, toast, openModal, closeModal, confirm2, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
+  return { go, goBack, toast, openModal, closeModal, confirm2, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
 })();
 
 /* ============================================
    HELPERS
    ============================================ */
+// ¿El contenedor está realmente a la vista? (vista activa + panel activo)
+// Evita repintar listas ocultas en cada interacción. Es seguro porque cada
+// entrada a una vista/pestaña vuelve a renderizar su contenido.
+function isLive(el) {
+  if (!el) return false;
+  const view = el.closest('.view');
+  if (!view || !view.classList.contains('active')) return false;
+  const panel = el.closest('.focus-panel, .stats-panel');
+  return !panel || panel.classList.contains('active');
+}
+
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -4026,7 +4879,7 @@ const Habits = (() => {
     if (newPos < 0 || newPos >= habits.length) return;
     [habits[pos], habits[newPos]] = [habits[newPos], habits[pos]];
     Storage.save();
-    renderToday();
+    renderOverview();
     renderFull();
     renderHeatmap();
     UI.buzz(8);
@@ -4119,7 +4972,7 @@ const Habits = (() => {
     }
 
     Storage.save();
-    renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+    renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
     Goals.renderAll(); Goals.renderWeeklyMini();
   }
 
@@ -4154,7 +5007,7 @@ const Habits = (() => {
     }
 
     Storage.save();
-    renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+    renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
     Goals.renderAll(); Goals.renderWeeklyMini();
   }
 
@@ -4274,7 +5127,7 @@ const Habits = (() => {
         if (h._completedAt) delete h._completedAt[dateKey];
         if (isQuant(h) && h.dailyProgress) delete h.dailyProgress[dateKey];
         Storage.save();
-        renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+        renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
         UI.toast(isRetro ? `Desmarcado · ${dateLabel}` : 'Hábito desmarcado');
       };
@@ -4343,7 +5196,7 @@ const Habits = (() => {
         }
         UI.buzz(15);
         Storage.save();
-        renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+        renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
       }
     });
@@ -4496,7 +5349,7 @@ const Habits = (() => {
 
         UI.buzz(15);
         Storage.save();
-        renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+        renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
 
         if (amount > 0) {
@@ -4533,52 +5386,15 @@ const Habits = (() => {
         const s = Storage.get();
         s.habits = s.habits.filter(h => h.id !== id);
         Storage.save();
-        renderFull(); renderToday(); renderHeatmap(); App.refreshKPIs();
+        renderFull(); renderOverview(); renderHeatmap(); App.refreshKPIs();
         UI.toast('Hábito eliminado');
       }
     });
   }
 
-  function renderToday() {
-    const c = document.getElementById('habits-by-time');
-    if (!c) return;
-    const state = Storage.get();
-
-    // Si está activo el modo vacaciones, no mostrar hábitos
-    if (Vacation.isActive()) {
-      c.innerHTML = '<div class="empty">🏖️ De vacaciones · tus hábitos volverán cuando termines</div>';
-      return;
-    }
-
-    const list = state.habits.filter(h => isHabitForToday(h));
-    if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin hábitos · toca "gestionar" para crear</div>';
-      return;
-    }
-
-    // Separar pendientes vs completados.
-    // Pendientes mantienen el orden de Mi sistema (orden global de state.habits).
-    // Completados van al final, ordenados por _completedAt[todayKey] (más reciente = más al final).
-    const todayKey = UI.todayKey();
-    const pending = [];
-    const completed = [];
-    list.forEach(h => {
-      if (isCompletedToday(h)) completed.push(h);
-      else pending.push(h);
-    });
-    completed.sort((a, b) => {
-      const ta = (a._completedAt && a._completedAt[todayKey]) || 0;
-      const tb = (b._completedAt && b._completedAt[todayKey]) || 0;
-      return ta - tb;
-    });
-
-    c.innerHTML = [...pending, ...completed].map(renderItem).join('');
-    bindClicks(c);
-  }
-
   function renderFull() {
     const c = document.getElementById('habits-full-list');
-    if (!c) return;
+    if (!isLive(c)) return;
     const state = Storage.get();
     if (state.habits.length === 0) {
       c.innerHTML = '<div class="empty">No tienes hábitos creados · usa el + de arriba para crear uno</div>';
@@ -4589,43 +5405,110 @@ const Habits = (() => {
     bindClicks(c);
   }
 
-  function renderItem(h) {
-    const done = isCompletedToday(h);
-    const streak = calcStreak(h);
-    const target = getDailyTarget(h);
-    const unit = getUnit(h);
-    const todayNote = h.notes && h.notes[UI.todayKey()];
-    const dailyCur = getDailyProgress(h);
-    const dailyPct = Math.min(100, Math.round((dailyCur / target) * 100));
+  // Cumplimiento promedio de los últimos 30 días, contando solo los días
+  // en que el hábito estaba programado y descartando días de vacaciones.
+  function complianceLast30(h) { return complianceWindow(h, 30); }
 
-    // Cantidad sugerida por toque rápido (+)
-    const step = h.defaultIncrement || Math.max(1, Math.ceil(target / 4));
+  function complianceWindow(h, nDays) {
+    let total = 0, sum = 0, full = 0;
+    const base = new Date();
+    // No contar días anteriores a la creación del hábito (falsearían el %)
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+    for (let i = 0; i < nDays; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const dk = UI.localDateKey(d);
+      if (bornKey && dk < bornKey) continue;
+      if (typeof Vacation !== 'undefined' && Vacation.isDateInVacation && Vacation.isDateInVacation(dk)) continue;
+      if (!isHabitForDate(h, d)) continue;
+      total++;
+      const p = getHabitDayPct(h, dk);
+      sum += p;
+      if (p >= 100) full++;
+    }
+    return { pct: total === 0 ? 0 : Math.round(sum / total), full, total };
+  }
+
+  // Lista de hábitos de la pestaña "Hábitos" de Enfoque.
+  // Barra = progreso de HOY. El cumplimiento a 30 días va como dato secundario.
+  function renderOverview() {
+    const c = document.getElementById('habits-overview-list');
+    if (!isLive(c)) return;
+    const state = Storage.get();
+
+    if (Vacation.isActive()) {
+      c.innerHTML = '<div class="empty">🏖️ De vacaciones · tus hábitos vuelven cuando termines</div>';
+      return;
+    }
+    if (!state.habits.length) {
+      c.innerHTML = '<div class="empty">Sin hábitos · usa el ícono de arriba para crear el primero</div>';
+      return;
+    }
+
+    // Orden: pendientes de hoy → completados de hoy → los que no tocan hoy
+    const todayKey = UI.todayKey();
+    const pending = [], completed = [], offDay = [];
+    state.habits.forEach(h => {
+      if (!isHabitForToday(h)) offDay.push(h);
+      else if (isCompletedToday(h)) completed.push(h);
+      else pending.push(h);
+    });
+    completed.sort((a, b) => {
+      const ta = (a._completedAt && a._completedAt[todayKey]) || 0;
+      const tb = (b._completedAt && b._completedAt[todayKey]) || 0;
+      return ta - tb;
+    });
+
+    c.innerHTML = [...pending, ...completed, ...offDay].map(renderOverviewItem).join('');
+    bindOverviewClicks(c);
+  }
+
+  function renderOverviewItem(h) {
+    const today   = isHabitForToday(h);
+    const done    = isCompletedToday(h);
+    const target  = getDailyTarget(h);
+    const unit    = getUnit(h);
+    const cur     = getDailyProgress(h);
+    const dayPct  = getHabitDayPct(h);
+    const streak  = calcStreak(h);
+    const { pct: pct30 } = complianceLast30(h);
+    const color   = h.color || '#f5c842';
+    const step    = h.defaultIncrement || Math.max(1, Math.ceil(target / 4));
+
+    const meta = [
+      today ? `${cur}/${target} ${unit}` : 'no toca hoy',
+      streak > 0 ? `${streak}🔥` : null,
+      `${pct30}% 30d`,
+    ].filter(Boolean).join(' · ');
 
     return `
-      <div class="item done-aware is-quant ${done ? 'done' : ''}" data-id="${h.id}">
-        <button class="quant-ring" data-action="quant-modal" aria-label="Registrar cantidad">
-          <svg viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" stroke-width="3"/>
-            <circle cx="18" cy="18" r="15" fill="none" stroke="${h.color || '#f5c842'}" stroke-width="3"
-              stroke-linecap="round"
-              stroke-dasharray="${2 * Math.PI * 15}"
-              stroke-dashoffset="${2 * Math.PI * 15 * (1 - dailyPct / 100)}"
-              transform="rotate(-90 18 18)"/>
-          </svg>
-          <span class="quant-ring-pct">${done ? '✓' : dailyPct + '%'}</span>
-        </button>
-        <span class="item-icon" data-action="detail">${h.icon || '⭐'}</span>
-        <div class="item-body" data-action="detail">
-          <div class="item-name">${escapeHtml(h.name)}${todayNote ? `<span class="note-indicator" title="${escapeAttr(todayNote)}">📝</span>` : ''}</div>
-          <div class="item-meta">
-            <span class="quant-progress">${dailyCur}/${target} ${unit}</span>
-            ${streak > 0 ? `<span class="streak">${streak}🔥</span>` : ''}
-          </div>
+      <div class="hab-ov-item ${done ? 'done' : ''} ${today ? '' : 'off-day'}" data-id="${h.id}">
+        <button class="hab-ov-icon" data-action="quant-modal" aria-label="Registrar cantidad exacta">${h.icon || '⭐'}</button>
+        <div class="hab-ov-body" data-action="detail">
+          <div class="hab-ov-name">${escapeHtml(h.name)}${done ? ' <span class="hab-ov-check">✓</span>' : ''}</div>
+          <div class="hab-ov-meta">${meta}</div>
+          <div class="hab-ov-bar"><div class="hab-ov-bar-fill" style="width:${dayPct}%;background:${color}"></div></div>
         </div>
-        ${!done ? `
-          <button class="quant-plus" data-action="quant-quick" data-step="${step}" aria-label="Sumar ${step}">+${step}</button>
-        ` : ''}
+        <div class="hab-ov-actions">
+          <button class="hab-ov-btn" data-action="minus" data-step="${step}" ${cur > 0 ? '' : 'disabled'} aria-label="Restar ${step}">−${step}</button>
+          <button class="hab-ov-btn plus" data-action="plus" data-step="${step}" aria-label="Sumar ${step}">+${step}</button>
+        </div>
       </div>`;
+  }
+
+  function bindOverviewClicks(c) {
+    c.querySelectorAll('[data-action]').forEach(b => {
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = b.closest('.hab-ov-item').dataset.id;
+        const a = b.dataset.action;
+        const step = parseFloat(b.dataset.step) || 1;
+        if (a === 'detail') openDetail(id);
+        if (a === 'quant-modal') openQuantModal(id);
+        if (a === 'plus') { UI.buzz(8); addToHabitProgress(id, step); }
+        if (a === 'minus') { UI.buzz(8); subFromHabitProgress(id, step); }
+      });
+    });
   }
 
   function renderItemFull(h) {
@@ -4880,7 +5763,7 @@ const Habits = (() => {
           UI.toast('Hábito creado');
         }
         Storage.save();
-        renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+        renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
       }
     });
@@ -5176,7 +6059,7 @@ const Habits = (() => {
       if (h.notes) delete h.notes[dateKey];
       Storage.save();
       renderDetail();
-      renderToday(); renderFull(); renderHeatmap(); App.refreshKPIs();
+      renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
       Goals.renderAll(); Goals.renderWeeklyMini();
       UI.toast('Desmarcado');
       if (onAfter) onAfter();
@@ -5223,7 +6106,7 @@ const Habits = (() => {
   // ====== HEATMAP de últimos 30 días ======
   function renderHeatmap() {
     const c = document.getElementById('heatmap-list');
-    if (!c) return;
+    if (!isLive(c)) return;
     const state = Storage.get();
     if (state.habits.length === 0) {
       c.innerHTML = '<div class="empty">No hay hábitos para mostrar</div>';
@@ -5284,7 +6167,7 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { renderToday, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { complianceWindow, calcBestStreak, renderOverview, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();
 
 /* ============================================
@@ -5449,7 +6332,7 @@ const Tasks = (() => {
 
   function renderToday() {
     const c = document.getElementById('today-tasks');
-    if (!c) return;
+    if (!isLive(c)) return;
     const todayKey = UI.todayKey();
     const all = Storage.get().tasks.filter(t => !t.done);
     const overdue = all.filter(t => t.date && t.date < todayKey);
@@ -5496,7 +6379,7 @@ const Tasks = (() => {
 
   function renderFull() {
     const c = document.getElementById('tasks-full-list');
-    if (!c) return;
+    if (!isLive(c)) return;
 
     // Filtro "Hechas": vista especial con agrupación por mes
     if (filter === 'done') {
@@ -5909,8 +6792,11 @@ const Goals = (() => {
     // Permitir propagar incluso si el padre está archivado (para ediciones retroactivas)
     const parent = state.goals.find(g => g.id === goal.parentGoalId);
     if (!parent || !parent.target) return;
+    const parentWasDone = !!parent.done;
     parent.current = Math.max(0, (parent.current || 0) + delta);
     parent.done = parent.current >= parent.target;
+    if (!parentWasDone && parent.done) parent.doneAt = Date.now();
+    if (parentWasDone && !parent.done) delete parent.doneAt;
     // Propagar recursivamente hacia el abuelo, bisabuelo, etc.
     // Así una semanal vinculada a mensual vinculada a anual actualiza la anual también.
     if (parent.parentGoalId) {
@@ -5923,8 +6809,11 @@ const Goals = (() => {
     const g = s.goals.find(x => x.id === id);
     if (!g) return;
     const oldCurrent = g.current || 0;
+    const wasDone = !!g.done;
     g.current = Math.max(0, +v || 0);
     g.done = g.target ? g.current >= g.target : g.done;
+    if (!wasDone && g.done) g.doneAt = Date.now();
+    if (wasDone && !g.done) delete g.doneAt;
 
     // Propagar el delta proporcional al padre (en tiempo real, no esperar al 100%)
     const delta = g.current - oldCurrent;
@@ -5984,6 +6873,7 @@ const Goals = (() => {
     const oldCurrent = g.current || 0;
     const oldDone = g.done;
     g.done = !g.done;
+    if (g.done) g.doneAt = Date.now(); else delete g.doneAt;
     // Si la marca como hecha, llevar current al target. Si la desmarca y current está en target, no tocar current.
     if (g.done && g.target) g.current = g.target;
 
@@ -6056,15 +6946,15 @@ const Goals = (() => {
 
   function renderWeeklyMini() {
     const c = document.getElementById('goals-unified-list');
-    if (!c) return;
+    if (!isLive(c)) return;
     const list = Storage.get().goals.filter(g =>
       g.horizon === currentInnerHorizon && !g.archived
     ).sort((a, b) => (a.done === b.done) ? 0 : (a.done ? 1 : -1));
     const emptyMsg = {
-      'week':    'Sin metas semanales · toca "Gestionar →" para crear',
-      'month':   'Sin metas mensuales · toca "Gestionar →" para crear',
-      'quarter': 'Sin metas trimestrales · toca "Gestionar →" para crear',
-      'year':    'Sin metas anuales · toca "Gestionar →" para crear',
+      'week':    'Sin metas semanales · usa el ícono de arriba para crear',
+      'month':   'Sin metas mensuales · usa el ícono de arriba para crear',
+      'quarter': 'Sin metas trimestrales · usa el ícono de arriba para crear',
+      'year':    'Sin metas anuales · usa el ícono de arriba para crear',
     }[currentInnerHorizon] || 'Sin metas';
     if (list.length === 0) {
       c.innerHTML = `<div class="empty">${emptyMsg}</div>`;
@@ -6846,7 +7736,7 @@ const GoalArchive = (() => {
 
   function render() {
     const c = document.getElementById('goal-archive-list');
-    if (!c) return;
+    if (!isLive(c)) return;
     const tree = buildTree();
     const years = Object.keys(tree).sort().reverse();
     if (years.length === 0) {
@@ -7015,13 +7905,14 @@ const Finance = (() => {
 
   // Categorías de gastos
   const EXPENSE_CATEGORIES = [
-    { id: 'servicios',    name: 'Servicios básicos', icon: '💡' },
+    { id: 'servicios',    name: 'Servicios básicos', icon: '🔌' },
     { id: 'vivienda',     name: 'Vivienda',          icon: '🏠' },
     { id: 'alimentacion', name: 'Alimentación',      icon: '🍽️' },
     { id: 'transporte',   name: 'Transporte',        icon: '🚗' },
     { id: 'salud',        name: 'Salud',             icon: '💊' },
     { id: 'ocio',         name: 'Ocio',              icon: '🎮' },
     { id: 'otros',        name: 'Otros',             icon: '📦' },
+    { id: 'ajuste',       name: 'Ajuste',            icon: '⚖️' },
   ];
 
   // Categorías de ingresos
@@ -7030,6 +7921,7 @@ const Finance = (() => {
     { id: 'freelance',  name: 'Freelance',  icon: '🧑‍💻' },
     { id: 'inversion',  name: 'Inversión',  icon: '📈' },
     { id: 'otros',      name: 'Otros',      icon: '💵' },
+    { id: 'ajuste',     name: 'Ajuste',     icon: '⚖️' },
   ];
 
   // Recurrencias para gastos (puntual = solo evento, los otros son configurables y se repiten)
@@ -7800,72 +8692,6 @@ const Finance = (() => {
     renderBalance();
     renderPending();
     renderMonthMovements();
-    renderSummary();
-  }
-
-  // Resumen compacto que se muestra al final de la pantalla Hoy
-  function renderSummary() {
-    const body = document.getElementById('finance-summary-body');
-    const subtitle = document.getElementById('finance-summary-subtitle');
-    if (!body) return;
-
-    const mk = getCurrentMonthKey();
-    const { start, end } = getMonthRange(mk);
-    const movs = (Storage.get().movements || []).filter(m =>
-      m.date && m.date >= start && m.date <= end
-    );
-    const income = movs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
-    const expense = movs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
-    const net = income - expense;
-    const netClass = net > 0 ? 'positive' : (net < 0 ? 'negative' : 'neutral');
-    const netSign = net > 0 ? '+' : (net < 0 ? '−' : '');
-
-    // Pagos pendientes (todos los que vienen de getAllPending son pendientes ya vencidos o del mes en curso)
-    const pending = getAllPending();
-    // De meses anteriores al actual = atrasados
-    const overdue = pending.filter(p => p.periodMk < mk);
-    // Del mes actual = pendientes "normales"
-    const currentMonth = pending.filter(p => p.periodMk === mk);
-
-    // Subtitle dinámico con el nombre del mes
-    const [y, m] = mk.split('-').map(Number);
-    const monthName = new Date(y, m - 1, 15).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
-    if (subtitle) subtitle.textContent = monthName;
-
-    let html = `
-      <div class="finance-summary-row">
-        <span class="finance-summary-label">Balance del mes</span>
-        <span class="finance-summary-value ${netClass}">${netSign}${formatCLP(Math.abs(net))}</span>
-      </div>
-    `;
-
-    if (overdue.length > 0) {
-      const totalOverdue = overdue.reduce((s, p) => s + (p.recurring.amount || 0), 0);
-      html += `
-        <div class="finance-summary-alert is-overdue">
-          <span>⚠️</span>
-          <span>${overdue.length} ${overdue.length === 1 ? 'pago atrasado' : 'pagos atrasados'} · ${formatCLP(totalOverdue)}</span>
-        </div>
-      `;
-    }
-    if (currentMonth.length > 0) {
-      const totalCurrent = currentMonth.reduce((s, p) => s + (p.recurring.amount || 0), 0);
-      html += `
-        <div class="finance-summary-alert">
-          <span>⏰</span>
-          <span>${currentMonth.length} ${currentMonth.length === 1 ? 'pago pendiente' : 'pagos pendientes'} este mes · ${formatCLP(totalCurrent)}</span>
-        </div>
-      `;
-    }
-    if (overdue.length === 0 && currentMonth.length === 0) {
-      if (income === 0 && expense === 0) {
-        html += '<div class="finance-summary-empty">Sin movimientos este mes</div>';
-      } else {
-        html += '<div class="finance-summary-empty">✓ Sin pagos pendientes</div>';
-      }
-    }
-
-    body.innerHTML = html;
   }
 
   function renderMonthBanner() {
@@ -7922,6 +8748,86 @@ const Finance = (() => {
         <span class="fb-amount">${netSign}${formatCLP(Math.abs(net))}</span>
       </div>
     `;
+  }
+
+  // Saldo neto actual = arrastre de meses anteriores + ingresos − gastos del mes
+  function getCurrentNet() {
+    const { start, end } = getMonthRange(getCurrentMonthKey());
+    const all = Storage.get().movements || [];
+    const carried = all.filter(m => m.date && m.date < start)
+      .reduce((s, m) => s + (m.type === 'income' ? (m.amount || 0) : -(m.amount || 0)), 0);
+    const movs = all.filter(m => m.date && m.date >= start && m.date <= end);
+    const income = movs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
+    const expense = movs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
+    return carried + income - expense;
+  }
+
+  // Cuadra el saldo declarando cuánto tienes de verdad.
+  // No edita el balance: registra un movimiento de ajuste por la diferencia.
+  function openAdjustBalanceModal() {
+    const current = getCurrentNet();
+
+    UI.openModal({
+      title: '⚖️ Ajustar saldo',
+      okText: 'Registrar ajuste',
+      bodyHTML: `
+        <div class="adj-current">
+          <span class="adj-current-lbl">Saldo según la app</span>
+          <span class="adj-current-val">${formatCLP(current)}</span>
+        </div>
+        <label>¿Cuánto tienes realmente? (CLP)</label>
+        <input type="number" id="adj-real" inputmode="numeric" placeholder="0" value="${current}" />
+        <div class="adj-diff" id="adj-diff"></div>
+        <label>Nota (opcional)</label>
+        <input type="text" id="adj-note" placeholder="Ej: efectivo sin registrar" />
+        <p class="settings-help" style="margin-top:10px">Se registrará como un movimiento de ajuste con la fecha de hoy. Puedes editarlo o borrarlo después.</p>
+      `,
+      onSave: () => {
+        const real = parseFloat(document.getElementById('adj-real').value);
+        if (isNaN(real)) { UI.toast('Ingresa un monto válido'); return false; }
+        const diff = Math.round(real - current);
+        if (diff === 0) { UI.toast('El saldo ya está cuadrado'); return; }
+        const note = document.getElementById('adj-note').value.trim();
+        const s = Storage.get();
+        s.movements.push({
+          id: Storage.uid(),
+          type: diff > 0 ? 'income' : 'expense',
+          name: 'Ajuste de saldo',
+          category: 'ajuste',
+          amount: Math.abs(diff),
+          date: UI.todayKey(),
+          note,
+          recurringExpenseId: null,
+          isAdjustment: true,
+          createdAt: Date.now(),
+        });
+        Storage.save();
+        render();
+        renderDashboard();
+        UI.toast(`Ajuste de ${diff > 0 ? '+' : '−'} ${formatCLP(Math.abs(diff))}`);
+      }
+    });
+
+    setTimeout(() => {
+      const input = document.getElementById('adj-real');
+      const out = document.getElementById('adj-diff');
+      if (!input || !out) return;
+      const refresh = () => {
+        const real = parseFloat(input.value);
+        if (isNaN(real)) { out.textContent = ''; out.className = 'adj-diff'; return; }
+        const diff = Math.round(real - current);
+        if (diff === 0) {
+          out.textContent = 'Sin diferencia · ya está cuadrado';
+          out.className = 'adj-diff zero';
+        } else {
+          out.textContent = `Se registrará ${diff > 0 ? '+' : '−'} ${formatCLP(Math.abs(diff))}`;
+          out.className = 'adj-diff ' + (diff > 0 ? 'positive' : 'negative');
+        }
+      };
+      input.addEventListener('input', refresh);
+      refresh();
+      input.focus(); input.select();
+    }, 80);
   }
 
   function renderPending() {
@@ -8014,7 +8920,7 @@ const Finance = (() => {
 
   function renderMonthMovements() {
     const c = document.getElementById('finance-movements-list');
-    if (!c) return;
+    if (!isLive(c)) return;
     const mk = getCurrentMonthKey();
     const { start, end } = getMonthRange(mk);
     const movs = (Storage.get().movements || []).filter(m =>
@@ -8106,39 +9012,116 @@ const Finance = (() => {
 
   // ====== GRÁFICOS (SVG nativo) ======
 
+  // Mes que se está analizando (se reinicia al mes actual al entrar a la vista)
+  let analysisMk = null;
+
+  function openAnalysis() {
+    analysisMk = getCurrentMonthKey();
+    renderAnalysis();
+  }
+
+  function setAnalysisMonth(mk) {
+    analysisMk = mk;
+    renderAnalysis();
+    const view = document.getElementById('view-finance-analysis');
+    if (view) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function renderAnalysis() {
     const c = document.getElementById('finance-analysis-card');
     if (!c) return;
-    const mk = getCurrentMonthKey();
+    const mk = analysisMk || getCurrentMonthKey();
+    const curMk = getCurrentMonthKey();
     const { start, end } = getMonthRange(mk);
-    const movs = (Storage.get().movements || []).filter(m => m.date && m.date >= start && m.date <= end);
+
+    // Los ajustes de saldo quedan fuera del análisis: son descuadres, no hábitos de gasto
+    const movs = (Storage.get().movements || []).filter(m =>
+      m.date && m.date >= start && m.date <= end && !m.isAdjustment
+    );
     const expenses = movs.filter(m => m.type === 'expense');
     const incomes = movs.filter(m => m.type === 'income');
 
-    const donutHTML = renderExpenseDonut(expenses);
-    const incomeHTML = renderIncomeTable(incomes);
-    const compareHTML = renderCompareBars();
+    const income = incomes.reduce((s2, m) => s2 + (m.amount || 0), 0);
+    const expense = expenses.reduce((s2, m) => s2 + (m.amount || 0), 0);
+    const net = income - expense;
+    const netCls = net > 0 ? 'positive' : (net < 0 ? 'negative' : 'zero');
+
+    // Navegador de meses
+    const firstMk = firstMonthWithData();
+    const canPrev = mk > firstMk;
+    const canNext = mk < curMk;
+    const nav = `
+      <div class="mnav">
+        <button class="mnav-btn" data-mnav="prev" ${canPrev ? '' : 'disabled'} aria-label="Mes anterior">‹</button>
+        <div class="mnav-center">
+          <div class="mnav-month">${monthLong(mk)}</div>
+          <div class="mnav-sub">${mk === curMk ? 'Mes en curso' : ''}</div>
+        </div>
+        <button class="mnav-btn" data-mnav="next" ${canNext ? '' : 'disabled'} aria-label="Mes siguiente">›</button>
+      </div>`;
+
+    // Sin movimientos: no tiene sentido pintar gráficos en cero
+    if (movs.length === 0) {
+      c.innerHTML = nav +
+        '<div class="empty" style="margin:22px 0">Sin movimientos registrados en este mes</div>' +
+        `<div class="analysis-block">
+           <div class="analysis-block-title">Ingresos vs gastos · 6 meses hasta ${monthShort(mk)}</div>
+           ${renderCompareBars(mk)}
+         </div>`;
+      bindAnalysis(c);
+      return;
+    }
+
+    const summary = `
+      <div class="m-summary">
+        <div class="ms-cell"><span class="ms-val income">+ ${formatCLP(income)}</span><span class="ms-lbl">Ingresos</span></div>
+        <div class="ms-cell"><span class="ms-val expense">− ${formatCLP(expense)}</span><span class="ms-lbl">Gastos</span></div>
+        <div class="ms-cell"><span class="ms-val ${netCls}">${net > 0 ? '+ ' : (net < 0 ? '− ' : '')}${formatCLP(Math.abs(net))}</span><span class="ms-lbl">Balance</span></div>
+      </div>`;
 
     c.innerHTML = `
+      ${nav}
+      ${summary}
       <div class="analysis-block">
         <div class="analysis-block-title">Gastos por categoría</div>
-        ${donutHTML}
+        ${renderExpenseDonut(expenses, mk)}
       </div>
       <div class="analysis-block">
         <div class="analysis-block-title">Ingresos del mes</div>
-        ${incomeHTML}
+        ${renderIncomeTable(incomes)}
       </div>
       <div class="analysis-block">
-        <div class="analysis-block-title">Ingresos vs gastos · últimos 6 meses</div>
-        ${compareHTML}
+        <div class="analysis-block-title">Ingresos vs gastos · 6 meses hasta ${monthShort(mk)}</div>
+        ${renderCompareBars(mk)}
       </div>
     `;
+    bindAnalysis(c);
   }
 
-  function renderExpenseDonut(expenses) {
+  function bindAnalysis(c) {
+    const cur = analysisMk || getCurrentMonthKey();
+    c.querySelectorAll('[data-mnav]').forEach(b => {
+      b.addEventListener('click', () => {
+        if (b.disabled) return;
+        UI.buzz(8);
+        setAnalysisMonth(shiftMonth(cur, b.dataset.mnav === 'prev' ? -1 : 1));
+      });
+    });
+    c.querySelectorAll('[data-jump]').forEach(r => {
+      r.addEventListener('click', () => {
+        const mk = r.dataset.jump;
+        if (mk === cur || mk > getCurrentMonthKey()) return;
+        UI.buzz(8);
+        setAnalysisMonth(mk);
+      });
+    });
+  }
+
+  function renderExpenseDonut(expenses, mk) {
     if (expenses.length === 0) {
       return '<div class="empty" style="margin:6px 0">Sin gastos este mes</div>';
     }
+    const avgData = categoryAverages(mk);
     // Agrupar por categoría
     const byCat = {};
     expenses.forEach(e => {
@@ -8151,7 +9134,7 @@ const Finance = (() => {
 
     // Construir slices ordenados por monto desc
     const entries = Object.entries(byCat)
-      .map(([id, val]) => ({ cat: getExpenseCategory(id), val, pct: val / total }))
+      .map(([id, val]) => ({ cat: { ...getExpenseCategory(id), id }, val, pct: val / total }))
       .sort((a, b) => b.val - a.val);
 
     // Paleta basada en variables existentes + tonos
@@ -8180,11 +9163,28 @@ const Finance = (() => {
     const legend = entries.map((e, idx) => {
       const color = palette[idx % palette.length];
       const pctTxt = Math.round(e.pct * 100);
+      // Contraste contra el promedio de los otros meses con datos
+      let delta = '';
+      if (avgData && avgData.avg[e.cat.id] > 0) {
+        const a = avgData.avg[e.cat.id];
+        const diff = Math.round(((e.val - a) / a) * 100);
+        if (Math.abs(diff) >= 5) {
+          const over = diff > 0;
+          delta = `<div class="donut-delta ${over ? 'over' : 'under'}">${over ? '▲' : '▼'} ${Math.abs(diff)}% ${over ? 'sobre' : 'bajo'} tu promedio</div>`;
+        } else {
+          delta = '<div class="donut-delta even">= en tu promedio</div>';
+        }
+      }
       return `
         <div class="donut-legend-row">
           <span class="donut-dot" style="background:${color}"></span>
-          <span class="donut-cat-name">${e.cat.icon} ${e.cat.name}</span>
-          <span class="donut-cat-val">${formatCLP(e.val)} · ${pctTxt}%</span>
+          <div class="donut-legend-body">
+            <div class="donut-legend-top">
+              <span class="donut-cat-name">${e.cat.icon} ${e.cat.name}</span>
+              <span class="donut-cat-val">${formatCLP(e.val)} · ${pctTxt}%</span>
+            </div>
+            ${delta}
+          </div>
         </div>
       `;
     }).join('');
@@ -8237,12 +9237,12 @@ const Finance = (() => {
     `;
   }
 
-  function renderCompareBars() {
-    const months = getLast6Months();
+  function renderCompareBars(endMk) {
+    const months = getLast6Months(endMk);
     const allMovs = Storage.get().movements || [];
     const data = months.map(mk => {
       const { start, end } = getMonthRange(mk);
-      const inMovs = allMovs.filter(m => m.date && m.date >= start && m.date <= end);
+      const inMovs = allMovs.filter(m => m.date && m.date >= start && m.date <= end && !m.isAdjustment);
       return {
         mk,
         income: inMovs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0),
@@ -8253,7 +9253,7 @@ const Finance = (() => {
       return '<div class="empty" style="margin:6px 0">Sin datos suficientes</div>';
     }
     const max = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
-    const curMk = getCurrentMonthKey();
+    const curMk = endMk || getCurrentMonthKey();
 
     // Dimensiones generosas
     const w = 320, h = 200;
@@ -8313,6 +9313,7 @@ const Finance = (() => {
         : '';
       return `
         ${highlight}
+        <rect class="bar-hit" data-jump="${d.mk}" x="${padL + i * slotW}" y="${padT}" width="${slotW}" height="${chartH + padB - 6}" fill="transparent" style="cursor:pointer" />
         <rect x="${slotX}" y="${inY}" width="${barW}" height="${inH}" rx="2" fill="var(--accent-green)" opacity="${isCurrent ? '1' : '0.78'}" />
         <rect x="${slotX + barW + 2}" y="${exY}" width="${barW}" height="${exH}" rx="2" fill="var(--accent-red)" opacity="${isCurrent ? '1' : '0.78'}" />
         ${inLabel}
@@ -8336,21 +9337,65 @@ const Finance = (() => {
         <div class="chart-legend-row">
           <span><span class="dot-green"></span> Ingresos</span>
           <span><span class="dot-red"></span> Gastos</span>
-          <span class="chart-legend-hint">Balance neto bajo cada mes</span>
+          <span class="chart-legend-hint">Toca un mes para verlo</span>
         </div>
       </div>
     `;
   }
 
-  function getLast6Months() {
+  function getLast6Months(endMk) {
     const arr = [];
-    const d = new Date();
-    d.setDate(1);
+    const [ey, em] = (endMk || getCurrentMonthKey()).split('-').map(Number);
     for (let i = 5; i >= 0; i--) {
-      const x = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      const x = new Date(ey, em - 1 - i, 1);
       arr.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`);
     }
     return arr;
+  }
+
+  // Desplaza una monthKey n meses
+  function shiftMonth(mk, n) {
+    const [y, m] = mk.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  // Etiqueta larga: "JULIO 2026"
+  function monthLong(mk) {
+    const [y, m] = mk.split('-').map(Number);
+    return new Date(y, m - 1, 15)
+      .toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+      .replace(' de ', ' ').toUpperCase();
+  }
+
+  // Mes más antiguo con movimientos (límite para navegar hacia atrás)
+  function firstMonthWithData() {
+    const dates = (Storage.get().movements || []).map(m => m.date).filter(Boolean).sort();
+    return dates.length ? dates[0].slice(0, 7) : getCurrentMonthKey();
+  }
+
+  // Promedio de gasto por categoría en los demás meses con datos.
+  // El denominador son todos los meses con gasto, no solo aquellos donde
+  // apareció la categoría: un mes sin ese gasto cuenta como cero.
+  function categoryAverages(excludeMk) {
+    const byMonth = {};
+    (Storage.get().movements || []).forEach(m => {
+      if (m.isAdjustment || m.type !== 'expense' || !m.date) return;
+      const mk = m.date.slice(0, 7);
+      if (mk === excludeMk) return;
+      byMonth[mk] = byMonth[mk] || {};
+      const id = m.category || 'otros';
+      byMonth[mk][id] = (byMonth[mk][id] || 0) + (m.amount || 0);
+    });
+    const months = Object.keys(byMonth);
+    if (months.length === 0) return null;
+    const sums = {};
+    months.forEach(mk => Object.entries(byMonth[mk]).forEach(([id, v]) => {
+      sums[id] = (sums[id] || 0) + v;
+    }));
+    const avg = {};
+    Object.keys(sums).forEach(id => { avg[id] = sums[id] / months.length; });
+    return { avg, count: months.length };
   }
 
   function monthShort(mk) {
@@ -8443,10 +9488,12 @@ const Finance = (() => {
     render,
     renderDashboard,
     renderAnalysis,
+    openAnalysis,
     renderArchive,
     openMovementModal,
     openNewExpense,
     openNewIncome,
+    openAdjustBalanceModal,
     EXPENSE_CATEGORIES,
     INCOME_CATEGORIES,
     RECURRENCES,
@@ -8671,6 +9718,10 @@ const GoalRollover = (() => {
         totalArchived += result.archived;
         totalPropagated += result.propagated;
         totalCreated += result.created;
+        // Si terminó una semana sin cerrar, dejarla marcada para poder revisarla
+        if (horizon === 'week' && !(state.weekClosures || {})[lastKey]) {
+          state.settings.pendingWeekClose = lastKey;
+        }
       }
 
       // Actualizar tracker
@@ -8797,8 +9848,6 @@ const GoalRollover = (() => {
   return { check, periodKey };
 })();
 
-// Alias retrocompatible (el código viejo llama WeekRollover.check)
-const WeekRollover = GoalRollover;
 
 
 /* ============================================
@@ -8921,6 +9970,617 @@ const Vacation = (() => {
   }
 
   return { isActive, isDateInVacation, get, set, clear, renderBanner, renderStatus, openModal };
+})();
+
+/* ============================================
+   STATS (vista de revisión)
+   ============================================ */
+const Stats = (() => {
+  let currentTab = 'resumen';
+
+  function setTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.stats-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.statsTab === tab);
+    });
+    document.querySelectorAll('.stats-panel').forEach(pn => {
+      pn.classList.toggle('active', pn.id === 'stats-panel-' + tab);
+    });
+    render();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  function render() {
+    if (currentTab === 'resumen') {
+      renderTrend();
+      renderGoals();
+      Habits.renderHeatmap();
+    } else if (currentTab === 'habitos') {
+      renderHabits();
+    } else if (currentTab === 'cierres') {
+      renderWellbeing();
+      renderHistory();
+    }
+  }
+
+  /* ---------- Tendencia semanal ---------- */
+  function weeklyAverages(nWeeks) {
+    const state = Storage.get();
+    const today = new Date();
+    const todayKey = UI.todayKey();
+    const out = [];
+    for (let i = nWeeks - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i * 7);
+      const wk = UI.weekKey(d);
+      const r = App.weekRange(wk);
+      if (!r) continue;
+      const vals = r.days
+        .filter(dk => dk <= todayKey)
+        .map(dk => state.dailySnapshots[dk])
+        .filter(v => typeof v === 'number');
+      out.push({
+        wk,
+        start: r.start,
+        pct: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null,
+        isCurrent: i === 0,
+      });
+    }
+    return out;
+  }
+
+  function renderTrend() {
+    const c = document.getElementById('stats-trend');
+    if (!c) return;
+    const data = weeklyAverages(12);
+    const withData = data.filter(d => d.pct !== null);
+    if (withData.length < 2) {
+      c.innerHTML = '<div class="empty">Aún no hay suficiente historial · vuelve en unos días</div>';
+      return;
+    }
+
+    const avg = Math.round(withData.reduce((a, b) => a + b.pct, 0) / withData.length);
+    const cur = data[data.length - 1].pct;
+    const prev = data.length > 1 ? data[data.length - 2].pct : null;
+    let deltaHTML = '';
+    if (cur !== null && prev !== null) {
+      const diff = cur - prev;
+      const cls = diff > 0 ? 'positive' : (diff < 0 ? 'negative' : 'zero');
+      const sign = diff > 0 ? '▲ +' : (diff < 0 ? '▼ ' : '= ');
+      deltaHTML = `<span class="trend-delta ${cls}">${sign}${diff === 0 ? '' : Math.abs(diff) + ' pts'}</span>`;
+    }
+
+    const bars = data.map((d, i) => {
+      const h = d.pct === null ? 0 : Math.max(3, d.pct);
+      const label = new Date(d.start + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+      const showLbl = (data.length - 1 - i) % 3 === 0;
+      return `
+        <div class="trend-col ${d.isCurrent ? 'is-current' : ''} ${d.pct === null ? 'is-empty' : ''}" title="${label}: ${d.pct === null ? 'sin datos' : d.pct + '%'}">
+          <div class="trend-val">${d.pct === null ? '' : d.pct}</div>
+          <div class="trend-bar-wrap"><div class="trend-bar" style="height:${h}%"></div></div>
+          <div class="trend-lbl">${showLbl ? label.replace('.', '') : ''}</div>
+        </div>`;
+    }).join('');
+
+    c.innerHTML = `
+      <div class="trend-summary">
+        <div class="trend-summary-main">
+          <span class="trend-summary-val">${cur === null ? '—' : cur + '%'}</span>
+          <span class="trend-summary-lbl">Esta semana</span>
+        </div>
+        ${deltaHTML}
+        <div class="trend-summary-side">Promedio ${avg}%</div>
+      </div>
+      <div class="trend-chart">${bars}</div>`;
+  }
+
+  /* ---------- Metas del período ---------- */
+  function renderGoals() {
+    const c = document.getElementById('stats-goals');
+    if (!c) return;
+    const state = Storage.get();
+    const rows = [
+      ['week', 'Semana'], ['month', 'Mes'], ['quarter', 'Trimestre'], ['year', 'Año'],
+    ].map(([h, label]) => {
+      const key = GoalRollover.periodKey(h);
+      const list = state.goals.filter(g =>
+        g.horizon === h && GoalRollover.periodKey(h, new Date(g.createdAt)) === key
+      );
+      return { label, done: list.filter(g => g.done).length, total: list.length };
+    });
+
+    if (rows.every(r => r.total === 0)) {
+      c.innerHTML = '<div class="empty">Sin metas definidas en los períodos en curso</div>';
+      return;
+    }
+
+    c.innerHTML = rows.map(r => {
+      const pct = r.total === 0 ? 0 : Math.round((r.done / r.total) * 100);
+      return `
+        <div class="sg-row ${r.total === 0 ? 'is-empty' : ''}">
+          <span class="sg-label">${r.label}</span>
+          <div class="sg-bar"><div class="sg-fill" style="width:${pct}%"></div></div>
+          <span class="sg-val">${r.total === 0 ? '—' : r.done + '/' + r.total}</span>
+        </div>`;
+    }).join('');
+  }
+
+  /* ---------- Cumplimiento por hábito ---------- */
+  function renderHabits() {
+    const c = document.getElementById('stats-habits');
+    if (!c) return;
+    const state = Storage.get();
+    if (!state.habits.length) {
+      c.innerHTML = '<div class="empty">No tienes hábitos creados</div>';
+      return;
+    }
+    c.innerHTML = state.habits.map(h => {
+      const w7 = Habits.complianceWindow(h, 7).pct;
+      const w30 = Habits.complianceWindow(h, 30).pct;
+      const w90 = Habits.complianceWindow(h, 90).pct;
+      const streak = Habits.calcStreak(h);
+      const best = Habits.calcBestStreak(h);
+      const color = h.color || '#f5c842';
+      const trend = w7 - w30;
+      const trendCls = trend > 4 ? 'positive' : (trend < -4 ? 'negative' : 'zero');
+      const trendTxt = trend > 4 ? '▲ subiendo' : (trend < -4 ? '▼ bajando' : '= estable');
+      return `
+        <div class="sh-item">
+          <div class="sh-head">
+            <span class="sh-name">${h.icon || '⭐'} ${escapeHtml(h.name)}</span>
+            <span class="sh-trend ${trendCls}">${trendTxt}</span>
+          </div>
+          <div class="sh-windows">
+            ${[['7d', w7], ['30d', w30], ['90d', w90]].map(([lbl, v]) => `
+              <div class="sh-win">
+                <div class="sh-win-bar"><div class="sh-win-fill" style="height:${Math.max(2, v)}%;background:${color}"></div></div>
+                <div class="sh-win-val">${v}%</div>
+                <div class="sh-win-lbl">${lbl}</div>
+              </div>`).join('')}
+            <div class="sh-streaks">
+              <div class="sh-streak"><span class="sh-streak-val">${streak}</span><span class="sh-streak-lbl">racha</span></div>
+              <div class="sh-streak"><span class="sh-streak-val">${best}</span><span class="sh-streak-lbl">récord</span></div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ---------- Bienestar ---------- */
+  function renderWellbeing() {
+    const c = document.getElementById('stats-wellbeing');
+    if (!c) return;
+    const state = Storage.get();
+    const today = new Date();
+    const entries = [];
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const e = state.closures[UI.localDateKey(d)];
+      if (e) entries.push(e);
+    }
+    if (entries.length === 0) {
+      c.innerHTML = '<div class="empty">Aún no has cerrado ningún día · el cierre está al final de Enfoque → Hoy</div>';
+      return;
+    }
+    const avgOf = (k) => {
+      const vals = entries.map(e => e[k]).filter(v => typeof v === 'number');
+      return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    };
+    const rows = [
+      { icon: '⚡', label: 'Energía', val: avgOf('energy'), max: 5, unit: '/5', color: 'var(--accent-yellow)' },
+      { icon: '😰', label: 'Estrés', val: avgOf('stress'), max: 5, unit: '/5', color: 'var(--accent-red)' },
+      { icon: '💤', label: 'Sueño', val: avgOf('sleep'), max: 9, unit: ' h', color: 'var(--accent-blue, #60a5fa)' },
+    ];
+    c.innerHTML = rows.map(r => {
+      const pct = r.val === null ? 0 : Math.min(100, Math.round((r.val / r.max) * 100));
+      return `
+        <div class="wb-row">
+          <span class="wb-label">${r.icon} ${r.label}</span>
+          <div class="wb-bar"><div class="wb-fill" style="width:${pct}%;background:${r.color}"></div></div>
+          <span class="wb-val">${r.val === null ? '—' : r.val.toFixed(1) + r.unit}</span>
+        </div>`;
+    }).join('') + `<div class="wb-count">${entries.length} día${entries.length > 1 ? 's' : ''} cerrado${entries.length > 1 ? 's' : ''} en los últimos 30</div>`;
+  }
+
+  /* ---------- Historial de cierres ---------- */
+  function renderHistory() {
+    const c = document.getElementById('stats-history');
+    if (!c) return;
+    const state = Storage.get();
+    const items = [];
+
+    Object.keys(state.weekClosures || {}).forEach(wk => {
+      items.push({ kind: 'week', key: wk, sort: (App.weekRange(wk) || {}).start || wk });
+    });
+    Object.keys(state.closures || {}).forEach(dk => {
+      items.push({ kind: 'day', key: dk, sort: dk });
+    });
+    items.sort((a, b) => b.sort.localeCompare(a.sort) || (a.kind === 'week' ? -1 : 1));
+
+    if (items.length === 0) {
+      c.innerHTML = '<div class="empty">Todavía no hay cierres guardados</div>';
+      return;
+    }
+
+    c.innerHTML = items.slice(0, 60).map(it => {
+      if (it.kind === 'week') {
+        const e = state.weekClosures[it.key];
+        const preview = e.focus || e.worked || e.blocked || 'Sin notas';
+        return `
+          <div class="hist-item" data-kind="week" data-key="${it.key}">
+            <span class="hist-icon">📅</span>
+            <div class="hist-body">
+              <div class="hist-title">Semana ${App.weekLabelFor(it.key)}</div>
+              <div class="hist-preview">${escapeHtml(preview)}</div>
+            </div>
+          </div>`;
+      }
+      const e = state.closures[it.key];
+      const label = new Date(it.key + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
+      const bits = [];
+      if (typeof e.energy === 'number') bits.push(`⚡ ${e.energy}`);
+      if (typeof e.sleep === 'number') bits.push(`💤 ${e.sleep} h`);
+      const preview = e.learn || (e.gratitude || []).filter(Boolean)[0] || bits.join(' · ') || 'Sin notas';
+      return `
+        <div class="hist-item" data-kind="day" data-key="${it.key}">
+          <span class="hist-icon">🌙</span>
+          <div class="hist-body">
+            <div class="hist-title">${label}</div>
+            <div class="hist-preview">${escapeHtml(preview)}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    c.querySelectorAll('.hist-item').forEach(el => {
+      el.addEventListener('click', () => openClosure(el.dataset.kind, el.dataset.key));
+    });
+  }
+
+  function openClosure(kind, key) {
+    const state = Storage.get();
+    if (kind === 'week') {
+      App.openWeekCloseModal(key);
+      return;
+    }
+    const e = state.closures[key];
+    if (!e) return;
+    const label = new Date(key + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+    const grat = (e.gratitude || []).filter(Boolean);
+    let html = `<div class="ds-close-metrics">
+        <span>⚡ Energía ${e.energy ?? '—'}/5</span>
+        <span>😰 Estrés ${e.stress ?? '—'}/5</span>
+        <span>💤 ${e.sleep ?? '—'} h</span>
+      </div>`;
+    if (grat.length) {
+      html += '<div class="ds-close-block"><div class="ds-close-lbl">Agradecido por</div>' +
+        grat.map(g => `<div class="ds-close-txt">· ${escapeHtml(g)}</div>`).join('') + '</div>';
+    }
+    if (e.learn) {
+      html += `<div class="ds-close-block"><div class="ds-close-lbl">Destacado del día</div><div class="ds-close-txt">${escapeHtml(e.learn)}</div></div>`;
+    }
+    UI.openModal({ title: `🌙 ${label}`, okText: 'Cerrar', bodyHTML: html, onSave: () => true });
+  }
+
+  function bind() {
+    document.querySelectorAll('.stats-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        UI.buzz(8);
+        setTab(tab.dataset.statsTab);
+      });
+    });
+  }
+
+  return { setTab, render, bind };
+})();
+
+/* ============================================
+   DEMO DATA (datos de prueba para revisar la app)
+   ============================================ */
+const Demo = (() => {
+  const SNAP_KEY = 'mi_dashboard_v1_pre_demo';
+  const rnd  = (a, b) => a + Math.random() * (b - a);
+  const rndi = (a, b) => Math.floor(rnd(a, b + 1));
+  const pick = arr => arr[rndi(0, arr.length - 1)];
+  const chance = p => Math.random() < p;
+
+  function hasSnapshot() { try { return !!localStorage.getItem(SNAP_KEY); } catch (e) { return false; } }
+
+  function dayKey(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return UI.localDateKey(d);
+  }
+  function ts(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    d.setHours(rndi(8, 21), rndi(0, 59), 0, 0);
+    return d.getTime();
+  }
+
+  function generate() {
+    const DAYS = 120;
+    const uid = () => Storage.uid();
+
+    /* ---------- HÁBITOS ---------- */
+    const specs = [
+      { name: 'Correr',           icon: '🏃', color: '#4ade80', area: 'salud',       target: 5,  unit: 'km',      freq: { type: 'days', days: [1, 3, 5] }, adher: 0.78, born: 115 },
+      { name: 'Leer',             icon: '📚', color: '#a78bfa', area: 'crecimiento', target: 20, unit: 'páginas', freq: { type: 'daily' },                 adher: 0.66, born: 118 },
+      { name: 'Meditar',          icon: '🧘', color: '#60a5fa', area: 'salud',       target: 1,  unit: 'sesión',  freq: { type: 'daily' },                 adher: 0.85, born: 100 },
+      { name: 'Estudiar inglés',  icon: '🗣️', color: '#f5c842', area: 'carrera',     target: 30, unit: 'min',     freq: { type: 'days', days: [1, 2, 3, 4] }, adher: 0.55, born: 74 },
+      { name: 'Sin azúcar',       icon: '🍎', color: '#f0abfc', area: 'salud',       target: 1,  unit: 'día',     freq: { type: 'daily' },                 adher: 0.62, born: 45 },
+      { name: 'Ordenar la casa',  icon: '🧹', color: '#34d399', area: 'hogar',       target: 1,  unit: 'sesión',  freq: { type: 'days', days: [6, 0] },    adher: 0.71, born: 60 },
+    ];
+
+    const habits = specs.map(sp => {
+      const h = {
+        id: uid(), name: sp.name, icon: sp.icon, color: sp.color, area: sp.area,
+        frequency: sp.freq, linkedGoalId: null,
+        defaultIncrement: sp.target > 4 ? Math.ceil(sp.target / 4) : 1,
+        dailyTarget: sp.target, unit: sp.unit,
+        createdAt: ts(sp.born), history: [], contributions: {}, dailyProgress: {}, notes: {}, _completedAt: {},
+      };
+      // Tendencia: mejora o empeora suavemente hacia el presente
+      const drift = rnd(-0.18, 0.18);
+      for (let i = sp.born; i >= 0; i--) {
+        const dk = dayKey(i);
+        const d = new Date(dk + 'T12:00:00');
+        if (sp.freq.type === 'days' && !sp.freq.days.includes(d.getDay())) continue;
+        const p = Math.min(0.97, Math.max(0.15, sp.adher + drift * (1 - i / sp.born)));
+        if (chance(p)) {
+          h.dailyProgress[dk] = sp.target;
+          h.history.push(dk);
+          h._completedAt[dk] = new Date(dk + 'T' + String(rndi(6, 22)).padStart(2, '0') + ':00:00').getTime();
+        } else if (chance(0.35) && sp.target > 1) {
+          h.dailyProgress[dk] = Math.round(sp.target * rnd(0.2, 0.8) * 10) / 10; // día a medias
+        }
+      }
+      if (chance(0.7)) h.notes[dayKey(rndi(1, 10))] = pick(['Costó arrancar', 'Muy buena sesión', 'Poco tiempo hoy', 'Me sentí liviano']);
+      return h;
+    });
+
+    /* ---------- METAS ---------- */
+    const goals = [];
+    const yearGoal = { id: uid(), name: 'Correr 500 km en el año', horizon: 'year', area: 'salud',
+      target: 500, unit: 'km', current: 318, done: false, archived: false, createdAt: ts(115) };
+    const quarterGoal = { id: uid(), name: 'Leer 6 libros el trimestre', horizon: 'quarter', area: 'crecimiento',
+      target: 6, unit: 'libros', current: 4, done: false, archived: false, createdAt: ts(60) };
+    goals.push(yearGoal, quarterGoal);
+
+    const monthGoals = [
+      { name: 'Correr 60 km este mes', target: 60, unit: 'km',      current: 41, parent: yearGoal.id },
+      { name: 'Leer 2 libros',          target: 2,  unit: 'libros',  current: 2,  parent: quarterGoal.id, done: true },
+      { name: 'Ahorrar 200.000',        target: 200000, unit: 'CLP', current: 120000, parent: null },
+    ].map(g => ({
+      id: uid(), name: g.name, horizon: 'month', area: 'salud', target: g.target, unit: g.unit,
+      current: g.current, done: !!g.done, doneAt: g.done ? ts(rndi(2, 12)) : undefined,
+      parentGoalId: g.parent, archived: false, createdAt: ts(rndi(15, 25)),
+    }));
+    goals.push(...monthGoals);
+
+    // Metas semanales: 6 semanas hacia atrás, la actual activa y las previas archivadas
+    const serieCorrer = uid();
+    for (let w = 5; w >= 0; w--) {
+      const born = w * 7 + rndi(0, 2);
+      const isCurrent = w === 0;
+      const hechas = [
+        { name: 'Correr 15 km',        target: 15, unit: 'km',      serie: serieCorrer, rec: 'weekly', parent: monthGoals[0].id },
+        { name: 'Leer 120 páginas',    target: 120, unit: 'páginas', parent: monthGoals[1].id },
+        { name: 'Cocinar 3 veces',     target: 3,  unit: 'veces' },
+      ];
+      hechas.forEach((g, idx) => {
+        if (!isCurrent && idx === 2 && chance(0.5)) return;
+        const done = isCurrent ? idx === 0 : chance(0.62);
+        const cur = done ? g.target : Math.round(g.target * rnd(0.15, 0.85));
+        goals.push({
+          id: uid(), seriesId: g.serie, name: g.name, horizon: 'week', area: 'salud',
+          target: g.target, unit: g.unit, current: cur, done,
+          doneAt: done ? ts(born - rndi(0, 5)) : undefined,
+          parentGoalId: g.parent || null, recurrence: g.rec || null,
+          archived: !isCurrent, archivedAt: isCurrent ? undefined : ts(born - 7),
+          createdAt: ts(born),
+        });
+      });
+    }
+
+    // Vincular algunos hábitos a metas
+    habits[0].linkedGoalId = goals.find(g => g.horizon === 'week' && !g.archived && g.name.startsWith('Correr')).id;
+    habits[1].linkedGoalId = goals.find(g => g.horizon === 'week' && !g.archived && g.name.startsWith('Leer')).id;
+
+    /* ---------- TAREAS ---------- */
+    const taskNames = ['Pagar la luz', 'Llamar al dentista', 'Revisar presupuesto', 'Comprar mercadería',
+      'Responder correos', 'Actualizar CV', 'Sacar la basura', 'Agendar reunión', 'Renovar seguro',
+      'Ordenar el escritorio', 'Enviar informe', 'Comprar regalo', 'Reservar hora médica', 'Lavar el auto'];
+    const tasks = [];
+    for (let i = 60; i >= -7; i--) {
+      if (!chance(0.42)) continue;
+      const n = rndi(1, 2);
+      for (let k = 0; k < n; k++) {
+        const future = i < 0;
+        tasks.push({
+          id: uid(), name: pick(taskNames), date: dayKey(i),
+          done: future ? false : chance(0.74),
+          note: chance(0.12) ? 'Quedó a medias, retomar' : '',
+          createdAt: ts(Math.max(0, i) + 1),
+        });
+      }
+    }
+
+    /* ---------- SNAPSHOTS DIARIOS ---------- */
+    const dailySnapshots = {};
+    let base = 58;
+    for (let i = DAYS; i >= 0; i--) {
+      base = Math.min(96, Math.max(22, base + rnd(-9, 9.6)));
+      dailySnapshots[dayKey(i)] = Math.round(base);
+    }
+
+    /* ---------- CIERRES DE DÍA ---------- */
+    const gratitudes = ['Café de la mañana', 'Salió el sol', 'Conversación con mi hermana', 'Terminé el informe',
+      'Buena música', 'Almuerzo tranquilo', 'Caminata al atardecer', 'Dormí bien', 'Llamada con un amigo', 'Casa en orden'];
+    const learnings = ['Cuando parto temprano rindo el doble.', 'Dormir menos de 6 horas me destruye el día siguiente.',
+      'Decir que no también es avanzar.', 'Las tareas chicas juntas pesan más que una grande.',
+      'Correr en la mañana me deja mejor ánimo todo el día.', 'Dejar el celular lejos cambia mi concentración.',
+      'Planificar el domingo me ahorra la semana.'];
+    const closures = {};
+    for (let i = 0; i <= 45; i++) {
+      if (!chance(0.62)) continue;
+      const g = [...gratitudes].sort(() => Math.random() - 0.5).slice(0, rndi(2, 3));
+      closures[dayKey(i)] = {
+        gratitude: g, learn: chance(0.75) ? pick(learnings) : '',
+        energy: rndi(2, 5), stress: rndi(1, 4), sleep: Math.round(rnd(5, 8.5) * 2) / 2,
+      };
+    }
+
+    /* ---------- CIERRES DE SEMANA ---------- */
+    const weekClosures = {};
+    const worked = ['Mantuve la rutina de la mañana casi todos los días.', 'Cerré las metas grandes antes del jueves.',
+      'Bajé el tiempo en el celular.', 'Cociné en casa toda la semana.'];
+    const blocked = ['Dormí mal martes y miércoles.', 'Se me acumularon las tareas chicas.',
+      'Reuniones sin agenda me comieron la tarde.', 'Me costó arrancar los lunes.'];
+    const focuses = ['Proteger la primera hora del día.', 'Cerrar las tareas pendientes antes del viernes.',
+      'Volver a correr tres veces.', 'Ordenar las finanzas del mes.'];
+    for (let w = 1; w <= 5; w++) {
+      const d = new Date(); d.setDate(d.getDate() - w * 7);
+      weekClosures[UI.weekKey(d)] = {
+        worked: pick(worked), blocked: pick(blocked), focus: pick(focuses), savedAt: ts(w * 7),
+      };
+    }
+
+    /* ---------- FINANZAS ---------- */
+    const recurringExpenses = [
+      { name: 'Arriendo',        category: 'vivienda',  amount: 480000, day: 5  },
+      { name: 'Luz',             category: 'servicios', amount: 32000,  day: 12 },
+      { name: 'Agua',            category: 'servicios', amount: 18000,  day: 15 },
+      { name: 'Internet',        category: 'servicios', amount: 25000,  day: 20 },
+      { name: 'Plan de celular', category: 'servicios', amount: 15000,  day: 8  },
+    ].map(r => {
+      const d = new Date(); d.setDate(r.day);
+      return {
+        id: uid(), name: r.name, category: r.category, recurrence: 'monthly',
+        defaultAmount: r.amount, dueDate: UI.localDateKey(d), dueDay: r.day,
+        note: '', createdAt: ts(100),
+      };
+    });
+
+    const movements = [];
+    const gastos = [
+      ['Supermercado', 'alimentacion', 45000, 120000], ['Bencina', 'transporte', 20000, 45000],
+      ['Farmacia', 'salud', 8000, 35000], ['Restaurante', 'alimentacion', 12000, 40000],
+      ['Cine', 'ocio', 9000, 25000], ['Metro', 'transporte', 5000, 15000],
+      ['Ropa', 'otros', 20000, 80000], ['Café', 'alimentacion', 3000, 9000],
+    ];
+    for (let i = 110; i >= 0; i--) {
+      const dk = dayKey(i);
+      // Sueldo el día 30 de cada mes
+      if (new Date(dk + 'T12:00:00').getDate() === 30) {
+        movements.push({ id: uid(), type: 'income', name: 'Sueldo', category: 'sueldo',
+          amount: 1350000, date: dk, note: '', recurringExpenseId: null, createdAt: ts(i) });
+      }
+      // Pago de recurrentes
+      recurringExpenses.forEach(re => {
+        if (new Date(dk + 'T12:00:00').getDate() === re.dueDay && chance(0.9)) {
+          movements.push({ id: uid(), type: 'expense', name: re.name, category: re.category,
+            amount: Math.round(re.defaultAmount * rnd(0.9, 1.12) / 100) * 100, date: dk, note: '',
+            recurringExpenseId: re.id, periodMk: dk.slice(0, 7), createdAt: ts(i) });
+        }
+      });
+      // Gastos sueltos
+      if (chance(0.5)) {
+        const g = pick(gastos);
+        movements.push({ id: uid(), type: 'expense', name: g[0], category: g[1],
+          amount: Math.round(rnd(g[2], g[3]) / 500) * 500, date: dk, note: '',
+          recurringExpenseId: null, createdAt: ts(i) });
+      }
+      if (chance(0.04)) {
+        movements.push({ id: uid(), type: 'income', name: 'Freelance', category: 'freelance',
+          amount: Math.round(rnd(80000, 320000) / 1000) * 1000, date: dk, note: '',
+          recurringExpenseId: null, createdAt: ts(i) });
+      }
+    }
+    // Un par de ajustes de saldo
+    [40, 9].forEach(off => {
+      const diff = Math.round(rnd(-25000, 25000) / 100) * 100;
+      movements.push({ id: uid(), type: diff > 0 ? 'income' : 'expense', name: 'Ajuste de saldo',
+        category: 'ajuste', amount: Math.abs(diff) || 5000, date: dayKey(off),
+        note: 'Cuadre con la cuenta', recurringExpenseId: null, isAdjustment: true, createdAt: ts(off) });
+    });
+
+    return {
+      version: 1,
+      user: { name: 'Mathias' },
+      settings: {
+        theme: Storage.get().settings.theme || 'dark',
+        lastBackup: null, backupReminderDismissed: null, onboarded: true,
+        lastWeekKey: UI.weekKey(), vacation: null, pendingWeekClose: null,
+        lastPeriodKeys: {
+          week: GoalRollover.periodKey('week'), month: GoalRollover.periodKey('month'),
+          quarter: GoalRollover.periodKey('quarter'), year: GoalRollover.periodKey('year'),
+        },
+      },
+      areas: Storage.get().areas,
+      habits, tasks, goals, focus: { week: '', updatedAt: null },
+      closures, weekClosures, dailySnapshots,
+      recurringExpenses, movements,
+    };
+  }
+
+  function load() {
+    UI.confirm2({
+      title: '🧪 Cargar datos de prueba',
+      message: 'Esto reemplaza TODO tu contenido actual por datos generados al azar para revisar la app. Se guarda una copia de tus datos reales y podrás restaurarla desde acá mismo.',
+      okText: 'Cargar demo',
+      danger: true,
+      onConfirm: () => {
+        try {
+          localStorage.setItem(SNAP_KEY, JSON.stringify(Storage.get()));
+          Storage.replace(generate());
+          UI.toast('Datos de prueba cargados');
+          setTimeout(() => location.reload(), 400);
+        } catch (e) {
+          console.error(e);
+          UI.toast('No se pudo cargar la demo');
+        }
+      }
+    });
+  }
+
+  function restore() {
+    UI.confirm2({
+      title: '↩️ Restaurar mis datos',
+      message: 'Se descartan los datos de prueba y vuelven tus datos reales tal como estaban antes de cargar la demo.',
+      okText: 'Restaurar',
+      onConfirm: () => {
+        try {
+          const snap = localStorage.getItem(SNAP_KEY);
+          if (!snap) { UI.toast('No hay copia guardada'); return; }
+          Storage.replace(JSON.parse(snap));
+          localStorage.removeItem(SNAP_KEY);
+          UI.toast('Datos restaurados');
+          setTimeout(() => location.reload(), 400);
+        } catch (e) {
+          console.error(e);
+          UI.toast('No se pudo restaurar');
+        }
+      }
+    });
+  }
+
+  function renderStatus() {
+    const wrap = document.getElementById('demo-status');
+    const btn = document.getElementById('demo-btn');
+    if (!wrap || !btn) return;
+    if (hasSnapshot()) {
+      wrap.innerHTML = '<div class="demo-active">⚠️ Estás viendo datos de prueba · tus datos reales están guardados</div>';
+      btn.textContent = '↩️ Restaurar mis datos';
+      btn.onclick = restore;
+    } else {
+      wrap.innerHTML = '';
+      btn.textContent = '🧪 Cargar datos de prueba';
+      btn.onclick = load;
+    }
+  }
+
+  return { load, restore, hasSnapshot, renderStatus };
 })();
 
 /* ============================================
@@ -9073,22 +10733,24 @@ const App = (() => {
     applyTheme();
 
     // Verificar rollover de semana antes de cualquier render
-    WeekRollover.check();
+    GoalRollover.check();
 
     renderHeader();
     renderWeekStrip();
-    renderFocus();
-    renderMood();
     renderBackupReminder();
     Vacation.renderBanner();
     Vacation.renderStatus();
-    Habits.renderToday(); Habits.renderFull(); Habits.renderHeatmap();
+    Habits.renderOverview(); Habits.renderFull(); Habits.renderHeatmap();
     Tasks.renderToday(); Tasks.renderFull();
     Goals.renderAll(); Goals.renderWeeklyMini();
     Finance.render();
     Finance.renderDashboard();
     refreshKPIs();
+    renderCloseDay();
+    renderWeekClose();
     bindAll();
+    Stats.bind();
+    Demo.renderStatus();
     renderWeekLabel();
     setupDayRolloverWatcher();
 
@@ -9104,25 +10766,29 @@ const App = (() => {
   function refreshAll() {
     renderHeader();
     renderWeekStrip();
-    renderFocus();
-    renderMood();
     renderBackupReminder();
     Vacation.renderBanner();
     Vacation.renderStatus();
-    Habits.renderToday(); Habits.renderFull(); Habits.renderHeatmap();
+    Habits.renderOverview(); Habits.renderFull(); Habits.renderHeatmap();
     Tasks.renderToday(); Tasks.renderFull();
     Goals.renderAll(); Goals.renderWeeklyMini();
     Finance.render();
     Finance.renderDashboard();
     refreshKPIs();
+    renderCloseDay();
+    renderWeekClose();
     renderWeekLabel();
+    if (typeof Stats !== 'undefined') Stats.render();
     if (typeof Habits.renderDetail === 'function') Habits.renderDetail();
   }
 
   function applyTheme() {
     const t = Storage.get().settings.theme || 'dark';
     document.documentElement.setAttribute('data-theme', t);
-    document.querySelectorAll('[data-theme]').forEach(b => {
+    // OJO: el propio <html> lleva data-theme, así que hay que acotar el selector
+    // a los botones reales. Si no, se le cuelga un listener al <html> y CADA clic
+    // de la app termina escribiendo el estado completo en localStorage.
+    document.querySelectorAll('.theme-row [data-theme]').forEach(b => {
       b.classList.toggle('active', b.dataset.theme === t);
     });
   }
@@ -9139,7 +10805,6 @@ const App = (() => {
 
   function renderWeekStrip(precomputedPct) {
     const c = document.getElementById('week-strip');
-    if (!c) return;
     const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const today = new Date();
     // Lunes como inicio de semana
@@ -9163,11 +10828,19 @@ const App = (() => {
       pctToday = total === 0 ? 0 : Math.round((habitsPctSum + tasksPctSum) / total);
     }
 
-    // Persistir el % de hoy en dailySnapshots (para que mañana, cuando este día sea pasado, conserve su anillo)
+    // Persistir el % de hoy en dailySnapshots (para que mañana, cuando este día sea
+    // pasado, conserve su anillo). Se guarda aunque el strip no esté a la vista,
+    // pero solo si el valor cambió: evita escribir en localStorage en cada render.
     const state = Storage.get();
     if (!state.dailySnapshots) state.dailySnapshots = {};
-    state.dailySnapshots[UI.todayKey()] = pctToday;
-    Storage.save();
+    const tk = UI.todayKey();
+    if (state.dailySnapshots[tk] !== pctToday) {
+      state.dailySnapshots[tk] = pctToday;
+      Storage.save();
+    }
+
+    // Desde aquí es solo pintado
+    if (!isLive(c)) return;
 
     // Anillo: radio 22 en viewBox 48, circunferencia ≈ 138.23
     const R = 22;
@@ -9333,6 +11006,26 @@ const App = (() => {
     }
     html += '</div>';
 
+    // Cierre del día (solo lectura, solo si existe)
+    const cl = (state.closures || {})[dateKey];
+    if (cl) {
+      const grat = (cl.gratitude || []).filter(Boolean);
+      html += '<div class="day-summary-section"><div class="day-summary-section-title">🌙 Cierre del día</div>';
+      html += `<div class="ds-close-metrics">
+          <span>⚡ Energía ${cl.energy ?? '—'}/5</span>
+          <span>😰 Estrés ${cl.stress ?? '—'}/5</span>
+          <span>💤 ${cl.sleep ?? '—'} h</span>
+        </div>`;
+      if (grat.length) {
+        html += '<div class="ds-close-block"><div class="ds-close-lbl">Agradecido por</div>' +
+          grat.map(g => `<div class="ds-close-txt">· ${escapeHtml(g)}</div>`).join('') + '</div>';
+      }
+      if (cl.learn) {
+        html += `<div class="ds-close-block"><div class="ds-close-lbl">Destacado del día</div><div class="ds-close-txt">${escapeHtml(cl.learn)}</div></div>`;
+      }
+      html += '</div>';
+    }
+
     UI.openModal({
       title: `📅 ${dateLabel}`,
       okText: 'Cerrar',
@@ -9348,17 +11041,8 @@ const App = (() => {
     return 'Buenas noches';
   }
 
-  function renderFocus() {
-    // Foco semanal eliminado de la UI. No-op por compatibilidad.
-  }
 
-  function renderMood() {
-    // Mood eliminado de la UI. No-op por compatibilidad.
-  }
 
-  function setMood(v) {
-    // Mood eliminado. No-op.
-  }
 
   // ====== BACKUP REMINDER ======
   function renderBackupReminder() {
@@ -9425,9 +11109,8 @@ const App = (() => {
         // Refrescar todo
         renderHeader();
         renderWeekStrip();
-        renderMood();
         renderWeekLabel();
-        Habits.renderToday(); Habits.renderFull(); Habits.renderHeatmap();
+        Habits.renderOverview(); Habits.renderFull(); Habits.renderHeatmap();
         Tasks.renderToday(); Tasks.renderFull();
         Goals.renderAll(); Goals.renderWeeklyMini();
         refreshKPIs();
@@ -9443,9 +11126,8 @@ const App = (() => {
           lastSeenDay = now;
           renderHeader();
           renderWeekStrip();
-          renderMood();
           renderWeekLabel();
-          Habits.renderToday(); Habits.renderFull(); Habits.renderHeatmap();
+          Habits.renderOverview(); Habits.renderFull(); Habits.renderHeatmap();
           Tasks.renderToday(); Tasks.renderFull();
           Goals.renderAll(); Goals.renderWeeklyMini();
           refreshKPIs();
@@ -9453,6 +11135,37 @@ const App = (() => {
         }
       }
     });
+  }
+
+  // ====== PESTAÑAS DE ENFOQUE ======
+  let currentFocusTab = 'hoy';
+
+  function setFocusTab(tab) {
+    currentFocusTab = tab;
+    document.querySelectorAll('.focus-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.focusTab === tab);
+    });
+    document.querySelectorAll('.focus-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'focus-panel-' + tab);
+    });
+    renderFocusTab(tab);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  // Refresca solo el contenido del panel visible
+  function renderFocusTab(tab = currentFocusTab) {
+    if (tab === 'hoy') {
+      Tasks.renderToday();
+      refreshKPIs();
+      renderCloseDay();
+      renderWeekClose();
+    } else if (tab === 'habitos') {
+      Habits.renderOverview();
+      refreshKPIs();
+    } else if (tab === 'metas') {
+      Goals.renderWeeklyMini();
+      renderWeekLabel();
+    }
   }
 
   function refreshKPIs() {
@@ -9487,7 +11200,7 @@ const App = (() => {
     // Pinta los dos anillos (vista Hoy y vista Estadísticas) con los mismos datos
     const C = 2 * Math.PI * 92;
     const offset = C - (pct / 100) * C;
-    ['today', 'stats'].forEach(suffix => {
+    ['today'].forEach(suffix => {
       const ring = document.getElementById('ring-fg-' + suffix);
       if (ring) {
         ring.style.strokeDasharray = C;
@@ -9501,29 +11214,245 @@ const App = (() => {
 
     // Actualizar también el anillo del día actual en el week-strip (mismo %)
     renderWeekStrip(pct);
+
+    // Contadores del día
+    renderDayCounters({
+      onVacation,
+      habitsDone, habitsTotal: habitsToday.length,
+      tasksDone,  tasksTotal: tasksToday.length,
+    });
   }
 
-  function showCloseDayIfNeeded() {
-    // El botón "Cierre del día" fue eliminado. Función conservada como no-op
-    // por compatibilidad si alguna llamada externa quedó por ahí.
+  function renderDayCounters({ onVacation, habitsDone, habitsTotal, tasksDone, tasksTotal }) {
+    const c = document.getElementById('day-counters');
+    if (!isLive(c)) return;
+    const cell = (target, icon, label, done, total, vacation) => {
+      const complete = !vacation && total > 0 && done === total;
+      const value = vacation ? '🏖️' : (total === 0 ? '—' : `${done}<span class="dc-total">/${total}</span>`);
+      return `
+        <button class="day-counter ${complete ? 'complete' : ''}" data-counter="${target}">
+          <span class="day-counter-label">${icon} ${label}</span>
+          <span class="day-counter-value">${value}</span>
+        </button>`;
+    };
+    c.innerHTML =
+      cell('habitos', '✨', 'Hábitos', habitsDone, habitsTotal, onVacation) +
+      cell('tareas',  '✅', 'Tareas',  tasksDone,  tasksTotal,  false);
+  }
+
+  // ====== HELPERS DE SEMANA ======
+  // Devuelve { start, end } (YYYY-MM-DD) del lunes y domingo de una weekKey ISO
+  function weekRange(wk) {
+    const m = String(wk).match(/^(\d{4})-W(\d{2})$/);
+    if (!m) return null;
+    const year = +m[1], week = +m[2];
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1) + (week - 1) * 7);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setUTCDate(monday.getUTCDate() + i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return { start: days[0], end: days[6], days };
+  }
+
+  function weekLabelFor(wk) {
+    const r = weekRange(wk);
+    if (!r) return wk;
+    const fmt = k => new Date(k + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+    return `${fmt(r.start)} – ${fmt(r.end)}`;
+  }
+
+  // Estadísticas agregadas de una semana (para el cierre semanal)
+  function weekStats(wk) {
+    const state = Storage.get();
+    const r = weekRange(wk);
+    const todayKey = UI.todayKey();
+    if (!r) return null;
+
+    // Solo días ya transcurridos
+    const past = r.days.filter(d => d <= todayKey);
+
+    // Promedio del anillo diario
+    const snaps = past.map(d => state.dailySnapshots[d]).filter(v => typeof v === 'number');
+    const ringAvg = snaps.length ? Math.round(snaps.reduce((a, b) => a + b, 0) / snaps.length) : 0;
+
+    // Hábitos: promedio de cumplimiento sobre días programados
+    let hSum = 0, hCount = 0;
+    state.habits.forEach(h => {
+      const born = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+      past.forEach(dk => {
+        if (born && dk < born) return;
+        if (Vacation.isDateInVacation(dk)) return;
+        if (!Habits.isHabitForDate(h, new Date(dk + 'T12:00:00'))) return;
+        hSum += Habits.getHabitDayPct(h, dk);
+        hCount++;
+      });
+    });
+    const habitsPct = hCount ? Math.round(hSum / hCount) : 0;
+
+    // Tareas de la semana
+    const tasks = state.tasks.filter(t => t.date >= r.start && t.date <= r.end);
+    const tasksDone = tasks.filter(t => t.done).length;
+
+    // Metas semanales de esa semana (activas y archivadas)
+    const goals = state.goals
+      .filter(g => g.horizon === 'week' && UI.weekKey(new Date(g.createdAt)) === wk)
+      .map(g => ({
+        name: g.name,
+        done: !!g.done,
+        pct: g.done ? 100 : (g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0),
+        detail: g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : '',
+      }))
+      .sort((a, b) => (a.done === b.done) ? b.pct - a.pct : (a.done ? -1 : 1));
+
+    return {
+      ringAvg, habitsPct,
+      tasksDone, tasksTotal: tasks.length,
+      goals, goalsDone: goals.filter(g => g.done).length,
+    };
+  }
+
+  // ====== CIERRE DE SEMANA ======
+  // Devuelve la weekKey que corresponde cerrar, o null si no toca
+  function weekCloseTarget() {
+    const s = Storage.get();
+    const pending = s.settings.pendingWeekClose;
+    if (pending && !s.weekClosures[pending]) return pending;
+    // Domingo: se puede cerrar la semana en curso
+    if (new Date().getDay() === 0) return UI.weekKey();
+    // Si ya cerraste la semana en curso, dejar el botón para poder editarla
+    const cur = UI.weekKey();
+    if (s.weekClosures[cur]) return cur;
+    return null;
+  }
+
+  function renderWeekClose() {
+    const btn = document.getElementById('week-close-btn');
+    if (!btn) return;
+    const wk = weekCloseTarget();
+    if (!wk) { btn.hidden = true; return; }
+    const s = Storage.get();
+    const closed = !!s.weekClosures[wk];
+    const isPast = wk !== UI.weekKey();
+    btn.hidden = false;
+    btn.dataset.week = wk;
+    btn.textContent = closed
+      ? `✓ Semana cerrada · editar`
+      : (isPast ? `📅 Cerrar la semana pasada` : `📅 Cerrar la semana`);
+    btn.classList.toggle('is-closed', closed);
+  }
+
+  function openWeekCloseModal(wk) {
+    const s = Storage.get();
+    const e = s.weekClosures[wk] || {};
+    const st = weekStats(wk);
+    if (!st) return;
+
+    const goalsHTML = st.goals.length === 0
+      ? '<div class="wc-empty">No definiste metas esta semana</div>'
+      : st.goals.map(g => `
+          <div class="wc-goal ${g.done ? 'done' : ''}">
+            <div class="wc-goal-top">
+              <span class="wc-goal-name">${g.done ? '✓ ' : ''}${escapeHtml(g.name)}</span>
+              <span class="wc-goal-pct">${g.detail || g.pct + '%'}</span>
+            </div>
+            <div class="wc-goal-bar"><div class="wc-goal-fill" style="width:${g.pct}%"></div></div>
+          </div>`).join('');
+
+    UI.openModal({
+      title: '📅 Cierre de semana',
+      okText: 'Guardar cierre',
+      bodyHTML: `
+        <div class="wc-period">${weekLabelFor(wk)}</div>
+
+        <div class="wc-stats">
+          <div class="wc-stat"><span class="wc-stat-val">${st.ringAvg}%</span><span class="wc-stat-lbl">Promedio</span></div>
+          <div class="wc-stat"><span class="wc-stat-val">${st.habitsPct}%</span><span class="wc-stat-lbl">Hábitos</span></div>
+          <div class="wc-stat"><span class="wc-stat-val">${st.tasksDone}/${st.tasksTotal}</span><span class="wc-stat-lbl">Tareas</span></div>
+          <div class="wc-stat"><span class="wc-stat-val">${st.goalsDone}/${st.goals.length}</span><span class="wc-stat-lbl">Metas</span></div>
+        </div>
+
+        <div class="wc-section-title">Tus metas semanales</div>
+        ${goalsHTML}
+
+        <label>¿Qué funcionó bien?</label>
+        <textarea id="wc-worked" rows="2">${escapeHtml(e.worked)}</textarea>
+        <label>¿Qué te frenó?</label>
+        <textarea id="wc-blocked" rows="2">${escapeHtml(e.blocked)}</textarea>
+        <label>Foco de la próxima semana</label>
+        <textarea id="wc-focus" rows="2">${escapeHtml(e.focus)}</textarea>
+      `,
+      onSave: () => {
+        const st2 = Storage.get();
+        st2.weekClosures[wk] = {
+          worked:  document.getElementById('wc-worked').value.trim(),
+          blocked: document.getElementById('wc-blocked').value.trim(),
+          focus:   document.getElementById('wc-focus').value.trim(),
+          savedAt: Date.now(),
+        };
+        if (st2.settings.pendingWeekClose === wk) st2.settings.pendingWeekClose = null;
+        Storage.save();
+        renderWeekClose();
+        UI.toast('Semana cerrada · buen inicio');
+      }
+    });
+  }
+
+  // ====== CIERRE DEL DÍA ======
+  function renderCloseDay() {
     const btn = document.getElementById('close-day-btn');
     if (!btn) return;
-    btn.style.display = new Date().getHours() >= 18 ? 'block' : 'none';
+    const closed = !!Storage.get().closures[UI.todayKey()];
+    btn.textContent = closed ? '✓ Día cerrado · editar' : '🌙 Cerrar el día';
+    btn.classList.toggle('is-closed', closed);
   }
 
   function openCloseDayModal() {
     const today = UI.todayKey();
-    const e = Storage.get().closures[today] || {};
+    const state = Storage.get();
+    const e = state.closures[today] || {};
+
+    // Resumen automático del día
+    const onVacation = Vacation.isActive();
+    const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
+    const habitsDone = habitsToday.filter(Habits.isCompletedToday).length;
+    const tasksToday = state.tasks.filter(t => t.date === today);
+    const tasksDone = tasksToday.filter(t => t.done).length;
+
+    // Metas cerradas hoy (requiere doneAt, así que solo aplica hacia adelante)
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const closedToday = state.goals.filter(g => g.done && g.doneAt && g.doneAt >= startOfDay.getTime());
+    const goalsLine = closedToday.length
+      ? `<div class="cd-goals">🎯 Cerraste: ${closedToday.map(g => escapeHtml(g.name)).join(' · ')}</div>`
+      : '';
+
+    const stat = (icon, label, done, total, vac) => `
+      <div class="cd-stat">
+        <span class="cd-stat-val">${vac ? '🏖️' : (total === 0 ? '—' : done + '/' + total)}</span>
+        <span class="cd-stat-lbl">${icon} ${label}</span>
+      </div>`;
+
     UI.openModal({
       title: '✨ Cierre del día',
       okText: 'Cerrar el día',
       bodyHTML: `
+        <div class="cd-summary">
+          <div class="cd-stats">
+            ${stat('✨', 'Hábitos', habitsDone, habitsToday.length, onVacation)}
+            ${stat('✅', 'Tareas', tasksDone, tasksToday.length, false)}
+          </div>
+          ${goalsLine}
+        </div>
         <p style="color:var(--text-dim);font-size:12px;margin-bottom:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px">3 minutos para reflexionar</p>
         <label>3 cosas por las que estás agradecido</label>
         <input type="text" id="cd-g1" placeholder="1." value="${escapeAttr(e.gratitude?.[0])}" />
         <input type="text" id="cd-g2" placeholder="2." value="${escapeAttr(e.gratitude?.[1])}" style="margin-top:6px" />
         <input type="text" id="cd-g3" placeholder="3." value="${escapeAttr(e.gratitude?.[2])}" style="margin-top:6px" />
-        <label>¿Qué destacás o aprendiste hoy?</label>
+        <label>¿Qué destacas o aprendiste hoy?</label>
         <textarea id="cd-learn" rows="3">${escapeHtml(e.learn)}</textarea>
         <label>Energía hoy (1-5)</label>
         <input type="number" id="cd-energy" min="1" max="5" value="${e.energy || 3}" />
@@ -9545,14 +11474,12 @@ const App = (() => {
           sleep: +document.getElementById('cd-sleep').value || 7,
         };
         Storage.save();
+        renderCloseDay();
         UI.toast('Día cerrado · buen descanso');
       }
     });
   }
 
-  function openFocusModal() {
-    // Foco semanal eliminado. No-op.
-  }
 
   function bindAll() {
     // Helper para bindear toggles de acordeón sub-section
@@ -9631,10 +11558,45 @@ const App = (() => {
     if (tskAdd) tskAdd.addEventListener('click', () => Tasks.openCreateModal());
     const goalAdd = document.getElementById('goals-manage-add');
     if (goalAdd) goalAdd.addEventListener('click', () => Goals.openCreateModal());
+    const adjBtn = document.getElementById('balance-adjust-btn');
+    if (adjBtn) adjBtn.addEventListener('click', () => Finance.openAdjustBalanceModal());
     const finAdd = document.getElementById('finance-add-btn');
     if (finAdd) finAdd.addEventListener('click', () => Finance.openMovementModal());
     const finSetAdd = document.getElementById('finance-settings-add');
     if (finSetAdd) finSetAdd.addEventListener('click', () => Finance.openMovementModal());
+
+    // Contadores del día → llevan a la pestaña / sección correspondiente
+    const counters = document.getElementById('day-counters');
+    if (counters) {
+      counters.addEventListener('click', e => {
+        const b = e.target.closest('[data-counter]');
+        if (!b) return;
+        if (b.dataset.counter === 'habitos') {
+          setFocusTab('habitos');
+        } else {
+          const card = document.getElementById('today-tasks');
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+
+    // Cierre del día
+    const closeDay = document.getElementById('close-day-btn');
+    if (closeDay) closeDay.addEventListener('click', openCloseDayModal);
+
+    const weekClose = document.getElementById('week-close-btn');
+    if (weekClose) weekClose.addEventListener('click', () => {
+      const wk = weekClose.dataset.week;
+      if (wk) openWeekCloseModal(wk);
+    });
+
+    // Pestañas principales de Enfoque
+    document.querySelectorAll('.focus-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        UI.buzz(8);
+        setFocusTab(tab.dataset.focusTab);
+      });
+    });
 
     // Pestañas internas del recuadro Metas en Hoy
     document.querySelectorAll('.goals-inner-tab').forEach(tab => {
@@ -9681,7 +11643,7 @@ const App = (() => {
       UI.toast('Nombre guardado');
     });
 
-    document.querySelectorAll('[data-theme]').forEach(b => {
+    document.querySelectorAll('.theme-row [data-theme]').forEach(b => {
       b.addEventListener('click', () => {
         Storage.get().settings.theme = b.dataset.theme;
         Storage.save();
@@ -9770,7 +11732,7 @@ const App = (() => {
     });
   }
 
-  return { init, refreshKPIs, refreshAll };
+  return { init, refreshKPIs, refreshAll, setFocusTab, renderFocusTab, weekRange, weekLabelFor, weekStats, openWeekCloseModal };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);
