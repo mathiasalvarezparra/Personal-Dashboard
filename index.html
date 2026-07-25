@@ -6402,7 +6402,7 @@ const Tasks = (() => {
     const todays = all.filter(t => t.date === todayKey);
 
     if (overdue.length === 0 && todays.length === 0) {
-      c.innerHTML = '<div class="empty empty-tasks">🌤️ Nada pendiente hoy</div>';
+      c.innerHTML = '<div class="empty empty-tasks">🌤️ No tienes tareas pendientes</div>';
       return;
     }
 
@@ -6429,12 +6429,12 @@ const Tasks = (() => {
             <span>⚠ Atrasadas</span>
             <span class="overdue-count">${overdue.length}</span>
           </div>
-          ${overdue.map(t => renderItem(t, { overdue: true })).join('')}
+          ${overdue.map(t => renderItem(t, { overdue: true, noActions: true })).join('')}
         </div>
       `;
     }
     if (todays.length > 0) {
-      html += todays.map(t => renderItem(t)).join('');
+      html += todays.map(t => renderItem(t, { noActions: true })).join('');
     }
     c.innerHTML = html;
     bindClicks(c);
@@ -6651,10 +6651,11 @@ const Tasks = (() => {
           </div>
           ${noteBlock}
         </div>
+        ${opts.noActions ? '' : `
         <div class="item-actions">
           <button class="item-edit" data-action="edit" aria-label="Editar">✎</button>
           <button class="item-delete" data-action="delete">×</button>
-        </div>
+        </div>`}
       </div>`;
   }
 
