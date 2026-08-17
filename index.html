@@ -2152,7 +2152,7 @@ label {
   -webkit-backdrop-filter: blur(6px);
   display: grid;
   place-items: end center;
-  z-index: 100;
+  z-index: 400;
   animation: fadeIn 0.2s ease;
 }
 .modal-backdrop[hidden] { display: none; }
@@ -2189,6 +2189,162 @@ label {
   font-weight: 700;
   font-size: 13px;
 }
+
+/* ============== SHEETS (pantalla completa) ============== */
+.today-topbar-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.sheet {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sheet[hidden] { display: none; }
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(14px + env(safe-area-inset-top)) 18px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sheet-head h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--text);
+}
+.sheet-close {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.sheet-close:active { transform: scale(0.92); }
+.sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 18px calc(28px + env(safe-area-inset-bottom));
+}
+
+/* ============== CALENDARIO MENSUAL ============== */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.cal-nav button {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+.cal-nav button:active { transform: scale(0.92); }
+#cal-month-label {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  text-transform: capitalize;
+  color: var(--text);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.cal-dow {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding-bottom: 6px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  transition: transform 0.12s;
+}
+.cal-cell.empty { background: transparent; }
+.cal-cell.is-today {
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+  font-weight: 800;
+}
+.cal-cell.is-future { opacity: 0.38; }
+.cal-cell:not(.empty):active { transform: scale(0.9); }
+.cal-hint {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 18px;
+}
+
+/* ============== PAGOS PENDIENTES EN HOY ============== */
+.tp-list { display: flex; flex-direction: column; gap: 8px; }
+.tp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border-left: 3px solid var(--border);
+}
+.tp-item.overdue { border-left-color: var(--accent-red); }
+.tp-item.today   { border-left-color: var(--accent-yellow); }
+.tp-item.soon    { border-left-color: var(--border); }
+.tp-main { flex: 1; min-width: 0; }
+.tp-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tp-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.tp-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-dim);
+}
+.tp-tag.overdue { color: var(--accent-red); }
+.tp-tag.today   { color: var(--accent-yellow); }
+.tp-amount { font-size: 11.5px; color: var(--text-faint); }
+.tp-pay {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 9px;
+  background: var(--accent-yellow);
+  color: #1a1a1a;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.tp-pay:active { transform: scale(0.94); }
 
 /* ============== TOAST ============== */
 .toast {
@@ -4133,14 +4289,14 @@ label {
       <h1 class="today-greet" id="today-greet">Hola</h1>
     </div>
     <div class="today-topbar-right">
+      <button class="topbar-icon" id="open-calendar-sheet" aria-label="Calendario">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>
+      </button>
       <button class="topbar-icon" data-go="settings" aria-label="Configuración">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </header>
-
-  <!-- Strip semanal Lun-Dom -->
-  <div class="week-strip" id="week-strip"></div>
 
   <!-- Banner de vacaciones (se muestra solo si está activo) -->
   <div id="vacation-banner-slot"></div>
@@ -4148,27 +4304,8 @@ label {
   <!-- Recordatorio de respaldo (se muestra solo si corresponde) -->
   <div id="backup-reminder-slot"></div>
 
-  <!-- Pestañas de Enfoque -->
-  <div class="focus-tabs" id="focus-tabs">
-    <button class="focus-tab active" data-focus-tab="hoy">
-      <span class="focus-tab-icon">☀️</span>Hoy
-    </button>
-    <button class="focus-tab" data-focus-tab="habitos">
-      <span class="focus-tab-icon">✨</span>Hábitos
-    </button>
-    <button class="focus-tab" data-focus-tab="metas">
-      <span class="focus-tab-icon">📌</span>Metas
-    </button>
-  </div>
-
   <!-- ===== PANEL: HOY ===== -->
   <div class="focus-panel active" id="focus-panel-hoy">
-    <!-- Tarjeta de foco -->
-    <div id="focus-card-slot"></div>
-
-    <!-- Contadores del día -->
-    <div class="day-counters" id="day-counters"></div>
-
     <!-- Tareas de hoy -->
     <div class="section-card">
       <div class="section-head">
@@ -4181,42 +4318,36 @@ label {
       <div id="today-tasks"></div>
     </div>
 
-    <!-- Cierres -->
-    <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
-    <button class="btn-secondary close-day-btn week-close-btn" id="week-close-btn" hidden></button>
-  </div>
+    <!-- Pagos pendientes (aparece solo si hay algo por pagar) -->
+    <div id="today-pending"></div>
 
-  <!-- ===== PANEL: HÁBITOS (panorámica) ===== -->
-  <div class="focus-panel" id="focus-panel-habitos">
+    <!-- Hábitos de hoy -->
     <div class="section-card">
       <div class="section-head">
         <div>
-          <div class="section-title">✨ Mis hábitos</div>
-          <div class="section-subtitle">Cumplimiento · últimos 30 días</div>
+          <div class="section-title">✨ Hábitos de hoy</div>
+          <div class="section-subtitle">Los que tocan hoy</div>
         </div>
         <button class="section-icon-btn" data-go="habits-manage" aria-label="Gestionar hábitos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
       </div>
-      <div id="habits-overview-list"></div>
+      <div id="today-habits-list"></div>
     </div>
-  </div>
 
-  <!-- ===== PANEL: METAS ===== -->
-  <div class="focus-panel" id="focus-panel-metas">
+    <!-- Metas (desplegables por horizonte) -->
     <div class="section-card">
       <div class="section-head">
         <div>
           <div class="section-title">📌 Metas</div>
-          <div class="section-subtitle" id="week-label"></div>
+          <div class="section-subtitle">Tu avance por período</div>
         </div>
         <button class="section-icon-btn" data-go="goals-manage" aria-label="Gestionar metas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
       </div>
-      <div class="goals-inner-tabs" id="goals-inner-tabs">
-        <button class="goals-inner-tab active" data-inner-horizon="week">Semanal</button>
-        <button class="goals-inner-tab" data-inner-horizon="month">Mensual</button>
-        <button class="goals-inner-tab" data-inner-horizon="year">Anual</button>
-      </div>
-      <div id="goals-unified-list"></div>
+      <div id="today-goals"></div>
     </div>
+
+    <!-- Cierres -->
+    <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
+    <button class="btn-secondary close-day-btn week-close-btn" id="week-close-btn" hidden></button>
   </div>
 
   <div class="bottom-spacer"></div>
@@ -4556,15 +4687,32 @@ label {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
     <span>Enfoque</span>
   </button>
-  <button class="nav-btn" data-go="stats">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
-    <span>Estadísticas</span>
-  </button>
   <button class="nav-btn" data-go="finance">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
     <span>Finanzas</span>
   </button>
+  <button class="nav-btn" data-go="stats">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+    <span>Estadísticas</span>
+  </button>
 </nav>
+
+<!-- ===== SHEET: CALENDARIO ===== -->
+<div class="sheet" id="sheet-calendar" hidden>
+  <div class="sheet-head">
+    <h2>📅 Calendario</h2>
+    <button class="sheet-close" data-close-sheet aria-label="Cerrar">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="cal-nav">
+      <button id="cal-prev" aria-label="Mes anterior">‹</button>
+      <div id="cal-month-label"></div>
+      <button id="cal-next" aria-label="Mes siguiente">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <p class="cal-hint">Toca un día para ver lo que hiciste.</p>
+  </div>
+</div>
 
 <!-- ===== MODAL genérico ===== -->
 <div class="modal-backdrop" id="modal-backdrop" hidden>
@@ -4743,6 +4891,8 @@ const UI = (() => {
   const navHistory = [];
 
   function go(view) {
+    // Al navegar, cerrar cualquier sheet a pantalla completa abierto
+    document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; });
     // Guardar la vista anterior en el historial (excepto si es la misma)
     if (currentView && currentView !== view) {
       navHistory.push(currentView);
@@ -4913,6 +5063,9 @@ const UI = (() => {
 // entrada a una vista/pestaña vuelve a renderizar su contenido.
 function isLive(el) {
   if (!el) return false;
+  // Dentro de un sheet a pantalla completa: vivo si el sheet está visible
+  const sheet = el.closest('.sheet');
+  if (sheet) return !sheet.hidden;
   const view = el.closest('.view');
   if (!view || !view.classList.contains('active')) return false;
   const panel = el.closest('.focus-panel, .stats-panel');
@@ -5526,23 +5679,63 @@ const Habits = (() => {
     bindOverviewClicks(c);
   }
 
-  function renderOverviewItem(h) {
+  // Lista compacta de hábitos para el panel "Hoy": SOLO los que tocan hoy,
+  // en versión limpia (sin racha ni 30d). Reutiliza el mismo item y binds.
+  function renderTodayHabits() {
+    const c = document.getElementById('today-habits-list');
+    if (!isLive(c)) return;
+    const state = Storage.get();
+
+    if (Vacation.isActive()) {
+      c.innerHTML = '<div class="empty">🏖️ De vacaciones · tus hábitos vuelven cuando termines</div>';
+      return;
+    }
+
+    const todayKey = UI.todayKey();
+    const pending = [], completed = [];
+    state.habits.forEach(h => {
+      if (!isHabitForToday(h)) return; // solo los de hoy
+      if (isCompletedToday(h)) completed.push(h);
+      else pending.push(h);
+    });
+    completed.sort((a, b) => {
+      const ta = (a._completedAt && a._completedAt[todayKey]) || 0;
+      const tb = (b._completedAt && b._completedAt[todayKey]) || 0;
+      return ta - tb;
+    });
+
+    if (pending.length + completed.length === 0) {
+      c.innerHTML = '<div class="empty">No hay hábitos para hoy · disfruta 🌿</div>';
+      return;
+    }
+
+    c.innerHTML = [...pending, ...completed].map(h => renderOverviewItem(h, true)).join('');
+    bindOverviewClicks(c);
+  }
+
+  function renderOverviewItem(h, clean = false) {
     const today   = isHabitForToday(h);
     const done    = isCompletedToday(h);
     const target  = getDailyTarget(h);
     const unit    = getUnit(h);
     const cur     = getDailyProgress(h);
     const dayPct  = getHabitDayPct(h);
-    const streak  = calcStreak(h);
-    const { pct: pct30 } = complianceLast30(h);
     const color   = h.color || '#f5c842';
     const step    = h.defaultIncrement || Math.max(1, Math.ceil(target / 4));
 
-    const meta = [
-      today ? `${cur}/${target} ${unit}` : 'no toca hoy',
-      streak > 0 ? `${streak}🔥` : null,
-      `${pct30}% 30d`,
-    ].filter(Boolean).join(' · ');
+    let meta;
+    if (clean) {
+      // Versión limpia para "Hoy": solo progreso del día, sin racha ni 30d
+      meta = today ? `${cur}/${target} ${unit}` : 'no toca hoy';
+    } else {
+      const streak = calcStreak(h);
+      const { pct: pct30 } = complianceLast30(h);
+      meta = [
+        today ? `${cur}/${target} ${unit}` : 'no toca hoy',
+        streak > 0 ? `${streak}🔥` : null,
+        `${pct30}% 30d`,
+      ].filter(Boolean).join(' · ');
+    }
 
     return `
       <div class="hab-ov-item ${done ? 'done' : ''} ${today ? '' : 'off-day'}" data-id="${h.id}">
@@ -6230,7 +6423,7 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { complianceWindow, calcBestStreak, renderOverview, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();
 
 /* ============================================
@@ -7035,6 +7228,52 @@ const Goals = (() => {
     renderWeeklyMini();
   }
 
+  // Horizonte activo de las metas en "Hoy". Semanal por defecto.
+  let todayGoalsHorizon = 'week';
+
+  // Metas en "Hoy": pestañas Semanal / Mensual / Anual (una a la vez),
+  // mismo formato que el sheet de Metas. Semanal por defecto.
+  function renderTodayGoals() {
+    const c = document.getElementById('today-goals');
+    if (!isLive(c)) return;
+    const state = Storage.get();
+
+    const tabs = [
+      ['week',  'Semanal'],
+      ['month', 'Mensual'],
+      ['year',  'Anual'],
+    ];
+
+    const list = state.goals
+      .filter(g => g.horizon === todayGoalsHorizon && !g.archived)
+      .sort((a, b) => (a.done === b.done) ? 0 : (a.done ? 1 : -1));
+
+    const tabsHtml = tabs.map(([hz, label]) =>
+      `<button class="goals-inner-tab ${hz === todayGoalsHorizon ? 'active' : ''}" data-today-horizon="${hz}" type="button">${label}</button>`
+    ).join('');
+
+    const listHtml = list.length
+      ? list.map(renderGoalMini).join('')
+      : '<div class="empty">Sin metas en este período</div>';
+
+    c.innerHTML =
+      `<div class="goals-inner-tabs" id="today-goals-tabs">${tabsHtml}</div>` +
+      `<div id="today-goals-list">${listHtml}</div>`;
+
+    // Cambiar de pestaña
+    c.querySelectorAll('[data-today-horizon]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        todayGoalsHorizon = btn.dataset.todayHorizon;
+        renderTodayGoals();
+      });
+    });
+
+    // Tap en una meta → registrar avance
+    c.querySelectorAll('[data-goal-quick]').forEach(item => {
+      item.addEventListener('click', () => openQuickProgressModal(item.dataset.goalQuick));
+    });
+  }
+
   function renderGoalMini(g) {
     const pct = g.done ? 100 : getProgress(g);
     const tt = g.done ? '✓' : (g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : `${pct}%`);
@@ -7702,7 +7941,7 @@ const Goals = (() => {
     }[rec] || '';
   }
 
-  return { renderAll, renderWeeklyMini, openCreateModal, setInnerHorizon, openQuickProgressModal, updateCurrent };
+  return { renderAll, renderWeeklyMini, renderTodayGoals, openCreateModal, setInnerHorizon, openQuickProgressModal, updateCurrent };
 })();
 
 /* ============================================
@@ -8982,6 +9221,97 @@ const Finance = (() => {
     });
   }
 
+  // Pagos pendientes en la vista "Hoy": solo lo que está vencido, vence hoy
+  // o vence dentro de los próximos 3 días. Ordenado por urgencia. Aparece
+  // únicamente si hay algo por pagar (si no, no muestra nada).
+  function renderTodayPending() {
+    const c = document.getElementById('today-pending');
+    if (!isLive(c)) return;
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const curMk = getCurrentMonthKey();
+    const pending = getAllPending();
+
+    const items = [];
+    pending.forEach(item => {
+      const re = item.recurring;
+      const mk = item.periodMk;
+      const dueDateKey = getDueDateForRecurringInMonth(re, mk);
+      let daysLeft; // <0 atrasado · 0 hoy · >0 faltan
+      if (mk < curMk) {
+        if (dueDateKey) {
+          const dDue = new Date(dueDateKey + 'T00:00:00');
+          daysLeft = -Math.max(1, Math.round((today - dDue) / 86400000));
+        } else {
+          daysLeft = -1; // arrastrado sin fecha: vencido
+        }
+      } else if (dueDateKey) {
+        const dDue = new Date(dueDateKey + 'T00:00:00');
+        daysLeft = Math.round((dDue - today) / 86400000);
+      } else {
+        return; // del mes actual sin fecha: no se puede ubicar, se omite en Hoy
+      }
+      if (daysLeft > 3) return; // aún lejos: no se muestra en Hoy
+      items.push({ re, mk, daysLeft });
+    });
+
+    // En Hoy basta una línea por gasto recurrente: la de su período más
+    // urgente (más atrasado). El desglose mes a mes vive en Finanzas.
+    const byRe = new Map();
+    items.forEach(it => {
+      const prev = byRe.get(it.re.id);
+      if (!prev || it.daysLeft < prev.daysLeft) byRe.set(it.re.id, it);
+    });
+    const collapsed = [...byRe.values()];
+
+    if (collapsed.length === 0) { c.innerHTML = ''; return; }
+
+    // Orden por urgencia: más atrasado primero
+    collapsed.sort((a, b) => a.daysLeft - b.daysLeft);
+
+    const total = collapsed.reduce((sum, it) => sum + (it.re.defaultAmount || 0), 0);
+    const subtitle = `${collapsed.length} ${collapsed.length === 1 ? 'pendiente' : 'pendientes'}${total ? ` · ${formatCLP(total)}` : ''}`;
+
+    const rows = collapsed.map(it => {
+      const cat = getExpenseCategory(it.re.category);
+      let tagClass, tagText;
+      if (it.daysLeft < 0) { tagClass = 'overdue'; tagText = `Atrasado ${Math.abs(it.daysLeft)}d`; }
+      else if (it.daysLeft === 0) { tagClass = 'today'; tagText = 'Vence hoy'; }
+      else { tagClass = 'soon'; tagText = it.daysLeft === 1 ? 'Vence mañana' : `Vence en ${it.daysLeft}d`; }
+      const amount = it.re.defaultAmount ? `~ ${formatCLP(it.re.defaultAmount)}` : 'Monto variable';
+      return `
+        <div class="tp-item ${tagClass}">
+          <div class="tp-main">
+            <div class="tp-name">${cat.icon} ${escapeHtml(it.re.name)}</div>
+            <div class="tp-meta">
+              <span class="tp-tag ${tagClass}">${tagText}</span>
+              <span class="tp-amount">${amount}</span>
+            </div>
+          </div>
+          <button class="tp-pay" data-tp-pay="${it.re.id}" data-tp-period="${it.mk}">Pagar</button>
+        </div>`;
+    }).join('');
+
+    c.innerHTML = `
+      <div class="section-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">💰 Pagos pendientes</div>
+            <div class="section-subtitle">${subtitle}</div>
+          </div>
+          <button class="section-icon-btn" data-go="finance" aria-label="Ir a Finanzas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <div class="tp-list">${rows}</div>
+      </div>`;
+
+    c.querySelectorAll('[data-tp-pay]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openPayRecurringModal(btn.dataset.tpPay, btn.dataset.tpPeriod);
+      });
+    });
+  }
+
   function renderMonthMovements() {
     const c = document.getElementById('finance-movements-list');
     if (!isLive(c)) return;
@@ -9065,6 +9395,7 @@ const Finance = (() => {
         Storage.save();
         renderDashboard();
         render();
+        if (typeof App !== 'undefined' && App.refreshKPIs) App.refreshKPIs();
         UI.toast('Pago registrado');
       }
     });
@@ -9551,6 +9882,7 @@ const Finance = (() => {
   return {
     render,
     renderDashboard,
+    renderTodayPending,
     renderAnalysis,
     openAnalysis,
     renderArchive,
@@ -10997,14 +11329,10 @@ const App = (() => {
       return false;
     });
 
-    // Pagos pendientes para ese día (recurrentes con dueDay = día del mes)
-    const dayOfMonth = date.getDate();
-    const pendingPays = (state.recurringExpenses || []).filter(re => {
-      if (!re.recurrence) return false;
-      if (re.recurrence !== 'monthly' && re.recurrence !== 'quarterly' && re.recurrence !== 'annual') return false;
-      const dueDay = re.dueDay || 1;
-      return dueDay === dayOfMonth;
-    });
+    // Pagos REALES de ese día: gastos registrados en movements con esa fecha
+    const dayPayments = (state.movements || []).filter(m =>
+      m.type === 'expense' && m.date === dateKey
+    );
 
     // Render
     let html = `<div class="day-summary-info">${dateLabel}${isFuture ? ' · futuro (solo lectura)' : isPast ? ' · pasado (solo lectura)' : ''}</div>`;
@@ -11045,15 +11373,15 @@ const App = (() => {
     }
     html += '</div>';
 
-    // Pagos pendientes
-    html += `<div class="day-summary-section"><div class="day-summary-section-title">💰 Pagos del día (${pendingPays.length})</div>`;
-    if (pendingPays.length === 0) {
-      html += '<div class="empty">Sin pagos programados</div>';
+    // Pagos del día (reales)
+    html += `<div class="day-summary-section"><div class="day-summary-section-title">💰 Pagos del día (${dayPayments.length})</div>`;
+    if (dayPayments.length === 0) {
+      html += '<div class="empty">Sin pagos este día</div>';
     } else {
-      html += pendingPays.map(p => `
+      html += dayPayments.map(p => `
         <div class="day-summary-item">
-          <span class="day-summary-icon">${p.icon || '💸'}</span>
-          <span class="day-summary-name">${escapeHtml(p.name || '')}</span>
+          <span class="day-summary-icon">💸</span>
+          <span class="day-summary-name">${escapeHtml(p.name || 'Pago')}</span>
           <span class="day-summary-progress">${Finance.formatCLP(p.amount || 0)}</span>
         </div>
       `).join('');
@@ -11085,6 +11413,60 @@ const App = (() => {
       okText: 'Cerrar',
       bodyHTML: html,
       onSave: () => true
+    });
+  }
+
+  // ====== CALENDARIO MENSUAL (sheet) ======
+  const CAL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  let calYear, calMonth;
+
+  function openCalendarSheet() {
+    const now = new Date();
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+    renderCalendar();
+    const s = document.getElementById('sheet-calendar');
+    if (s) s.hidden = false;
+  }
+
+  function calNav(delta) {
+    calMonth += delta;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const grid = document.getElementById('cal-grid');
+    const label = document.getElementById('cal-month-label');
+    if (!grid || !label) return;
+
+    label.textContent = `${CAL_MONTHS[calMonth]} ${calYear}`;
+
+    const dows = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+    let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+    const first = new Date(calYear, calMonth, 1);
+    // Lunes = 0 ... Domingo = 6
+    const startDow = (first.getDay() === 0) ? 6 : first.getDay() - 1;
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const todayKey = UI.todayKey();
+
+    for (let i = 0; i < startDow; i++) html += '<div class="cal-cell empty"></div>';
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = UI.localDateKey(new Date(calYear, calMonth, d));
+      const isToday = dk === todayKey;
+      const isFuture = dk > todayKey;
+      const cls = ['cal-cell'];
+      if (isToday) cls.push('is-today');
+      if (isFuture) cls.push('is-future');
+      html += `<button class="${cls.join(' ')}" data-cal-day="${dk}" type="button">${d}</button>`;
+    }
+
+    grid.innerHTML = html;
+    grid.querySelectorAll('[data-cal-day]').forEach(b => {
+      b.addEventListener('click', () => openDaySummary(b.dataset.calDay));
     });
   }
 
@@ -11245,11 +11627,12 @@ const App = (() => {
     renderGreeting();
     renderFocusCard();
 
-    // Anillo del día actual dentro del strip semanal
+    // Persistir el % del día (alimenta la Tendencia semanal). El strip visual
+    // ya no existe: renderWeekStrip solo guarda el snapshot y no pinta.
     renderWeekStrip(pct);
 
-    // Contadores del día. La barra usa el % proporcional (un hábito a medias
-    // ya mueve la barra); el número sigue siendo el conteo de cosas cerradas.
+    // Contadores del día. Sigue vivo por si se reactiva; guarda el cálculo
+    // pero no pinta si el contenedor fue removido de "Hoy".
     renderDayCounters({
       onVacation,
       habitsDone, habitsTotal: habitsToday.length,
@@ -11257,6 +11640,11 @@ const App = (() => {
       tasksDone,  tasksTotal: tasksToday.length,
       tasksPct: tasksToday.length ? Math.round(tasksPctSum / tasksToday.length) : 0,
     });
+
+    // Secciones nuevas del panel "Hoy"
+    Habits.renderTodayHabits();
+    Goals.renderTodayGoals();
+    Finance.renderTodayPending();
   }
 
   // ---------- Saludo y estado del día ----------
@@ -11894,7 +12282,28 @@ const App = (() => {
       if (wk) openWeekCloseModal(wk);
     });
 
-    // Pestañas principales de Enfoque
+    // Ícono de Calendario del header de Hoy → abre el sheet de calendario
+    const openCal = document.getElementById('open-calendar-sheet');
+    if (openCal) openCal.addEventListener('click', () => {
+      UI.buzz(8);
+      openCalendarSheet();
+    });
+
+    // Cerrar cualquier sheet
+    document.querySelectorAll('[data-close-sheet]').forEach(b => {
+      b.addEventListener('click', () => {
+        const s = b.closest('.sheet');
+        if (s) s.hidden = true;
+      });
+    });
+
+    // Navegación de meses del calendario
+    const calPrev = document.getElementById('cal-prev');
+    if (calPrev) calPrev.addEventListener('click', () => calNav(-1));
+    const calNext = document.getElementById('cal-next');
+    if (calNext) calNext.addEventListener('click', () => calNav(1));
+
+    // (Compatibilidad) Pestañas principales de Enfoque, si existieran
     document.querySelectorAll('.focus-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         UI.buzz(8);
