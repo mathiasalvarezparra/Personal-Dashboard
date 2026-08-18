@@ -917,7 +917,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 /* ============== ESTADÍSTICAS ============== */
 .stats-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 3px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -2358,6 +2358,20 @@ label {
   font-weight: 700;
 }
 .tp-pay:active { transform: scale(0.94); }
+
+/* ============== MAÑANA (adelanto tras cierre) ============== */
+.tomorrow-card { opacity: 0.82; }
+.tomorrow-card .section-title { color: var(--text-dim); }
+.tomorrow-list .item { background: transparent; }
+.checkbox.preview {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  flex-shrink: 0;
+  cursor: default;
+}
 
 /* ============== TOAST ============== */
 .toast {
@@ -4358,6 +4372,9 @@ label {
       <div id="today-goals"></div>
     </div>
 
+    <!-- Mañana (aparece solo tras cerrar el día) -->
+    <div id="tomorrow-tasks"></div>
+
     <!-- Cierres -->
     <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
     <button class="btn-secondary close-day-btn week-close-btn" id="week-close-btn" hidden></button>
@@ -4385,6 +4402,9 @@ label {
     </button>
     <button class="stats-tab" data-stats-tab="cierres">
       <span class="focus-tab-icon">🌙</span>Cierres
+    </button>
+    <button class="stats-tab" data-stats-tab="finanzas">
+      <span class="focus-tab-icon">💰</span>Finanzas
     </button>
   </div>
 
@@ -4455,6 +4475,11 @@ label {
       </div>
       <div id="stats-history"></div>
     </div>
+  </div>
+
+  <!-- ===== PANEL: FINANZAS ===== -->
+  <div class="stats-panel" id="stats-panel-finanzas">
+    <div class="section-card" id="finance-analysis-card"></div>
   </div>
 
   <div class="bottom-spacer"></div>
@@ -4548,15 +4573,6 @@ label {
     <div id="finance-list"></div>
   </div>
 
-  <!-- Archivo histórico (meses cerrados) -->
-  <button class="sub-section-toggle" id="finance-archive-toggle" aria-expanded="false" style="margin-top:14px">
-    <span class="sub-section-toggle-arrow">▶</span>
-    <span class="sub-section-toggle-label">🗄️ Archivo histórico · meses cerrados</span>
-  </button>
-  <div class="sub-section-content" id="finance-archive-content" hidden>
-    <div id="finance-archive-list"></div>
-  </div>
-
   <div class="bottom-spacer"></div>
 </section>
 
@@ -4643,16 +4659,13 @@ label {
     <button class="icon-btn" data-back aria-label="Volver">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
     </button>
-    <button class="icon-btn" data-go="finance-settings" aria-label="Configuración">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
     <h1 class="page-title">Mis finanzas</h1>
-    <div style="display:flex;gap:4px">
-      <button class="icon-btn" data-go="finance-analysis" aria-label="Análisis del mes">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
-      </button>
-      <button class="icon-btn" id="finance-add-btn" aria-label="Nuevo movimiento">
+    <div class="today-topbar-right">
+      <button class="topbar-icon" id="finance-add-btn" aria-label="Nuevo movimiento">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="topbar-icon" data-go="finance-settings" aria-label="Configuración">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </header>
@@ -4664,12 +4677,6 @@ label {
   <div class="finance-balance" id="finance-balance"></div>
   <button class="btn-secondary balance-adjust-btn" id="balance-adjust-btn">⚖️ Ajustar saldo</button>
 
-  <!-- Pagos pendientes (mes en curso + arrastrados de meses anteriores) -->
-  <div class="finance-section">
-    <div class="finance-section-title">⏰ Pagos pendientes</div>
-    <div id="finance-pending-list"></div>
-  </div>
-
   <!-- Movimientos del mes -->
   <div class="finance-section">
     <div class="finance-section-title">📋 Movimientos del mes</div>
@@ -4680,20 +4687,6 @@ label {
 </section>
 
 <!-- ===== ANÁLISIS DEL MES (vista dedicada) ===== -->
-<section id="view-finance-analysis" class="view">
-  <header class="topbar">
-    <button class="icon-btn" data-back aria-label="Volver">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    </button>
-    <h1 class="page-title">Análisis del mes</h1>
-    <span class="topbar-spacer"></span>
-  </header>
-
-  <div class="section-card" id="finance-analysis-card"></div>
-
-  <div class="bottom-spacer"></div>
-</section>
-
 <!-- ===== Bottom nav ===== -->
 <nav class="bottom-nav">
   <button class="nav-btn active" data-go="today">
@@ -4801,6 +4794,7 @@ const Storage = (() => {
       { id: 'relaciones',  name: 'Relaciones',  icon: '❤️', color: '#ef4444' },
       { id: 'creatividad', name: 'Creatividad', icon: '🎨', color: '#f0abfc' },
       { id: 'hogar',       name: 'Hogar',       icon: '🏡', color: '#34d399' },
+      { id: 'espiritualidad', name: 'Espiritualidad', icon: '🧘', color: '#818cf8' },
     ],
     habits: [],
     tasks: [],
@@ -4924,10 +4918,6 @@ const UI = (() => {
     // Refrescar dashboard de finanzas al entrar
     if (view === 'finance' && typeof Finance !== 'undefined' && Finance.renderDashboard) {
       Finance.renderDashboard();
-    }
-    // Renderizar análisis del mes al entrar a su vista
-    if (view === 'finance-analysis' && typeof Finance !== 'undefined' && Finance.openAnalysis) {
-      Finance.openAnalysis();
     }
     if (view === 'finance-settings' && typeof Finance !== 'undefined' && Finance.render) {
       Finance.render();
@@ -6646,6 +6636,46 @@ const Tasks = (() => {
     bindClicks(c);
   }
 
+  // Tareas de mañana en "Hoy": aparecen SOLO después de registrar el cierre
+  // del día, como adelanto para planificar. En modo preview (no accionable).
+  function renderTomorrow() {
+    const c = document.getElementById('tomorrow-tasks');
+    if (!isLive(c)) return;
+    const todayKey = UI.todayKey();
+    const closures = Storage.get().closures || {};
+
+    // Gatillo: solo tras cerrar el día
+    if (!closures[todayKey]) { c.innerHTML = ''; return; }
+
+    const tom = new Date();
+    tom.setDate(tom.getDate() + 1);
+    const tomorrowKey = UI.localDateKey(tom);
+
+    const list = Storage.get().tasks.filter(t => !t.done && t.date === tomorrowKey);
+    list.sort((a, b) => {
+      const ai = a.important ? 1 : 0;
+      const bi = b.important ? 1 : 0;
+      if (ai !== bi) return bi - ai;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+
+    const body = list.length
+      ? list.map(t => renderItem(t, { noActions: true, preview: true })).join('')
+      : '<div class="empty">Mañana sin tareas aún · buen momento para planificar</div>';
+
+    c.innerHTML = `
+      <div class="section-card tomorrow-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">🌙 Mañana</div>
+            <div class="section-subtitle">Para ir preparando</div>
+          </div>
+          <button class="section-icon-btn" data-go="tasks-manage" aria-label="Gestionar tareas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/><path d="M14 2v4M8 10v4M16 18v4"/></svg></button>
+        </div>
+        <div class="tomorrow-list">${body}</div>
+      </div>`;
+  }
+
   function renderFull() {
     const c = document.getElementById('tasks-full-list');
     if (!isLive(c)) return;
@@ -6843,10 +6873,12 @@ const Tasks = (() => {
       : '';
 
     return `
-      <div class="item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-id="${t.id}">
-        <button class="checkbox ${t.done ? 'checked' : ''}" data-action="toggle">
+      <div class="item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${opts.preview ? 'preview' : ''}" data-id="${t.id}">
+        ${opts.preview
+          ? '<span class="checkbox preview" aria-hidden="true"></span>'
+          : `<button class="checkbox ${t.done ? 'checked' : ''}" data-action="toggle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
-        </button>
+        </button>`}
         ${t.important ? '<span class="item-icon">⭐</span>' : ''}
         <div class="item-body">
           <div class="item-name">${escapeHtml(t.name)}${overdueBadge}</div>
@@ -6976,7 +7008,7 @@ const Tasks = (() => {
     });
   }
 
-  return { renderToday, renderFull, openCreateModal, setFilter };
+  return { renderToday, renderTomorrow, renderFull, openCreateModal, setFilter };
 })();
 
 /* ============================================
@@ -8227,6 +8259,14 @@ const Finance = (() => {
     { id: 'transporte',   name: 'Transporte',        icon: '🚗' },
     { id: 'salud',        name: 'Salud',             icon: '💊' },
     { id: 'ocio',         name: 'Ocio',              icon: '🎮' },
+    { id: 'suscripciones',name: 'Suscripciones',     icon: '🔄' },
+    { id: 'educacion',    name: 'Educación',         icon: '📚' },
+    { id: 'deudas',       name: 'Deudas',            icon: '💳' },
+    { id: 'vestuario',    name: 'Vestuario',         icon: '👕' },
+    { id: 'mascotas',     name: 'Mascotas',          icon: '🐾' },
+    { id: 'regalos',      name: 'Regalos',           icon: '🎁' },
+    { id: 'tecnologia',   name: 'Tecnología',        icon: '💻' },
+    { id: 'inversion',    name: 'Inversión/Ahorro',  icon: '🏦' },
     { id: 'otros',        name: 'Otros',             icon: '📦' },
     { id: 'ajuste',       name: 'Ajuste',            icon: '⚖️' },
   ];
@@ -8236,6 +8276,10 @@ const Finance = (() => {
     { id: 'sueldo',     name: 'Sueldo',     icon: '💼' },
     { id: 'freelance',  name: 'Freelance',  icon: '🧑‍💻' },
     { id: 'inversion',  name: 'Inversión',  icon: '📈' },
+    { id: 'venta',      name: 'Venta',      icon: '🏷️' },
+    { id: 'reembolsos', name: 'Reembolsos', icon: '↩️' },
+    { id: 'arriendo',   name: 'Arriendo',   icon: '🏘️' },
+    { id: 'bonos',      name: 'Bonos',      icon: '🏅' },
     { id: 'otros',      name: 'Otros',      icon: '💵' },
     { id: 'ajuste',     name: 'Ajuste',     icon: '⚖️' },
   ];
@@ -8250,14 +8294,13 @@ const Finance = (() => {
 
   // Sub-tabs (orden visible)
   const SUB_TABS = [
-    { id: 'once',      label: 'Puntuales' },
-    { id: 'monthly',   label: 'Mensuales' },
-    { id: 'quarterly', label: 'Trimestrales' },
-    { id: 'yearly',    label: 'Anuales' },
+    { id: 'scheduled', label: 'Pagos programados' },
     { id: 'income',    label: 'Ingresos' },
+    { id: 'once',      label: 'Gastos' },
+    { id: 'archive',   label: 'Archivo' },
   ];
 
-  let activeSubTab = 'once'; // por defecto: puntuales (gastos diarios)
+  let activeSubTab = 'scheduled'; // por defecto: pagos programados (recurrentes)
 
   function getExpenseCategory(id) {
     return EXPENSE_CATEGORIES.find(c => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
@@ -8320,17 +8363,43 @@ const Finance = (() => {
       renderIncomeList(c);
     } else if (activeSubTab === 'once') {
       renderOnceExpensesList(c);
+    } else if (activeSubTab === 'archive') {
+      // El archivo histórico se renderiza dentro de su propio contenedor,
+      // que renderArchive() busca por id.
+      c.innerHTML = '<div id="finance-archive-list"></div>';
+      renderArchive();
     } else {
-      renderRecurringList(c, activeSubTab);
+      renderScheduledList(c);
     }
+  }
+
+  // Pagos programados: TODOS los recurrentes juntos, ordenados por proximidad
+  // de vencimiento. La frecuencia se muestra como etiqueta en cada ítem.
+  function renderScheduledList(c) {
+    const list = (Storage.get().recurringExpenses || []).slice();
+    if (list.length === 0) {
+      c.innerHTML = '<div class="empty">Sin pagos programados · toca "+ Nuevo movimiento" para crear</div>';
+      return;
+    }
+    list.sort((a, b) => {
+      const da = a.dueDay ? daysUntilDueDay(a.dueDay) : 9999;
+      const db = b.dueDay ? daysUntilDueDay(b.dueDay) : 9999;
+      if (da !== db) return da - db;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    c.innerHTML = list.map(re => renderRecurringItem(re)).join('');
+    bindRecurringActions(c);
   }
 
   // --- Movimientos puntuales: gastos puntuales + pagos hechos a gastos recurrentes
   // (ambos comparten naturaleza de "movimiento real registrado" y deben ser editables/eliminables)
   function renderOnceExpensesList(c) {
-    const list = (Storage.get().movements || []).filter(m => m.type === 'expense');
+    const { start, end } = getMonthRange(getCurrentMonthKey());
+    const list = (Storage.get().movements || []).filter(m =>
+      m.type === 'expense' && m.date && m.date >= start && m.date <= end
+    );
     if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin gastos registrados</div>';
+      c.innerHTML = '<div class="empty">Sin gastos este mes · los de meses anteriores están en Archivo</div>';
       return;
     }
     list.sort((a, b) => {
@@ -8342,11 +8411,14 @@ const Finance = (() => {
     bindMovementActions(c);
   }
 
-  // --- Ingresos (movements tipo income, ordenados por fecha desc + createdAt desc)
+  // --- Ingresos del mes en curso (los de otros meses están en Archivo)
   function renderIncomeList(c) {
-    const list = (Storage.get().movements || []).filter(m => m.type === 'income');
+    const { start, end } = getMonthRange(getCurrentMonthKey());
+    const list = (Storage.get().movements || []).filter(m =>
+      m.type === 'income' && m.date && m.date >= start && m.date <= end
+    );
     if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin ingresos registrados · toca "+ Nuevo movimiento" para registrar</div>';
+      c.innerHTML = '<div class="empty">Sin ingresos este mes · toca "+ Nuevo movimiento" para registrar</div>';
       return;
     }
     list.sort((a, b) => {
@@ -8727,7 +8799,7 @@ const Finance = (() => {
         editingRecurring.dueDay = null;
       }
       // Si cambió la recurrencia, saltar a la sub-tab correspondiente para que el usuario vea el resultado
-      activeSubTab = modalState.recurrence;
+      activeSubTab = 'scheduled';
       UI.toast('Gasto actualizado');
     } else if (isRecurring) {
       // Nuevo gasto recurrente
@@ -8747,7 +8819,7 @@ const Finance = (() => {
         note,
         createdAt: Date.now(),
       });
-      activeSubTab = modalState.recurrence;
+      activeSubTab = 'scheduled';
       UI.toast('Gasto recurrente creado');
     } else {
       // Nuevo movement (gasto puntual o ingreso)
@@ -9006,7 +9078,6 @@ const Finance = (() => {
   function renderDashboard() {
     renderMonthBanner();
     renderBalance();
-    renderPending();
     renderMonthMovements();
   }
 
@@ -10409,6 +10480,8 @@ const Stats = (() => {
     } else if (currentTab === 'cierres') {
       renderWellbeing();
       renderHistory();
+    } else if (currentTab === 'finanzas') {
+      if (typeof Finance !== 'undefined' && Finance.openAnalysis) Finance.openAnalysis();
     }
   }
 
@@ -11128,8 +11201,23 @@ const Onboarding = (() => {
 
 
 const App = (() => {
+  function migrateAreas() {
+    const s = Storage.get();
+    if (s.settings.areasEspiritualidadAdded) return;
+    s.areas = s.areas || [];
+    if (!s.areas.some(a => a.id === 'espiritualidad')) {
+      s.areas.push({ id: 'espiritualidad', name: 'Espiritualidad', icon: '🧘', color: '#818cf8' });
+    }
+    s.settings.areasEspiritualidadAdded = true;
+    Storage.save();
+  }
+
   function init() {
     applyTheme();
+
+    // Migración one-shot: agregar el área "Espiritualidad" a usuarios existentes.
+    // Usa un flag para no reinsertarla si el usuario decide borrarla luego.
+    migrateAreas();
 
     // Verificar rollover de semana antes de cualquier render
     GoalRollover.check();
@@ -11661,6 +11749,7 @@ const App = (() => {
     Habits.renderTodayHabits();
     Goals.renderTodayGoals();
     Finance.renderTodayPending();
+    Tasks.renderTomorrow();
   }
 
   // ---------- Saludo y estado del día ----------
@@ -12239,25 +12328,6 @@ const App = (() => {
     document.querySelectorAll('.task-filter .chip').forEach(chip => {
       chip.addEventListener('click', () => Tasks.setFilter(chip.dataset.filter));
     });
-
-    // Archivo histórico (Mi Sistema → Finanzas)
-    const archiveToggle = document.getElementById('finance-archive-toggle');
-    if (archiveToggle) {
-      archiveToggle.addEventListener('click', () => {
-        const content = document.getElementById('finance-archive-content');
-        const arrow = archiveToggle.querySelector('.sub-section-toggle-arrow');
-        const expanded = archiveToggle.getAttribute('aria-expanded') === 'true';
-        archiveToggle.setAttribute('aria-expanded', !expanded);
-        if (expanded) {
-          content.setAttribute('hidden', '');
-          arrow.textContent = '▶';
-        } else {
-          content.removeAttribute('hidden');
-          arrow.textContent = '▼';
-          Finance.renderArchive();
-        }
-      });
-    }
 
     // Botones + en vistas de gestión
     const habAdd = document.getElementById('habits-manage-add');
