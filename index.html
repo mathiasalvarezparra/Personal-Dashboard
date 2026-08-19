@@ -1206,6 +1206,51 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 }
 
 /* Historial de cierres */
+.hist-month { margin-bottom: 6px; }
+.hist-month + .hist-month { margin-top: 10px; }
+.hist-month-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  text-transform: capitalize;
+  padding: 8px 2px;
+  border-bottom: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.hist-month-name { flex: 1; }
+.hist-month-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  background: var(--bg-card);
+  padding: 1px 7px;
+  border-radius: 9px;
+}
+.hist-month-chevron {
+  font-size: 12px;
+  color: var(--text-faint);
+  transition: transform 0.2s;
+}
+.hist-month.open .hist-month-chevron { transform: rotate(180deg); }
+.hist-month-body { display: none; }
+.hist-month.open .hist-month-body { display: block; animation: fadeIn 0.2s ease; }
+.hist-group-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 10px 2px 4px;
+}
 .hist-item {
   display: flex;
   align-items: center;
@@ -10457,6 +10502,8 @@ const Vacation = (() => {
    ============================================ */
 const Stats = (() => {
   let currentTab = 'resumen';
+  // Meses del historial de cierres abiertos/colapsados (por defecto: solo el más reciente)
+  const histMonthsOpen = {};
 
   function setTab(tab) {
     currentTab = tab;
@@ -10675,34 +10722,31 @@ const Stats = (() => {
     const c = document.getElementById('stats-history');
     if (!c) return;
     const state = Storage.get();
-    const items = [];
 
-    Object.keys(state.weekClosures || {}).forEach(wk => {
-      items.push({ kind: 'week', key: wk, sort: (App.weekRange(wk) || {}).start || wk });
+    const dayItems = Object.keys(state.closures || {}).map(dk => ({ kind: 'day', key: dk, sort: dk }));
+    const weekItems = Object.keys(state.weekClosures || {}).map(wk => {
+      const r = App.weekRange(wk) || {};
+      // La semana se ubica por su fecha de FIN (domingo): el cierre semanal se
+      // hace al terminar la semana, así que va DESPUÉS de sus días.
+      return { kind: 'week', key: wk, sort: r.end || r.start || wk };
     });
-    Object.keys(state.closures || {}).forEach(dk => {
-      items.push({ kind: 'day', key: dk, sort: dk });
-    });
-    items.sort((a, b) => b.sort.localeCompare(a.sort) || (a.kind === 'week' ? -1 : 1));
 
-    if (items.length === 0) {
+    if (dayItems.length + weekItems.length === 0) {
       c.innerHTML = '<div class="empty">Todavía no hay cierres guardados</div>';
       return;
     }
 
-    c.innerHTML = items.slice(0, 60).map(it => {
-      if (it.kind === 'week') {
-        const e = state.weekClosures[it.key];
-        const preview = e.focus || e.worked || e.blocked || 'Sin notas';
-        return `
-          <div class="hist-item" data-kind="week" data-key="${it.key}">
-            <span class="hist-icon">📅</span>
-            <div class="hist-body">
-              <div class="hist-title">Semana ${App.weekLabelFor(it.key)}</div>
-              <div class="hist-preview">${escapeHtml(preview)}</div>
-            </div>
-          </div>`;
-      }
+    // Agrupar por mes (YYYY-MM) usando la fecha de orden de cada cierre
+    const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const monthLabel = mk => {
+      const [y, m] = mk.split('-');
+      return `${MONTHS[parseInt(m, 10) - 1]} ${y}`;
+    };
+    const monthKeys = new Set();
+    [...dayItems, ...weekItems].forEach(it => monthKeys.add(it.sort.slice(0, 7)));
+    const orderedMonths = [...monthKeys].sort((a, b) => b.localeCompare(a));
+
+    const dayCard = it => {
       const e = state.closures[it.key];
       const label = new Date(it.key + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
       const bits = [];
@@ -10717,7 +10761,55 @@ const Stats = (() => {
             <div class="hist-preview">${escapeHtml(preview)}</div>
           </div>
         </div>`;
-    }).join('');
+    };
+    const weekCard = it => {
+      const e = state.weekClosures[it.key];
+      const preview = e.focus || e.worked || e.blocked || 'Sin notas';
+      return `
+        <div class="hist-item" data-kind="week" data-key="${it.key}">
+          <span class="hist-icon">📅</span>
+          <div class="hist-body">
+            <div class="hist-title">Semana ${App.weekLabelFor(it.key)}</div>
+            <div class="hist-preview">${escapeHtml(preview)}</div>
+          </div>
+        </div>`;
+    };
+
+    let html = '';
+    orderedMonths.forEach((mk, idx) => {
+      // Todos los cierres del mes (días y semanas) intercalados por fecha.
+      // En empate de fecha (el domingo), el día va primero y la semana después.
+      const monthItems = [...dayItems, ...weekItems]
+        .filter(it => it.sort.slice(0, 7) === mk)
+        .sort((a, b) => {
+          const c = b.sort.localeCompare(a.sort);
+          if (c !== 0) return c;
+          return a.kind === 'week' ? 1 : -1;
+        });
+      const open = (mk in histMonthsOpen) ? histMonthsOpen[mk] : (idx === 0);
+      const count = monthItems.length;
+      html += `<div class="hist-month ${open ? 'open' : ''}">`;
+      html += `<button class="hist-month-label" data-hist-month="${mk}" type="button">
+        <span class="hist-month-name">${monthLabel(mk)}</span>
+        <span class="hist-month-count">${count}</span>
+        <span class="hist-month-chevron">▾</span>
+      </button>`;
+      html += `<div class="hist-month-body">`;
+      html += monthItems.map(it => it.kind === 'week' ? weekCard(it) : dayCard(it)).join('');
+      html += `</div></div>`;
+    });
+    c.innerHTML = html;
+
+    // Toggle de meses (sin re-render, solo alterna la clase)
+    c.querySelectorAll('[data-hist-month]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mk = btn.dataset.histMonth;
+        const monthEl = btn.closest('.hist-month');
+        const nowOpen = !monthEl.classList.contains('open');
+        histMonthsOpen[mk] = nowOpen;
+        monthEl.classList.toggle('open', nowOpen);
+      });
+    });
 
     c.querySelectorAll('.hist-item').forEach(el => {
       el.addEventListener('click', () => openClosure(el.dataset.kind, el.dataset.key));
