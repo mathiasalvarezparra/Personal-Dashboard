@@ -806,6 +806,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   letter-spacing: 0.5px;
   margin-bottom: 12px;
 }
+.cd-delete-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 11px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+  font-size: 13px;
+  font-weight: 600;
+}
+.cd-delete-btn:active { transform: scale(0.97); }
 
 /* ============== NAVEGADOR DE MESES (análisis) ============== */
 .mnav {
@@ -1231,6 +1243,38 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 .hist-month.open .hist-month-chevron { transform: rotate(180deg); }
 .hist-month-body { display: none; }
 .hist-month.open .hist-month-body { display: block; animation: fadeIn 0.2s ease; }
+
+/* Nivel AÑO (envuelve los meses) */
+.hist-year { margin-bottom: 10px; }
+.hist-year-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  padding: 10px 2px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.hist-year-name { flex: 1; }
+.hist-year-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  background: var(--bg-card);
+  padding: 1px 7px;
+  border-radius: 9px;
+}
+.hist-year-chevron { font-size: 12px; color: var(--text-faint); transition: transform 0.2s; }
+.hist-year.open .hist-year-chevron { transform: rotate(180deg); }
+.hist-year-body { display: none; padding-left: 12px; }
+.hist-year.open .hist-year-body { display: block; animation: fadeIn 0.2s ease; }
 .hist-group-label {
   font-family: var(--font-mono);
   font-size: 10.5px;
@@ -2382,6 +2426,22 @@ label {
 .tp-tag.overdue { color: var(--accent-red); }
 .tp-tag.today   { color: var(--accent-yellow); }
 .tp-amount { font-size: 11.5px; color: var(--text-faint); }
+.tp-inst {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.re-inst {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-yellow);
+  font-weight: 600;
+}
+.re-inst.done { color: var(--accent-green); }
+.recurring-expense-item.is-done { opacity: 0.6; }
 .tp-pay {
   flex-shrink: 0;
   padding: 7px 14px;
@@ -4549,10 +4609,9 @@ label {
     </button>
   </header>
   <div class="task-filter">
-    <button class="chip active" data-filter="today">Hoy</button>
-    <button class="chip" data-filter="week">Semana</button>
-    <button class="chip" data-filter="all">Todas</button>
-    <button class="chip" data-filter="done">Hechas</button>
+    <button class="chip active" data-filter="scheduled">Programadas</button>
+    <button class="chip" data-filter="once">Puntuales</button>
+    <button class="chip" data-filter="archive">Archivo</button>
   </div>
   <div class="section-card">
     <div id="tasks-full-list"></div>
@@ -4574,14 +4633,12 @@ label {
   <div class="goals-horizon-tabs">
     <button class="chip active" data-horizon-tab="week">Semanal</button>
     <button class="chip" data-horizon-tab="month">Mensual</button>
-    <button class="chip" data-horizon-tab="quarter">Trimestral</button>
     <button class="chip" data-horizon-tab="year">Anual</button>
     <button class="chip" data-horizon-tab="archive">🗄️ Archivo</button>
   </div>
 
   <div class="goal-horizon-content active" data-horizon-content="week"><div class="goal-list" data-horizon="week"></div></div>
   <div class="goal-horizon-content" data-horizon-content="month"><div class="goal-list" data-horizon="month"></div></div>
-  <div class="goal-horizon-content" data-horizon-content="quarter"><div class="goal-list" data-horizon="quarter"></div></div>
   <div class="goal-horizon-content" data-horizon-content="year"><div class="goal-list" data-horizon="year"></div></div>
   <div class="goal-horizon-content" data-horizon-content="archive">
     <div id="goal-archive-list"></div>
@@ -6460,14 +6517,14 @@ const Habits = (() => {
    TASKS
    ============================================ */
 const Tasks = (() => {
-  let filter = 'today';
+  let filter = 'scheduled';
   let doneSearchQuery = '';
   let doneMonthsOpen = {}; // { '2026-05': true/false } — control de qué meses están expandidos
 
   function setFilter(f) {
     if (filter !== f) {
-      // Al salir del filtro "done", limpiar la búsqueda para que la próxima vez arranque limpia
-      if (filter === 'done') doneSearchQuery = '';
+      // Al salir del filtro "archivo", limpiar la búsqueda para que arranque limpia
+      if (filter === 'archive') doneSearchQuery = '';
     }
     filter = f;
     document.querySelectorAll('.task-filter .chip').forEach(c => {
@@ -6671,8 +6728,10 @@ const Tasks = (() => {
     const todayKey = UI.todayKey();
     const closures = Storage.get().closures || {};
 
-    // Gatillo: solo tras cerrar el día
-    if (!closures[todayKey]) { c.innerHTML = ''; return; }
+    // Gatillo: tras cerrar el día O pasadas las 21:00 (lo que ocurra primero)
+    const hora = new Date().getHours();
+    const yaCerro = !!closures[todayKey];
+    if (!yaCerro && hora < 21) { c.innerHTML = ''; return; }
 
     const tom = new Date();
     tom.setDate(tom.getDate() + 1);
@@ -6707,22 +6766,29 @@ const Tasks = (() => {
     const c = document.getElementById('tasks-full-list');
     if (!isLive(c)) return;
 
-    // Filtro "Hechas": vista especial con agrupación por mes
-    if (filter === 'done') {
+    // Archivo: tareas hechas, con agrupación por mes (vista especial)
+    if (filter === 'archive') {
       renderDoneGrouped(c);
       return;
     }
 
     let list = Storage.get().tasks.slice();
-    if (filter === 'today') list = list.filter(t => !t.done && isToday(t));
-    else if (filter === 'week') list = list.filter(t => !t.done && isThisWeek(t));
-    else if (filter === 'all') list = list.filter(t => !t.done);
+    if (filter === 'scheduled') {
+      // Programadas = tareas recurrentes activas (se repiten)
+      list = list.filter(t => !t.done && t.recurrence && t.recurrence !== 'none');
+    } else if (filter === 'once') {
+      // Puntuales = tareas sin recurrencia, activas
+      list = list.filter(t => !t.done && (!t.recurrence || t.recurrence === 'none'));
+    }
     list.sort((a, b) => {
       if ((a.important?1:0) !== (b.important?1:0)) return (b.important?1:0) - (a.important?1:0);
       return (a.date || '').localeCompare(b.date || '');
     });
     if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin tareas en este filtro</div>';
+      const msg = filter === 'scheduled'
+        ? 'Sin tareas recurrentes · crea una y elige que se repita'
+        : 'Sin tareas puntuales pendientes';
+      c.innerHTML = `<div class="empty">${msg}</div>`;
       return;
     }
     c.innerHTML = list.map(t => renderItem(t)).join('');
@@ -7042,9 +7108,9 @@ const Tasks = (() => {
    GOALS
    ============================================ */
 const Goals = (() => {
-  const HORIZONS = ['week','month','quarter','year'];
-  const HORIZON_LABEL = { week:'Semanal', month:'Mensual', quarter:'Trimestral', year:'Anual' };
-  const HORIZON_ORDER = { week: 1, month: 2, quarter: 3, year: 4 };
+  const HORIZONS = ['week','month','year'];
+  const HORIZON_LABEL = { week:'Semanal', month:'Mensual', year:'Anual' };
+  const HORIZON_ORDER = { week: 1, month: 2, year: 3 };
 
   // Reordenamiento de metas dentro del mismo horizonte (excluyendo archivadas)
   function moveGoal(id, direction) {
@@ -7282,7 +7348,6 @@ const Goals = (() => {
     const emptyMsg = {
       'week':    'Sin metas semanales · usa el ícono de arriba para crear',
       'month':   'Sin metas mensuales · usa el ícono de arriba para crear',
-      'quarter': 'Sin metas trimestrales · usa el ícono de arriba para crear',
       'year':    'Sin metas anuales · usa el ícono de arriba para crear',
     }[currentInnerHorizon] || 'Sin metas';
     if (list.length === 0) {
@@ -7558,7 +7623,7 @@ const Goals = (() => {
           }).join('');
 
           const isOpen = showArchivedByHorizon[h];
-          const periodWord = { week: 'Semanas', month: 'Meses', quarter: 'Trimestres', year: 'Años' }[h];
+          const periodWord = { week: 'Semanas', month: 'Meses', year: 'Años' }[h];
           html += `
             <div class="archived-section">
               <button class="archived-toggle" data-toggle-archived data-horizon-toggle="${h}">
@@ -7766,7 +7831,7 @@ const Goals = (() => {
     const isArchived = editing && editing.archived;
 
     const areasOpts = state.areas.map(a => `<option value="${a.id}" ${editing && editing.area === a.id ? 'selected' : ''}>${a.icon} ${a.name}</option>`).join('');
-    const horizonOpts = [['week','📅 Semanal'],['month','🗓️ Mensual'],['quarter','📊 Trimestral'],['year','🎯 Anual']]
+    const horizonOpts = [['week','📅 Semanal'],['month','🗓️ Mensual'],['year','🎯 Anual']]
       .map(([v,l]) => `<option value="${v}" ${editing && editing.horizon === v ? 'selected' : ''}>${l}</option>`).join('');
     const isQuant = editing ? (editing.target && editing.target > 0 ? 'quant' : 'qual') : 'quant';
     const typeOpts = [['quant','Cuantitativa (con número)'],['qual','Cualitativa (sí/no)']]
@@ -7778,7 +7843,6 @@ const Goals = (() => {
       ['none', 'Solo esta vez'],
       ['weekly', '🔁 Cada semana'],
       ['monthly', '🔁 Cada mes'],
-      ['quarterly', '🔁 Cada trimestre'],
       ['yearly', '🔁 Cada año'],
     ].map(([v, l]) => `<option value="${v}" ${currentRec === v ? 'selected' : ''}>${l}</option>`).join('');
 
@@ -7825,7 +7889,7 @@ const Goals = (() => {
           <label>🔁 Recurrencia</label>
           <select id="g-recurrence">${recOpts}</select>
           <p style="color:var(--text-dim);font-size:11px;margin-top:6px;line-height:1.4">
-            Si activas recurrencia, al cerrarse el ciclo (semana/mes/trimestre/año) se creará automáticamente una nueva copia para el siguiente período. Para pausar: cambia a "Solo esta vez".
+            Si activas recurrencia, al cerrarse el ciclo (semana/mes/año) se creará automáticamente una nueva copia para el siguiente período. Para pausar: cambia a "Solo esta vez".
           </p>
         `}
       `,
@@ -8028,62 +8092,6 @@ const GoalArchive = (() => {
     return g.done ? 100 : 0;
   }
 
-  // Devuelve la clave del período al que pertenece una meta archivada
-  function getPeriodKeyFor(g) {
-    const d = new Date(g.createdAt || g.archivedAt || Date.now());
-    if (g.horizon === 'week')    return 'week-' + UI.weekKey(d);
-    if (g.horizon === 'month')   return 'month-' + UI.monthKey(d);
-    if (g.horizon === 'quarter') return 'quarter-' + UI.quarterKey(d);
-    if (g.horizon === 'year')    return 'year-' + UI.yearKey(d);
-    return 'other';
-  }
-
-  // Construir árbol: año → trimestre → mes → semana
-  function buildTree() {
-    const state = Storage.get();
-    const tree = {};
-    const archived = state.goals.filter(g => g.archived);
-
-    archived.forEach(g => {
-      const periodKey = getPeriodKeyFor(g);
-
-      if (periodKey.startsWith('year-')) {
-        const y = periodKey.slice(5);
-        if (!tree[y]) tree[y] = { yearGoals: [], quarters: {} };
-        tree[y].yearGoals.push(g);
-      } else if (periodKey.startsWith('quarter-')) {
-        const rest = periodKey.slice(8); // YYYY-Qx
-        const [y, q] = rest.split('-');
-        if (!tree[y]) tree[y] = { yearGoals: [], quarters: {} };
-        if (!tree[y].quarters[q]) tree[y].quarters[q] = { quarterGoals: [], months: {} };
-        tree[y].quarters[q].quarterGoals.push(g);
-      } else if (periodKey.startsWith('month-')) {
-        const rest = periodKey.slice(6); // YYYY-MM
-        const [y, m] = rest.split('-');
-        const q = 'Q' + (Math.floor((parseInt(m, 10) - 1) / 3) + 1);
-        if (!tree[y]) tree[y] = { yearGoals: [], quarters: {} };
-        if (!tree[y].quarters[q]) tree[y].quarters[q] = { quarterGoals: [], months: {} };
-        const mk = `${y}-${m}`;
-        if (!tree[y].quarters[q].months[mk]) tree[y].quarters[q].months[mk] = { monthGoals: [], weeks: {} };
-        tree[y].quarters[q].months[mk].monthGoals.push(g);
-      } else if (periodKey.startsWith('week-')) {
-        const wk = periodKey.slice(5); // YYYY-WW
-        const [yStr, wStr] = wk.split('-W');
-        const monday = mondayOfISOWeek(parseInt(yStr, 10), parseInt(wStr, 10));
-        const y = String(monday.getFullYear());
-        const m = String(monday.getMonth() + 1).padStart(2, '0');
-        const q = 'Q' + (Math.floor(monday.getMonth() / 3) + 1);
-        const mk = `${y}-${m}`;
-        if (!tree[y]) tree[y] = { yearGoals: [], quarters: {} };
-        if (!tree[y].quarters[q]) tree[y].quarters[q] = { quarterGoals: [], months: {} };
-        if (!tree[y].quarters[q].months[mk]) tree[y].quarters[q].months[mk] = { monthGoals: [], weeks: {} };
-        if (!tree[y].quarters[q].months[mk].weeks[wk]) tree[y].quarters[q].months[mk].weeks[wk] = [];
-        tree[y].quarters[q].months[mk].weeks[wk].push(g);
-      }
-    });
-    return tree;
-  }
-
   function mondayOfISOWeek(year, week) {
     const simple = new Date(Date.UTC(year, 0, 4));
     const dow = simple.getUTCDay() || 7;
@@ -8092,22 +8100,107 @@ const GoalArchive = (() => {
     return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
   }
 
-  function formatWeekRange(weekKey) {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  function monthLabel(mk) {
+    const [y, m] = mk.split('-');
+    return `${MONTHS[parseInt(m, 10) - 1]} ${y}`;
+  }
+  const HORIZON_WORD = { week: 'Semanal', month: 'Mensual', year: 'Anual' };
+
+  function weekRangeLabel(weekKey) {
     const [yStr, wStr] = weekKey.split('-W');
     const monday = mondayOfISOWeek(parseInt(yStr, 10), parseInt(wStr, 10));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    const mLbl = monday.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
-    const sLbl = sunday.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
-    return `${mLbl} – ${sLbl}`.replace(/\./g, '');
-  }
-  function monthLabel(yyyymm) {
-    const [y, m] = yyyymm.split('-');
-    const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
-    return d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+    const f = d => d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }).replace(/\./g, '');
+    return `${f(monday)} – ${f(sunday)}`;
   }
 
-  const expanded = { years: new Set(), quarters: new Set(), months: new Set(), weeks: new Set() };
+  // Ubica cada meta archivada en año / mes / semana según su horizonte.
+  function placementFor(g) {
+    const d = new Date(g.createdAt || g.archivedAt || Date.now());
+    const pad = n => String(n).padStart(2, '0');
+    if (g.horizon === 'year') {
+      return { year: String(d.getFullYear()) };
+    }
+    if (g.horizon === 'month') {
+      return { year: String(d.getFullYear()), month: `${d.getFullYear()}-${pad(d.getMonth() + 1)}` };
+    }
+    if (g.horizon === 'week') {
+      const wk = UI.weekKey(d);
+      const [yStr, wStr] = wk.split('-W');
+      const monday = mondayOfISOWeek(parseInt(yStr, 10), parseInt(wStr, 10));
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6); // ubicar por el fin de la semana
+      const y = sunday.getFullYear();
+      return { year: String(y), month: `${y}-${pad(sunday.getMonth() + 1)}`, week: wk };
+    }
+    return { year: String(d.getFullYear()) };
+  }
+
+  // Árbol: año → { metas anuales, meses → { metas mensuales, semanas → [metas semanales] } }
+  function buildTree() {
+    const archived = Storage.get().goals.filter(g => g.archived);
+    const tree = {};
+    archived.forEach(g => {
+      const p = placementFor(g);
+      const y = p.year;
+      tree[y] = tree[y] || { yearGoals: [], months: {} };
+      if (!p.month) { tree[y].yearGoals.push(g); return; }
+      tree[y].months[p.month] = tree[y].months[p.month] || { monthGoals: [], weeks: {} };
+      if (!p.week) { tree[y].months[p.month].monthGoals.push(g); return; }
+      tree[y].months[p.month].weeks[p.week] = tree[y].months[p.month].weeks[p.week] || [];
+      tree[y].months[p.month].weeks[p.week].push(g);
+    });
+    return tree;
+  }
+
+  // Estado de expansión (persistente en la sesión).
+  const expanded = { years: new Set(), months: new Set(), weeks: new Set() };
+  let defaultsSet = false;
+
+  function subsection(title, goals) {
+    if (!goals.length) return '';
+    return `<div class="archive-subsection"><div class="archive-subsection-title">${title}</div>${goals.map(renderArchivedGoal).join('')}</div>`;
+  }
+
+  function renderWeek(wk, goals) {
+    const isOpen = expanded.weeks.has(wk);
+    return `
+      <div class="archive-week ${isOpen ? 'is-open' : ''}">
+        <button class="archive-toggle archive-week-toggle" data-gt-week="${wk}">
+          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+          <span class="archive-label">🗓️ ${weekRangeLabel(wk)}</span>
+        </button>
+        ${isOpen ? `<div class="archive-content">${goals.map(renderArchivedGoal).join('')}</div>` : ''}
+      </div>`;
+  }
+
+  function renderMonth(mk, data) {
+    const isOpen = expanded.months.has(mk);
+    const weeks = Object.keys(data.weeks).sort().reverse();
+    return `
+      <div class="archive-month ${isOpen ? 'is-open' : ''}">
+        <button class="archive-toggle archive-month-toggle" data-gt-month="${mk}">
+          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+          <span class="archive-label">${monthLabel(mk)}</span>
+        </button>
+        ${isOpen ? `<div class="archive-content">${subsection('📆 Metas mensuales', data.monthGoals)}${weeks.map(wk => renderWeek(wk, data.weeks[wk])).join('')}</div>` : ''}
+      </div>`;
+  }
+
+  function renderYear(year, data) {
+    const isOpen = expanded.years.has(year);
+    const months = Object.keys(data.months).sort().reverse();
+    return `
+      <div class="archive-year ${isOpen ? 'is-open' : ''}">
+        <button class="archive-toggle archive-year-toggle" data-gt-year="${year}">
+          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+          <span class="archive-label">📅 ${year}</span>
+        </button>
+        ${isOpen ? `<div class="archive-content">${subsection('🏆 Metas anuales', data.yearGoals)}${months.map(mk => renderMonth(mk, data.months[mk])).join('')}</div>` : ''}
+      </div>`;
+  }
 
   function render() {
     const c = document.getElementById('goal-archive-list');
@@ -8115,109 +8208,30 @@ const GoalArchive = (() => {
     const tree = buildTree();
     const years = Object.keys(tree).sort().reverse();
     if (years.length === 0) {
-      c.innerHTML = '<div class="empty">Aún no hay metas archivadas · cuando termine la semana, mes, trimestre o año verás aquí lo cerrado</div>';
+      c.innerHTML = '<div class="empty">Aún no hay metas archivadas · cuando termine la semana, el mes o el año verás aquí lo cerrado</div>';
       return;
     }
+    // Defaults la primera vez: año más reciente abierto + su mes más reciente abierto.
+    if (!defaultsSet) {
+      const y0 = years[0];
+      expanded.years.add(y0);
+      const m0 = Object.keys(tree[y0].months).sort().reverse()[0];
+      if (m0) expanded.months.add(m0);
+      defaultsSet = true;
+    }
     c.innerHTML = years.map(y => renderYear(y, tree[y])).join('');
-  }
 
-  function renderYear(year, yearData) {
-    const isOpen = expanded.years.has(year);
-    const quarters = Object.keys(yearData.quarters).sort().reverse();
-    const yearGoalsHTML = yearData.yearGoals.length > 0 ? `
-      <div class="archive-subsection">
-        <div class="archive-subsection-title">🏆 Metas anuales</div>
-        ${yearData.yearGoals.map(g => renderArchivedGoal(g)).join('')}
-      </div>
-    ` : '';
-    return `
-      <div class="archive-year ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-year-toggle" data-toggle-year="${year}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
-          <span class="archive-label">📅 ${year}</span>
-        </button>
-        ${isOpen ? `
-          <div class="archive-content">
-            ${yearGoalsHTML}
-            ${quarters.map(q => renderQuarter(year, q, yearData.quarters[q])).join('')}
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }
-
-  function renderQuarter(year, q, qData) {
-    const key = `${year}-${q}`;
-    const isOpen = expanded.quarters.has(key);
-    const months = Object.keys(qData.months).sort().reverse();
-    const qGoalsHTML = qData.quarterGoals.length > 0 ? `
-      <div class="archive-subsection">
-        <div class="archive-subsection-title">🎯 Metas trimestrales</div>
-        ${qData.quarterGoals.map(g => renderArchivedGoal(g)).join('')}
-      </div>
-    ` : '';
-    return `
-      <div class="archive-quarter ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-quarter-toggle" data-toggle-quarter="${key}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
-          <span class="archive-label">${q} · ${year}</span>
-        </button>
-        ${isOpen ? `
-          <div class="archive-content">
-            ${qGoalsHTML}
-            ${months.map(mk => renderMonth(mk, qData.months[mk])).join('')}
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }
-
-  function renderMonth(monthKey, mData) {
-    const isOpen = expanded.months.has(monthKey);
-    const weeks = Object.keys(mData.weeks).sort().reverse();
-    const mGoalsHTML = mData.monthGoals.length > 0 ? `
-      <div class="archive-subsection">
-        <div class="archive-subsection-title">📆 Metas mensuales</div>
-        ${mData.monthGoals.map(g => renderArchivedGoal(g)).join('')}
-      </div>
-    ` : '';
-    return `
-      <div class="archive-month ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-month-toggle" data-toggle-month="${monthKey}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
-          <span class="archive-label">${monthLabel(monthKey)}</span>
-        </button>
-        ${isOpen ? `
-          <div class="archive-content">
-            ${mGoalsHTML}
-            ${weeks.map(wk => renderWeek(wk, mData.weeks[wk])).join('')}
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }
-
-  function renderWeek(weekKey, goals) {
-    const isOpen = expanded.weeks.has(weekKey);
-    return `
-      <div class="archive-week ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-week-toggle" data-toggle-week="${weekKey}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
-          <span class="archive-label">🗓️ ${formatWeekRange(weekKey)}</span>
-        </button>
-        ${isOpen ? `
-          <div class="archive-content">
-            ${goals.map(g => renderArchivedGoal(g)).join('')}
-          </div>
-        ` : ''}
-      </div>
-    `;
+    const toggle = (set, key) => { set.has(key) ? set.delete(key) : set.add(key); render(); };
+    c.querySelectorAll('[data-gt-year]').forEach(b => b.addEventListener('click', () => toggle(expanded.years, b.dataset.gtYear)));
+    c.querySelectorAll('[data-gt-month]').forEach(b => b.addEventListener('click', () => toggle(expanded.months, b.dataset.gtMonth)));
+    c.querySelectorAll('[data-gt-week]').forEach(b => b.addEventListener('click', () => toggle(expanded.weeks, b.dataset.gtWeek)));
   }
 
   function renderArchivedGoal(g) {
     const pct = getPct(g);
     const icon = pct >= 100 ? '✅' : (pct >= 50 ? '🟡' : '⚪️');
-    const tt = g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : (g.done ? 'Hecho' : 'No completada');
+    const base = g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : (g.done ? 'Hecho' : 'No completada');
+    const tt = `${HORIZON_WORD[g.horizon] || ''} · ${base}`;
     return `
       <div class="archive-goal" data-edit-archived="${g.id}">
         <div class="archive-goal-row">
@@ -8264,13 +8278,7 @@ const GoalArchive = (() => {
     return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
 
-  return {
-    render, openEditModal,
-    toggleYear: y => { expanded.years.has(y) ? expanded.years.delete(y) : expanded.years.add(y); render(); },
-    toggleQuarter: k => { expanded.quarters.has(k) ? expanded.quarters.delete(k) : expanded.quarters.add(k); render(); },
-    toggleMonth: k => { expanded.months.has(k) ? expanded.months.delete(k) : expanded.months.add(k); render(); },
-    toggleWeek: k => { expanded.weeks.has(k) ? expanded.weeks.delete(k) : expanded.weeks.add(k); render(); },
-  };
+  return { render, openEditModal };
 })();
 
 /* ============================================
@@ -8471,21 +8479,28 @@ const Finance = (() => {
       : 'Sin fecha definida';
     // Proximidad como hint sutil
     let proximityLabel = '';
-    if (re.dueDay && re.recurrence === 'monthly') {
+    if (re.dueDay && re.recurrence === 'monthly' && !re.installmentsDone) {
       const d = daysUntilDueDay(re.dueDay);
       if (d === 0) proximityLabel = '<span class="re-proximity due-today">Hoy</span>';
       else if (d <= 3) proximityLabel = `<span class="re-proximity soon">En ${d}d</span>`;
       else if (d <= 7) proximityLabel = `<span class="re-proximity">En ${d}d</span>`;
     }
+    // Cuotas: "Cuota 5/24" o "Completada 24/24" (cualquier categoría)
+    let instLabel = '';
+    if (re.installmentsTotal) {
+      instLabel = re.installmentsDone
+        ? `<span class="re-inst done">✓ ${re.installmentsTotal}/${re.installmentsTotal}</span>`
+        : `<span class="re-inst">Cuota ${re.installmentsCurrent || 1}/${re.installmentsTotal}</span>`;
+    }
     return `
-      <div class="recurring-expense-item" data-id="${re.id}" data-kind="recurring">
+      <div class="recurring-expense-item ${re.installmentsDone ? 'is-done' : ''}" data-id="${re.id}" data-kind="recurring">
         <div class="re-main">
           <div class="re-name">${cat.icon} ${escapeHtml(re.name)} ${proximityLabel}</div>
           <div class="re-meta">
             <span class="re-rec">${rec.name}</span>
             <span class="re-cat">${cat.name}</span>
             ${amountLabel}
-            <span class="re-due">${dayLabel}</span>
+            ${instLabel || `<span class="re-due">${dayLabel}</span>`}
           </div>
         </div>
         <div class="re-actions">
@@ -8638,6 +8653,32 @@ const Finance = (() => {
           <p id="mv-due-help" style="color:var(--text-faint);font-size:11px;margin-top:4px"></p>
         </div>
 
+        <div id="mv-inst-toggle-wrap" hidden>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px">
+            <input type="checkbox" id="mv-inst-toggle" style="width:18px;height:18px;accent-color:var(--primary)" />
+            <span style="font-weight:600">Compra en cuotas</span>
+          </label>
+        </div>
+
+        <div id="mv-installments-wrap" hidden>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1">
+              <label>Cuota actual</label>
+              <input type="number" id="mv-inst-current" inputmode="numeric" min="1" step="1" placeholder="Ej: 5"
+                value="${editingRecurring && editingRecurring.installmentsCurrent != null ? editingRecurring.installmentsCurrent : ''}"
+                style="font-family:var(--font-mono)" />
+            </div>
+            <div style="flex:1">
+              <label>Total de cuotas</label>
+              <input type="number" id="mv-inst-total" inputmode="numeric" min="1" step="1" placeholder="Ej: 24"
+                value="${editingRecurring && editingRecurring.installmentsTotal != null ? editingRecurring.installmentsTotal : ''}"
+                style="font-family:var(--font-mono)" />
+            </div>
+          </div>
+          <p id="mv-inst-computed" style="color:var(--primary);font-size:12px;font-weight:600;margin-top:6px">Cuota mensual: —</p>
+          <p style="color:var(--text-faint);font-size:11px;margin-top:2px">La cuota se calcula como monto total ÷ total de cuotas. Al pagar la última, deja de repetirse.</p>
+        </div>
+
         <label>Nota (opcional)</label>
         <textarea id="mv-note" placeholder="Detalles, observaciones">${
           (editing && editing.note) ? escapeHtml(editing.note) :
@@ -8647,6 +8688,23 @@ const Finance = (() => {
       onSave: () => saveMovement(modalState, editing, editingRecurring)
     });
 
+    // Calcula y muestra la cuota mensual (monto total ÷ total de cuotas) en vivo.
+    const updateInstComputed = () => {
+      const line = document.getElementById('mv-inst-computed');
+      if (!line) return;
+      const toggle = document.getElementById('mv-inst-toggle');
+      const totalEl = document.getElementById('mv-inst-total');
+      const amountEl = document.getElementById('mv-amount');
+      if (!toggle || !toggle.checked) return;
+      const total = totalEl ? parseInt(totalEl.value, 10) : NaN;
+      const monto = amountEl ? Number(amountEl.value) : NaN;
+      if (total > 0 && monto > 0) {
+        line.textContent = `Cuota mensual: ${formatCLP(Math.round(monto / total))}`;
+      } else {
+        line.textContent = 'Cuota mensual: —';
+      }
+    };
+
     // Setup inicial: completar categorías y aplicar visibilidad según tipo/recurrencia
     const refreshUI = () => {
       const isIncome = modalState.type === 'income';
@@ -8654,8 +8712,13 @@ const Finance = (() => {
 
       // Categorías según tipo
       const catSel = document.getElementById('mv-category');
-      const currentCat = (editing && editing.category) || (editingRecurring && editingRecurring.category) || null;
       const cats = isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+      // Preservar lo que el usuario tenga elegido (si sigue siendo válido para el tipo);
+      // si no, caer en la categoría del ítem editado o la primera.
+      const prevCat = catSel.value;
+      const currentCat = (prevCat && cats.some(c => c.id === prevCat))
+        ? prevCat
+        : ((editing && editing.category) || (editingRecurring && editingRecurring.category) || null);
       catSel.innerHTML = cats.map(c =>
         `<option value="${c.id}" ${currentCat === c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`
       ).join('');
@@ -8673,6 +8736,18 @@ const Finance = (() => {
       const dateWrap = document.getElementById('mv-date-wrap');
       const amountLabel = document.getElementById('mv-amount-label');
       const amountHelp = document.getElementById('mv-amount-help');
+
+      // Cuotas: interruptor disponible para cualquier gasto MENSUAL (no solo deudas).
+      // El interruptor aparece en mensuales; los campos se muestran al encenderlo.
+      const instToggleWrap = document.getElementById('mv-inst-toggle-wrap');
+      const instToggle = document.getElementById('mv-inst-toggle');
+      const instWrap = document.getElementById('mv-installments-wrap');
+      const showToggle = !isIncome && modalState.recurrence === 'monthly';
+      if (instToggleWrap) instToggleWrap.hidden = !showToggle;
+      if (instWrap) instWrap.hidden = !(showToggle && instToggle && instToggle.checked);
+      if (!showToggle && instToggle) instToggle.checked = false;
+      updateInstComputed();
+      const instOn = !isIncome && showToggle && instToggle && instToggle.checked;
 
       if (isIncome) {
         recurrenceWrap.hidden = true;
@@ -8707,6 +8782,15 @@ const Finance = (() => {
           amountHelp.textContent = '';
         }
       }
+
+      // Si el interruptor de cuotas está encendido, el monto pasa a ser el TOTAL
+      // de la compra y la fecha de referencia se rotula como "Fecha de pago".
+      if (instOn) {
+        amountLabel.textContent = 'Monto total de la compra (CLP)';
+        amountHelp.textContent = 'Se divide en las cuotas indicadas. La cuota mensual se calcula abajo.';
+        dueLabel.textContent = 'Fecha de pago';
+        dueHelp.textContent = 'Día en que pagas cada cuota. Se repite el mismo día cada mes.';
+      }
     };
 
     setTimeout(() => {
@@ -8732,6 +8816,16 @@ const Finance = (() => {
           refreshUI();
         });
       }
+      // Interruptor de cuotas: al encender/apagar, muestra u oculta los campos.
+      const instToggleBind = document.getElementById('mv-inst-toggle');
+      if (instToggleBind) {
+        instToggleBind.addEventListener('change', () => refreshUI());
+      }
+      // Recalcular la cuota mensual en vivo al cambiar monto total o total de cuotas.
+      ['mv-amount', 'mv-inst-total'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateInstComputed);
+      });
       // Si estamos editando, deshabilitar el toggle de tipo (no cambias gasto↔ingreso al editar)
       if (isEditingSomething) {
         document.querySelectorAll('.finance-type-btn').forEach(b => {
@@ -8751,10 +8845,43 @@ const Finance = (() => {
         }
       }
 
+      // Al editar un recurrente que ya tiene cuotas, encender el interruptor y
+      // mostrar el MONTO TOTAL en el campo de monto (no la cuota individual).
+      if (editingRecurring && editingRecurring.installmentsTotal) {
+        const instToggle = document.getElementById('mv-inst-toggle');
+        if (instToggle) instToggle.checked = true;
+        const amountEl = document.getElementById('mv-amount');
+        if (amountEl) {
+          const total = editingRecurring.installmentTotalAmount != null
+            ? editingRecurring.installmentTotalAmount
+            : (editingRecurring.defaultAmount != null ? editingRecurring.defaultAmount * editingRecurring.installmentsTotal : '');
+          amountEl.value = total;
+        }
+      }
+
       refreshUI();
       const i = document.getElementById('mv-name');
       if (i) i.focus();
     }, 50);
+  }
+
+  // Lee los campos de cuotas del modal. Aplica cuando el interruptor está encendido
+  // (cualquier categoría, solo gastos mensuales). Devuelve total de cuotas, cuota
+  // actual, monto total de la compra y la cuota mensual calculada (total ÷ cuotas).
+  function readInstallmentsFields() {
+    const toggle = document.getElementById('mv-inst-toggle');
+    const on = !!(toggle && toggle.checked);
+    if (!on) return { total: null, current: null, totalAmount: null, perCuota: null };
+    const t = document.getElementById('mv-inst-total');
+    const c = document.getElementById('mv-inst-current');
+    const a = document.getElementById('mv-amount');
+    const total = (t && t.value.trim() !== '') ? Math.max(1, parseInt(t.value, 10)) : null;
+    let current = (c && c.value.trim() !== '') ? Math.max(1, parseInt(c.value, 10)) : null;
+    const totalAmount = (a && a.value.trim() !== '') ? Math.max(0, Number(a.value)) : null;
+    if (total && !current) current = 1;                 // hay total pero no cuota → empieza en 1
+    if (total && current > total) current = total;      // no exceder el total
+    const perCuota = (total && totalAmount != null) ? Math.round(totalAmount / total) : null;
+    return { total: total || null, current: total ? current : null, totalAmount: total ? totalAmount : null, perCuota };
   }
 
   function saveMovement(modalState, editing, editingRecurring) {
@@ -8808,6 +8935,21 @@ const Finance = (() => {
         editingRecurring.dueDate = null;
         editingRecurring.dueDay = null;
       }
+      // Cuotas (cualquier categoría, gasto mensual): total, cuota actual, monto total.
+      const instE = readInstallmentsFields();
+      editingRecurring.installmentsTotal = instE.total;
+      editingRecurring.installmentsCurrent = instE.current;
+      editingRecurring.installmentTotalAmount = instE.totalAmount;
+      // Si hay cuotas, el monto por pago (defaultAmount) es la cuota calculada.
+      if (instE.total) {
+        editingRecurring.defaultAmount = instE.perCuota;
+        if (!editingRecurring.installmentsCurrent || editingRecurring.installmentsCurrent <= instE.total) {
+          editingRecurring.installmentsDone = false;
+        }
+      } else {
+        editingRecurring.installmentsDone = false;
+        editingRecurring.installmentTotalAmount = null;
+      }
       // Si cambió la recurrencia, saltar a la sub-tab correspondiente para que el usuario vea el resultado
       activeSubTab = 'scheduled';
       UI.toast('Gasto actualizado');
@@ -8820,13 +8962,19 @@ const Finance = (() => {
         const [, , dd] = dueDateRaw.split('-');
         dueDay = parseInt(dd, 10);
       }
+      const inst = readInstallmentsFields();
       s.recurringExpenses.push({
         id: Storage.uid(),
         name, category,
         recurrence: modalState.recurrence,
-        defaultAmount: amount,
+        // Con cuotas, el monto por pago es la cuota (total ÷ cuotas); si no, el estimado.
+        defaultAmount: inst.total ? inst.perCuota : amount,
         dueDate, dueDay,
         note,
+        installmentsTotal: inst.total,
+        installmentsCurrent: inst.current,
+        installmentTotalAmount: inst.totalAmount,
+        installmentsDone: false,
         createdAt: Date.now(),
       });
       activeSubTab = 'scheduled';
@@ -9006,6 +9154,8 @@ const Finance = (() => {
     const result = [];
 
     recs.forEach(re => {
+      // Deuda con cuotas ya completada: no genera más pendientes
+      if (re.installmentsDone) return;
       // Mes en que se creó el gasto recurrente. Antes de ese mes no hay pendientes posibles.
       const createdDate = new Date(re.createdAt || Date.now());
       const createdMk = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`;
@@ -9283,6 +9433,9 @@ const Finance = (() => {
       else if (it.daysLeft === 0) { tagClass = 'today'; tagText = 'Vence hoy'; }
       else { tagClass = 'soon'; tagText = it.daysLeft === 1 ? 'Vence mañana' : `Vence en ${it.daysLeft}d`; }
       const amount = it.re.defaultAmount ? `~ ${formatCLP(it.re.defaultAmount)}` : 'Monto variable';
+      const instTag = (it.re.installmentsTotal)
+        ? `<span class="tp-inst">Cuota ${it.re.installmentsCurrent || 1}/${it.re.installmentsTotal}</span>`
+        : '';
       return `
         <div class="tp-item ${tagClass}">
           <div class="tp-main">
@@ -9290,6 +9443,7 @@ const Finance = (() => {
             <div class="tp-meta">
               <span class="tp-tag ${tagClass}">${tagText}</span>
               <span class="tp-amount">${amount}</span>
+              ${instTag}
             </div>
           </div>
           <button class="tp-pay" data-tp-pay="${it.re.id}" data-tp-period="${it.mk}">Pagar</button>
@@ -9303,7 +9457,7 @@ const Finance = (() => {
             <div class="section-title">💰 Pagos pendientes</div>
             <div class="section-subtitle">${subtitle}</div>
           </div>
-          <button class="section-icon-btn" data-go="finance" aria-label="Ir a Finanzas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+          <button class="section-icon-btn" data-go="finance" aria-label="Ir a Finanzas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
         </div>
         <div class="tp-list">${rows}</div>
       </div>`;
@@ -9346,6 +9500,7 @@ const Finance = (() => {
     const s = Storage.get();
     const re = (s.recurringExpenses || []).find(x => x.id === recurringId);
     if (!re) return;
+    let zeroConfirmed = false; // para confirmar un pago de $0
     const cat = getExpenseCategory(re.category);
     // Si es del mes en curso → fecha de hoy. Si es atrasado → hoy igualmente (el pago se hace HOY, va al balance de HOY).
     const defaultDate = UI.todayKey();
@@ -9355,12 +9510,18 @@ const Finance = (() => {
       ? `<p style="color:var(--accent-red);font-size:12px;margin-bottom:8px">⚠ Pago atrasado · correspondía a ${new Date(periodMk + '-15T12:00:00').toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}</p>`
       : '';
 
+    // Línea de cuota, si es una deuda con cuotas
+    const instHint = (re.installmentsTotal)
+      ? `<p style="color:var(--text-dim);font-size:12px;margin-bottom:8px">📄 Cuota ${re.installmentsCurrent || 1} de ${re.installmentsTotal}${(re.installmentsCurrent || 1) >= re.installmentsTotal ? ' · última' : ''}</p>`
+      : '';
+
     UI.openModal({
       title: `💸 Pagar · ${re.name}`,
       okText: 'Registrar pago',
       bodyHTML: `
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:6px">${cat.icon} ${cat.name} · ${getRecurrence(re.recurrence).name}</p>
         ${periodHint}
+        ${instHint}
         <label>Monto pagado (CLP)</label>
         <input type="number" id="pay-amount" inputmode="numeric" min="0" step="1" placeholder="Ej: 45000" value="${re.defaultAmount != null ? re.defaultAmount : ''}" style="font-family:var(--font-mono)" />
         ${re.defaultAmount ? `<p style="color:var(--text-faint);font-size:11px;margin-top:4px">Estimado: ${formatCLP(re.defaultAmount)}. Modifica si difiere.</p>` : ''}
@@ -9373,11 +9534,21 @@ const Finance = (() => {
       `,
       onSave: () => {
         const amountRaw = document.getElementById('pay-amount').value.trim();
-        if (amountRaw === '' || isNaN(Number(amountRaw)) || Number(amountRaw) <= 0) {
-          UI.toast('Falta el monto');
+        if (amountRaw === '' || isNaN(Number(amountRaw)) || Number(amountRaw) < 0) {
+          UI.toast('Ingresa un monto válido (0 o más)');
           return false;
         }
         const amount = Number(amountRaw);
+
+        // Confirmación de pago en $0 (doble toque)
+        if (amount === 0 && !zeroConfirmed) {
+          zeroConfirmed = true;
+          UI.toast('El pago es $0. Toca de nuevo para confirmar.');
+          const okBtn = document.getElementById('modal-ok');
+          if (okBtn) okBtn.textContent = 'Confirmar pago de $0';
+          return false;
+        }
+
         const date = document.getElementById('pay-date').value || UI.todayKey();
         const note = document.getElementById('pay-note').value.trim() || null;
 
@@ -9396,11 +9567,22 @@ const Finance = (() => {
           periodMk: periodMk || null,
           createdAt: Date.now(),
         });
+
+        // Avanzar cuota si el gasto está en cuotas (cualquier categoría)
+        if (re.installmentsTotal) {
+          const cur = re.installmentsCurrent || 1;
+          if (cur >= re.installmentsTotal) {
+            re.installmentsDone = true;   // pagó la última: deja de repetirse
+          } else {
+            re.installmentsCurrent = cur + 1;
+          }
+        }
+
         Storage.save();
         renderDashboard();
         render();
         if (typeof App !== 'undefined' && App.refreshKPIs) App.refreshKPIs();
-        UI.toast('Pago registrado');
+        UI.toast(amount === 0 ? 'Pago de $0 registrado' : 'Pago registrado');
       }
     });
     setTimeout(() => {
@@ -10062,7 +10244,7 @@ const Templates = (() => {
    ============================================ */
 /* ============================================
    GOAL ROLLOVER (archivar + auto-crear recurrentes)
-   Maneja week / month / quarter / year
+   Maneja week / month / year
    ============================================ */
 const GoalRollover = (() => {
 
@@ -10083,7 +10265,6 @@ const GoalRollover = (() => {
   const RECURRENCE_FOR_HORIZON = {
     week: 'weekly',
     month: 'monthly',
-    quarter: 'quarterly',
     year: 'yearly',
   };
 
@@ -10098,7 +10279,7 @@ const GoalRollover = (() => {
     // Para month/quarter/year: si no existen registros previos, inicializar al período
     // actual (sin hacer rollover) para evitar que la primera ejecución archive todo
     // de golpe. Solo se archivarán a partir del próximo cambio de período.
-    ['month', 'quarter', 'year'].forEach(h => {
+    ['month', 'year'].forEach(h => {
       if (!state.settings.lastPeriodKeys[h]) {
         state.settings.lastPeriodKeys[h] = periodKey(h);
       }
@@ -10108,7 +10289,7 @@ const GoalRollover = (() => {
     let totalPropagated = 0;
     let totalCreated = 0;
 
-    ['week', 'month', 'quarter', 'year'].forEach(horizon => {
+    ['week', 'month', 'year'].forEach(horizon => {
       const currentKey = periodKey(horizon);
       const lastKey = state.settings.lastPeriodKeys[horizon];
 
@@ -10379,6 +10560,7 @@ const Stats = (() => {
   let currentTab = 'resumen';
   // Meses del historial de cierres abiertos/colapsados (por defecto: solo el más reciente)
   const histMonthsOpen = {};
+  const histYearsOpen = {};
 
   function setTab(tab) {
     currentTab = tab;
@@ -10484,7 +10666,7 @@ const Stats = (() => {
     if (!c) return;
     const state = Storage.get();
     const rows = [
-      ['week', 'Semana'], ['month', 'Mes'], ['quarter', 'Trimestre'], ['year', 'Año'],
+      ['week', 'Semana'], ['month', 'Mes'], ['year', 'Año'],
     ].map(([h, label]) => {
       const key = GoalRollover.periodKey(h);
       const list = state.goals.filter(g =>
@@ -10651,29 +10833,57 @@ const Stats = (() => {
     };
 
     let html = '';
-    orderedMonths.forEach((mk, idx) => {
-      // Todos los cierres del mes (días y semanas) intercalados por fecha.
-      // En empate de fecha (el domingo), el día va primero y la semana después.
-      const monthItems = [...dayItems, ...weekItems]
-        .filter(it => it.sort.slice(0, 7) === mk)
-        .sort((a, b) => {
-          const c = b.sort.localeCompare(a.sort);
-          if (c !== 0) return c;
-          return a.kind === 'week' ? 1 : -1;
-        });
-      const open = (mk in histMonthsOpen) ? histMonthsOpen[mk] : (idx === 0);
-      const count = monthItems.length;
-      html += `<div class="hist-month ${open ? 'open' : ''}">`;
-      html += `<button class="hist-month-label" data-hist-month="${mk}" type="button">
-        <span class="hist-month-name">${monthLabel(mk)}</span>
-        <span class="hist-month-count">${count}</span>
-        <span class="hist-month-chevron">▾</span>
+    // Agrupar meses por AÑO. Dentro de cada año, los meses; dentro de cada mes,
+    // los cierres (días y semanas) intercalados por fecha.
+    const yearKeys = [...new Set(orderedMonths.map(mk => mk.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+
+    yearKeys.forEach((yk, yIdx) => {
+      const monthsOfYear = orderedMonths.filter(mk => mk.slice(0, 4) === yk);
+      const yearItemCount = [...dayItems, ...weekItems].filter(it => it.sort.slice(0, 4) === yk).length;
+      const yearOpen = (yk in histYearsOpen) ? histYearsOpen[yk] : (yIdx === 0);
+
+      let monthsHTML = '';
+      monthsOfYear.forEach((mk, mIdx) => {
+        const monthItems = [...dayItems, ...weekItems]
+          .filter(it => it.sort.slice(0, 7) === mk)
+          .sort((a, b) => {
+            const cc = b.sort.localeCompare(a.sort);
+            if (cc !== 0) return cc;
+            return a.kind === 'week' ? 1 : -1;
+          });
+        // Mes abierto: el más reciente del año más reciente por defecto.
+        const monthOpen = (mk in histMonthsOpen) ? histMonthsOpen[mk] : (yIdx === 0 && mIdx === 0);
+        monthsHTML += `<div class="hist-month ${monthOpen ? 'open' : ''}">`;
+        monthsHTML += `<button class="hist-month-label" data-hist-month="${mk}" type="button">
+          <span class="hist-month-name">${monthLabel(mk)}</span>
+          <span class="hist-month-count">${monthItems.length}</span>
+          <span class="hist-month-chevron">▾</span>
+        </button>`;
+        monthsHTML += `<div class="hist-month-body">`;
+        monthsHTML += monthItems.map(it => it.kind === 'week' ? weekCard(it) : dayCard(it)).join('');
+        monthsHTML += `</div></div>`;
+      });
+
+      html += `<div class="hist-year ${yearOpen ? 'open' : ''}">`;
+      html += `<button class="hist-year-label" data-hist-year="${yk}" type="button">
+        <span class="hist-year-name">${yk}</span>
+        <span class="hist-year-count">${yearItemCount}</span>
+        <span class="hist-year-chevron">▾</span>
       </button>`;
-      html += `<div class="hist-month-body">`;
-      html += monthItems.map(it => it.kind === 'week' ? weekCard(it) : dayCard(it)).join('');
-      html += `</div></div>`;
+      html += `<div class="hist-year-body">${monthsHTML}</div></div>`;
     });
     c.innerHTML = html;
+
+    // Toggle de años
+    c.querySelectorAll('[data-hist-year]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const yk = btn.dataset.histYear;
+        const yearEl = btn.closest('.hist-year');
+        const nowOpen = !yearEl.classList.contains('open');
+        histYearsOpen[yk] = nowOpen;
+        yearEl.classList.toggle('open', nowOpen);
+      });
+    });
 
     // Toggle de meses (sin re-render, solo alterna la clase)
     c.querySelectorAll('[data-hist-month]').forEach(btn => {
@@ -10871,12 +11081,26 @@ const App = (() => {
     Storage.save();
   }
 
+  // Migración one-shot: elimina el horizonte trimestral de metas.
+  // Se descartó por completo (eran datos de prueba). Borra las metas 'quarter'
+  // y normaliza cualquier recurrencia 'quarterly' huérfana a 'none'.
+  function migrateRemoveQuarter() {
+    const s = Storage.get();
+    if (s.settings.quarterRemoved) return;
+    s.goals = (s.goals || []).filter(g => g.horizon !== 'quarter');
+    s.goals.forEach(g => { if (g.recurrence === 'quarterly') g.recurrence = 'none'; });
+    if (s.settings.lastPeriodKeys) delete s.settings.lastPeriodKeys.quarter;
+    s.settings.quarterRemoved = true;
+    Storage.save();
+  }
+
   function init() {
     applyTheme();
 
     // Migración one-shot: agregar el área "Espiritualidad" a usuarios existentes.
     // Usa un flag para no reinsertarla si el usuario decide borrarla luego.
     migrateAreas();
+    migrateRemoveQuarter();
 
     // Verificar rollover de semana antes de cualquier render
     GoalRollover.check();
@@ -11743,10 +11967,20 @@ const App = (() => {
 
   // Cierre del día. Sin argumento = hoy. Con dateKey = editar un día pasado
   // (mismo formulario, precargado). No permite guardar completamente vacío.
+  // Día que se cierra por defecto. Con "corte de madrugada": si son antes de
+  // las 5 AM, se asume que sigues cerrando el día anterior (el que viviste).
+  function closingDayKey() {
+    const n = new Date();
+    if (n.getHours() < 5) n.setDate(n.getDate() - 1);
+    return UI.localDateKey(n);
+  }
+
   function openCloseDayModal(dateKey) {
     const today = UI.todayKey();
-    const key = dateKey || today;
-    const isToday = key === today;
+    const isClosingCurrent = !dateKey;              // cierre en curso (no edición desde historial)
+    const key = dateKey || closingDayKey();          // día propuesto (ajustable si es cierre en curso)
+    const isToday = key === today;                   // controla si mostrar el resumen automático
+    const hasClosure = !!(Storage.get().closures || {})[key];
     const state = Storage.get();
     const e = state.closures[key] || {};
 
@@ -11802,15 +12036,24 @@ const App = (() => {
       return `<div class="cd-scale" id="cd-sleep" data-value="${cur === null ? '' : SLEEP_OPTS[match].val}">${btns}</div>`;
     })();
 
-    const dateLabel = isToday ? '' :
-      `<div class="cd-editing-label">Editando ${new Date(key + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</div>`;
+    // Cierre en curso: selector de fecha (con corte de madrugada ya aplicado).
+    // Edición desde historial: solo muestra qué día se edita.
+    const dateBlock = isClosingCurrent
+      ? `<label>Estás cerrando el día</label>
+         <input type="date" id="cd-date" value="${key}" max="${today}" />`
+      : `<div class="cd-editing-label">Editando ${new Date(key + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</div>`;
+
+    // Botón para eliminar un cierre ya guardado (disponible al editarlo)
+    const deleteBlock = (hasClosure && !isClosingCurrent)
+      ? `<button type="button" class="cd-delete-btn" id="cd-delete">🗑️ Eliminar este cierre</button>`
+      : '';
 
     UI.openModal({
-      title: isToday ? '✨ Cierre del día' : '✏️ Editar cierre',
-      okText: isToday ? 'Cerrar el día' : 'Guardar',
+      title: isClosingCurrent ? '✨ Cierre del día' : '✏️ Editar cierre',
+      okText: isClosingCurrent ? 'Cerrar el día' : 'Guardar',
       bodyHTML: `
         ${summaryHTML}
-        ${dateLabel}
+        ${dateBlock}
         <label>3 cosas por las que estás agradecido</label>
         <input type="text" id="cd-g1" placeholder="1." value="${escapeAttr(e.gratitude?.[0])}" />
         <input type="text" id="cd-g2" placeholder="2." value="${escapeAttr(e.gratitude?.[1])}" style="margin-top:6px" />
@@ -11823,6 +12066,7 @@ const App = (() => {
         ${scale('stress', e.stress)}
         <label>Horas dormidas anoche</label>
         ${sleepSel}
+        ${deleteBlock}
       `,
       onSave: () => {
         const g = [
@@ -11847,12 +12091,19 @@ const App = (() => {
         if (energy) rec.energy = energy;
         if (stress) rec.stress = stress;
         if (sleep !== null) rec.sleep = sleep;
-        Storage.get().closures[key] = rec;
+
+        // La fecha efectiva del cierre: la del selector (si el usuario la ajustó)
+        // o el día propuesto (con corte de madrugada).
+        const dateInput = document.getElementById('cd-date');
+        const saveKey = (dateInput && dateInput.value) ? dateInput.value : key;
+
+        Storage.get().closures[saveKey] = rec;
         Storage.save();
         renderCloseDay();
         if (typeof Stats !== 'undefined') Stats.render();
-        if (isToday) renderFocusCard();
-        UI.toast(isToday ? 'Día cerrado · buen descanso' : 'Cierre actualizado');
+        if (saveKey === today) renderFocusCard();
+        refreshKPIs();
+        UI.toast(isClosingCurrent ? 'Día cerrado · buen descanso' : 'Cierre actualizado');
       }
     });
 
@@ -11868,6 +12119,28 @@ const App = (() => {
           });
         });
       });
+
+      // Eliminar el cierre (con confirmación)
+      const delBtn = document.getElementById('cd-delete');
+      if (delBtn) {
+        delBtn.addEventListener('click', () => {
+          UI.confirm2({
+            title: 'Eliminar cierre',
+            message: '¿Seguro que quieres eliminar este cierre? No se puede deshacer.',
+            okText: 'Eliminar',
+            danger: true,
+            onConfirm: () => {
+              const st = Storage.get();
+              if (st.closures) delete st.closures[key];
+              Storage.save();
+              renderCloseDay();
+              if (typeof Stats !== 'undefined') Stats.render();
+              refreshKPIs();
+              UI.toast('Cierre eliminado');
+            }
+          });
+        });
+      }
     }, 40);
   }
 
@@ -12007,23 +12280,13 @@ const App = (() => {
       });
     }
 
-    // Acordeón del archivo de metas (year/quarter/month/week toggle + edit)
+    // Archivo de metas: editar una meta archivada al tocarla.
+    // (El toggle de meses colapsables se liga dentro de GoalArchive.render)
     const archiveList = document.getElementById('goal-archive-list');
     if (archiveList) {
       archiveList.addEventListener('click', e => {
         const editBtn = e.target.closest('[data-edit-archived]');
-        if (editBtn) {
-          GoalArchive.openEditModal(editBtn.dataset.editArchived);
-          return;
-        }
-        const yBtn = e.target.closest('[data-toggle-year]');
-        if (yBtn) { GoalArchive.toggleYear(yBtn.dataset.toggleYear); return; }
-        const qBtn = e.target.closest('[data-toggle-quarter]');
-        if (qBtn) { GoalArchive.toggleQuarter(qBtn.dataset.toggleQuarter); return; }
-        const mBtn = e.target.closest('[data-toggle-month]');
-        if (mBtn) { GoalArchive.toggleMonth(mBtn.dataset.toggleMonth); return; }
-        const wBtn = e.target.closest('[data-toggle-week]');
-        if (wBtn) { GoalArchive.toggleWeek(wBtn.dataset.toggleWeek); return; }
+        if (editBtn) GoalArchive.openEditModal(editBtn.dataset.editArchived);
       });
     }
 
