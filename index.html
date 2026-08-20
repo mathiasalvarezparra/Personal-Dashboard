@@ -6520,6 +6520,7 @@ const Tasks = (() => {
   let filter = 'scheduled';
   let doneSearchQuery = '';
   let doneMonthsOpen = {}; // { '2026-05': true/false } — control de qué meses están expandidos
+  let doneYearsOpen = {};  // { '2026': true/false } — control de qué años están expandidos
 
   function setFilter(f) {
     if (filter !== f) {
@@ -6857,7 +6858,7 @@ const Tasks = (() => {
       return mk === todayMonth;
     };
 
-    const monthsHTML = monthKeys.map(mk => {
+    const monthCardHTML = (mk) => {
       const tasks = groups[mk];
       // Ordenar dentro del mes: más recientes primero
       tasks.sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
@@ -6877,6 +6878,28 @@ const Tasks = (() => {
           <div class="done-month-body" ${open ? '' : 'hidden'}>
             ${tasks.map(t => renderItem(t)).join('')}
           </div>
+        </div>
+      `;
+    };
+
+    // Agrupar los meses por AÑO. Año más reciente abierto por defecto.
+    const todayYear = String(new Date().getFullYear());
+    const isYearOpen = (yk) => (yk in doneYearsOpen) ? doneYearsOpen[yk] : (yk === todayYear);
+    const yearKeys = [...new Set(monthKeys.map(mk => mk.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+
+    const monthsHTML = yearKeys.map(yk => {
+      const yearLabel = yk === '0000' ? 'Sin fecha' : yk;
+      const monthsOfYear = monthKeys.filter(mk => mk.slice(0, 4) === yk);
+      const yearCount = monthsOfYear.reduce((n, mk) => n + groups[mk].length, 0);
+      const yOpen = isYearOpen(yk);
+      return `
+        <div class="hist-year ${yOpen ? 'open' : ''}">
+          <button class="hist-year-label" data-year-toggle="${yk}" type="button">
+            <span class="hist-year-name">${yearLabel}</span>
+            <span class="hist-year-count">${yearCount}</span>
+            <span class="hist-year-chevron">▾</span>
+          </button>
+          <div class="hist-year-body">${monthsOfYear.map(monthCardHTML).join('')}</div>
         </div>
       `;
     }).join('');
@@ -6916,6 +6939,16 @@ const Tasks = (() => {
   }
 
   function bindMonthToggles(c) {
+    c.querySelectorAll('[data-year-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const yk = btn.dataset.yearToggle;
+        const todayYear = String(new Date().getFullYear());
+        const current = (yk in doneYearsOpen) ? doneYearsOpen[yk] : (yk === todayYear);
+        doneYearsOpen[yk] = !current;
+        renderFull();
+      });
+    });
     c.querySelectorAll('[data-month-toggle]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -10006,7 +10039,7 @@ const Finance = (() => {
       return;
     }
 
-    c.innerHTML = monthKeys.map(mk => {
+    const monthCardHTML = (mk) => {
       const movs = groups[mk].slice().sort((a, b) => {
         const dateCmp = (b.date || '').localeCompare(a.date || '');
         if (dateCmp !== 0) return dateCmp;
@@ -10038,7 +10071,43 @@ const Finance = (() => {
           </div>
         </div>
       `;
+    };
+
+    // Agrupar los meses por AÑO. Año más reciente abierto por defecto.
+    const todayYear = String(new Date().getFullYear());
+    const isYearOpen = (yk) => (yk in archiveYearOpen) ? archiveYearOpen[yk] : (yk === todayYear);
+    const yearKeys = [...new Set(monthKeys.map(mk => mk.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+
+    c.innerHTML = yearKeys.map(yk => {
+      const monthsOfYear = monthKeys.filter(mk => mk.slice(0, 4) === yk);
+      // Resumen del año: ingresos, gastos y neto
+      const yMovs = monthsOfYear.flatMap(mk => groups[mk]);
+      const yInc = yMovs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
+      const yExp = yMovs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
+      const yNet = yInc - yExp;
+      const yNetClass = yNet > 0 ? 'positive' : (yNet < 0 ? 'negative' : 'zero');
+      const yNetSign = yNet > 0 ? '+' : (yNet < 0 ? '−' : '');
+      const yOpen = isYearOpen(yk);
+      return `
+        <div class="hist-year ${yOpen ? 'open' : ''}">
+          <button class="hist-year-label" data-archive-year-toggle="${yk}" type="button">
+            <span class="hist-year-name">${yk}</span>
+            <span class="archive-amt net ${yNetClass}" style="margin-left:auto">${yNetSign}${formatCLP(Math.abs(yNet))}</span>
+            <span class="hist-year-chevron">▾</span>
+          </button>
+          <div class="hist-year-body">${monthsOfYear.map(monthCardHTML).join('')}</div>
+        </div>
+      `;
     }).join('');
+
+    c.querySelectorAll('[data-archive-year-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const yk = btn.dataset.archiveYearToggle;
+        archiveYearOpen[yk] = !isYearOpen(yk);
+        renderArchive();
+      });
+    });
 
     c.querySelectorAll('[data-archive-toggle]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -10064,6 +10133,7 @@ const Finance = (() => {
   }
 
   let archiveOpen = {};
+  let archiveYearOpen = {};
 
   return {
     render,
