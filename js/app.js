@@ -1182,8 +1182,10 @@ const App = (() => {
       });
     });
 
-    // Pestañas internas del recuadro Metas en Hoy
-    document.querySelectorAll('.goals-inner-tab').forEach(tab => {
+    // Pestañas internas del recuadro Metas (legado, con data-inner-horizon). Las de
+    // Enfoque (data-today-horizon) las maneja Goals.renderTodayGoals; enlazarlas aquí
+    // marcaba las tres como activas al tocar una.
+    document.querySelectorAll('.goals-inner-tab[data-inner-horizon]').forEach(tab => {
       tab.addEventListener('click', () => {
         Goals.setInnerHorizon(tab.dataset.innerHorizon);
       });

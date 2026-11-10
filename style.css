@@ -4628,3 +4628,92 @@ label {
 .t-sub-when { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 4px; }
 .t-sub-date { width: auto !important; margin-top: 0 !important; padding: 5px 8px !important; font-size: 12px !important; }
 .t-sub-date[hidden] { display: none; }
+
+/* ============== METAS: RITMO ESPERADO, ORIGEN DEL AVANCE Y DIVISIÓN ============== */
+/* Marca del esperado: barra transparente con borde derecho (Animate anima su width) */
+.goal-bar.has-pace { position: relative; overflow: visible; }
+.goal-bar.has-pace .goal-bar-fill { border-radius: 2px; }
+.goal-pace-mark {
+  position: absolute;
+  left: 0;
+  top: -3px;
+  bottom: -3px;
+  box-sizing: border-box;
+  border-right: 2px solid var(--text-dim);
+  opacity: 0.7;
+  pointer-events: none;
+  transition: width var(--anim-dur) var(--anim-ease);
+}
+.goal-pace {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.goal-pace.ahead { color: var(--accent-green); }
+.goal-pace.behind { color: var(--accent-amber); }
+
+.goal-card-progress span { white-space: nowrap; }
+.goal-split-btn {
+  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+.goal-split-btn:active { transform: scale(0.96); }
+
+.goal-origin {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.goal-origin-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.goal-origin-row { padding: 1px 0; }
+.goal-origin-row strong { color: var(--text); font-family: var(--font-mono); font-weight: 600; }
+.goal-origin-empty { color: var(--text-faint); font-style: italic; }
+
+/* Modal de meta: dividir en metas más pequeñas */
+.g-split { margin-top: 14px; }
+.g-split[hidden], .g-split-body[hidden], .g-split-sec[hidden], .g-split-warn[hidden] { display: none; }
+.g-split-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  text-transform: none !important;
+  font-size: 13px !important;
+  color: var(--text) !important;
+}
+.g-split-toggle input { width: auto !important; margin: 0 !important; }
+.g-split-body { margin-top: 6px; }
+.g-split-sec {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+.g-split-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-yellow);
+}
+.g-split-row { display: flex; gap: 8px; }
+.g-split-row > div { flex: 1; min-width: 0; }
+.g-split-warn { margin-top: 6px; font-size: 12px; color: var(--accent-amber); }

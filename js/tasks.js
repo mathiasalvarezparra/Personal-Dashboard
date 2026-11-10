@@ -279,7 +279,7 @@ const Tasks = (() => {
             <span>⚠ Atrasadas</span>
             <span class="overdue-count">${groups.overdue.length}</span>
           </div>
-          ${groups.overdue.map(t => renderItem(t, { overdue: true, noActions: true })).join('')}
+          ${groups.overdue.map(t => renderItem(t, { overdue: true, noActions: true, focus: true })).join('')}
         </div>
       `;
     }
@@ -290,7 +290,7 @@ const Tasks = (() => {
     </div>`;
     const list = groups[tab[0]];
     html += `<div class="task-tab-list">${list.length
-      ? list.map(t => renderItem(t, { noActions: true, tapEdit: true })).join('')
+      ? list.map(t => renderItem(t, { noActions: true, tapEdit: true, focus: true })).join('')
       : `<div class="empty empty-tasks">${tab[2]}</div>`}</div>`;
 
     c.innerHTML = html;
@@ -522,7 +522,9 @@ const Tasks = (() => {
 
   function renderItem(t, opts = {}) {
     const area = Storage.get().areas.find(a => a.id === t.area);
-    const dl = t.date ? formatTaskDate(t.date) : (t.done ? '' : '📥 PRÓXIMAMENTE');
+    // Enfoque limpio (opts.focus): solo fecha/urgencia; sin área, repetición ni "Próximamente"
+    const focus = !!opts.focus;
+    const dl = t.date ? formatTaskDate(t.date) : (t.done || focus ? '' : '📥 PRÓXIMAMENTE');
     const recLabel = {
       daily: 'DIARIA',
       weekly: 'SEMANAL',
@@ -600,11 +602,11 @@ const Tasks = (() => {
         ${t.important ? '<span class="item-icon">⭐</span>' : ''}
         <div class="item-body ${opts.tapEdit ? 'tap-edit' : ''}" ${opts.tapEdit ? 'data-action="edit"' : ''}>
           <div class="item-name">${escapeHtml(t.name)}${overdueBadge}</div>
-          <div class="item-meta">
+          ${focus && !dl ? '' : `<div class="item-meta">
             ${doneInfo || (dl ? `<span>${dl}</span>` : '')}
-            ${area ? `<span class="area-tag">${area.name}</span>` : ''}
-            ${recLabel ? `<span class="recurrence-badge">🔁 ${recLabel}</span>` : ''}
-          </div>
+            ${area && !focus ? `<span class="area-tag">${area.name}</span>` : ''}
+            ${recLabel && !focus ? `<span class="recurrence-badge">🔁 ${recLabel}</span>` : ''}
+          </div>`}
           ${noteBlock}
           ${subtasksHTML}
           ${somedayHTML}

@@ -610,10 +610,16 @@ const Habits = (() => {
           habit.notes = habit.notes || {};
           habit.notes[dateKey] = note;
         }
-        // Sumar a la meta (del período correcto)
+        // Sumar a la meta (del período correcto). Si está activa, vía Goals.updateCurrent
+        // para que suba en tiempo real por la cadena parentGoalId (semanal → mensual → anual),
+        // igual que los hábitos cuantitativos y las tareas.
         if (amount > 0) {
-          goal.current = (goal.current || 0) + amount;
-          recalcGoalAfterContribChange(goal);
+          if (!goal.archived) {
+            Goals.updateCurrent(goal.id, (goal.current || 0) + amount);
+          } else {
+            goal.current = (goal.current || 0) + amount;
+            recalcGoalAfterContribChange(goal);
+          }
         }
 
         UI.buzz(15);
@@ -1723,5 +1729,5 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { countsForDate, isWeekly, weekPace, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { findGoalForDate, countsForDate, isWeekly, weekPace, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();

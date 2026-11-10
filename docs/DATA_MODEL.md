@@ -173,7 +173,9 @@ Leído/escrito por: `Tasks` (dueño). Leído por `App` (KPIs y contadores del d�
 | `seriesId` | string\|null | agrupa metas recurrentes generadas por `GoalRollover` |
 | `current` / `done` / `doneAt` | number / boolean / number\|undefined | progreso; `doneAt` se setea al cruzar `target` y se borra si vuelve a bajar |
 | `archived` / `archivedAt` | boolean / number | la archiva `GoalRollover` al cerrar su período |
-| `propagatedCurrent` | number\|undefined | solo en metas archivadas: cuánto de su `current` ya se sumó al padre, para no duplicar al editarla después de archivada |
+| `propagatedCurrent` | number\|undefined | solo en metas archivadas con padre: cuánto de su `current` ya se sumó al padre (al archivar, `GoalRollover` registra su `current`, que ya subió en tiempo real), para no duplicar al editarla después de archivada. Lo usa también el "origen del avance" de la padre |
+
+Sin campos nuevos por ritmo esperado, origen del avance ni división en cascada: todo se calcula al vuelo (`Goals.goalPace`, `Goals.originBreakdown`) y la división crea metas normales (`recurrence` `'monthly'`/`'weekly'`, `seriesId` propio, `parentGoalId` a la padre, área de la padre). No hubo migración ni cambio de `version`.
 
 Leído/escrito por: `Goals` (dueño, activas), `GoalArchive` (solo lectura de archivadas), `GoalRollover` (archiva + crea recurrentes). Leído por `Habits` (link), `Tasks` (link), `Stats`.
 
@@ -254,9 +256,9 @@ Cierre de semana. Dueño: `App`. Leído por `Stats`.
 
 ## Relaciones entre entidades
 
-- `habit.linkedGoalId → goal.id`: al registrar avance en el hábito, `Habits.addToHabitProgress` suma a `goal.current` vía `Goals.updateCurrent` (y registra el aporte en `habit.contributions`).
+- `habit.linkedGoalId → goal.id`: al registrar avance en el hábito (`Habits.addToHabitProgress` o el modal de cantidad) suma a `goal.current` vía `Goals.updateCurrent` (y registra el aporte en `habit.contributions[fecha]`). Si la meta vinculada ya está archivada, `Habits.findGoalForDate` encuentra la de la misma serie (`seriesId`) del período de esa fecha.
 - `task.goalId → goal.id`: al completar la tarea suma 1 al `current` de la meta (si tiene `target`) vía `Goals.updateCurrent`, y al desmarcarla resta 1; el avance sube a metas mensuales/anuales por la cadena `parentGoalId`. Las tareas nuevas solo se vinculan a metas **semanales** activas.
-- `goal.parentGoalId → goal.id` (de un horizonte mayor): `Goals.updateCurrent` propaga el delta del hijo al padre recursivamente (semana → mes → año). Una meta archivada guarda en `propagatedCurrent` lo ya propagado para no duplicar si se edita después.
+- `goal.parentGoalId → goal.id` (de un horizonte mayor): `Goals.updateCurrent` propaga el delta del hijo al padre recursivamente (semana → mes → año), en tiempo real. Al archivar, `GoalRollover` solo guarda en `propagatedCurrent` lo ya propagado (no lo vuelve a sumar). Si el padre también cambió de período, la hija activa se re-enlaza al reemplazo de la misma serie.
 - `movement.recurringExpenseId → recurringExpense.id`: el movimiento es el pago registrado de ese gasto programado.
 - `habit.area`, `goal.area → area.id`: solo para mostrar ícono/color/nombre, sin lógica adicional.
 
