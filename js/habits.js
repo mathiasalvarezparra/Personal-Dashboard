@@ -4,15 +4,86 @@
 const Habits = (() => {
   const TIME_LABELS = { 'mañana': '◐ MAÑANA', 'tarde': '◑ TARDE', 'noche': '◓ NOCHE' };
   const DAY_NAMES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  // Grupos de "Hoy" por momento del día (timeOfDay); sin timeOfDay → 'any'
+  const MOMENTS = ['mañana', 'tarde', 'noche'];
+  const MOMENT_LABELS = { 'mañana': 'Mañana', 'tarde': 'Tarde', 'noche': 'Noche', any: 'Cualquier momento' };
 
-  // Mover un hábito dentro de su grupo de timeOfDay
+  // ====== FRECUENCIA SEMANAL ('weekly': X veces por semana, semana lunes→domingo) ======
+  const isWeekly = h => !!(h.frequency && h.frequency.type === 'weekly');
+  const timesPerWeek = h => Math.min(7, Math.max(1, parseInt(h.frequency && h.frequency.timesPerWeek, 10) || 1));
+  const suggestedDays = h => (h.frequency && Array.isArray(h.frequency.suggestedDays)) ? h.frequency.suggestedDays : [];
+
+  // Lunes (12:00 para evitar saltos de horario) de la semana de `date`
+  function mondayOf(date) {
+    const d = new Date(date);
+    d.setHours(12, 0, 0, 0);
+    const dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return d;
+  }
+  // Las 7 fechas (YYYY-MM-DD) de la semana de `date`, de lunes a domingo
+  function weekKeys(date) {
+    const m = mondayOf(date);
+    return Array.from({ length: 7 }, (_, i) => {
+      const x = new Date(m);
+      x.setDate(m.getDate() + i);
+      return UI.localDateKey(x);
+    });
+  }
+  // Sesiones de la semana = días de history dentro de esa semana
+  function weekSessions(h, date = new Date(), exceptKey = null) {
+    const set = new Set(h.history || []);
+    return weekKeys(date).filter(k => k !== exceptKey && set.has(k)).length;
+  }
+  // Ritmo de la semana en curso. Un día cuenta una sola sesión, así que hoy
+  // solo es "disponible" si todavía no es sesión.
+  function weekPace(h, now = new Date()) {
+    const target = timesPerWeek(h);
+    const set = new Set(h.history || []);
+    const keys = weekKeys(now);
+    const todayKey = UI.localDateKey(now);
+    const sessions = keys.filter(k => set.has(k)).length;
+    const missing = Math.max(0, target - sessions);
+    const available = keys.filter(k => k > todayKey || (k === todayKey && !set.has(k))).length;
+    let state = 'ok';
+    if (sessions >= target) state = 'met';
+    else if (missing > available) state = 'unreachable';
+    else if (missing >= available) state = 'alert';
+    return { target, sessions, missing, available, state };
+  }
+
+  // ====== ARCHIVO ======
+  // Un hábito archivado no aparece en Hoy ni cuenta en KPIs/estadísticas.
+  // Los días en que estuvo archivado se tratan como "no aplica" (no rompen rachas),
+  // salvo que ese día haya quedado registrado antes de archivar.
+  function archivedOn(h, dk) {
+    if (!h.archived && !(h.archivedRanges && h.archivedRanges.length)) return false;
+    if (h.archived && h.archivedAt && dk >= UI.localDateKey(new Date(h.archivedAt))) return true;
+    return (h.archivedRanges || []).some(r => dk >= r.from && dk <= r.to);
+  }
+  function activeHabits() { return Storage.get().habits.filter(h => !h.archived); }
+
+  // ¿Cuenta este hábito en el % del día `date`? (KPIs, resumen del día, semana)
+  // daily/days: igual que isHabitForDate. weekly: si ese día es sugerido y la
+  // semana aún no estaba cumplida, o si ese día se registró algo.
+  function countsForDate(h, date) {
+    if (h.archived) return false;
+    if (!isWeekly(h)) return isHabitForDate(h, date);
+    const dk = UI.localDateKey(date);
+    if (archivedOn(h, dk)) return false;
+    if (getDailyProgress(h, dk) > 0) return true;
+    return suggestedDays(h).includes(date.getDay()) && weekSessions(h, date, dk) < timesPerWeek(h);
+  }
+
+  // Mover un hábito dentro de su grupo de timeOfDay (entre hábitos activos)
   // direction: -1 = arriba, +1 = abajo
   function moveHabit(id, direction) {
     const state = Storage.get();
     const habits = state.habits;
     const pos = habits.findIndex(h => h.id === id);
     if (pos === -1) return;
-    const newPos = pos + direction;
+    let newPos = pos + direction;
+    while (newPos >= 0 && newPos < habits.length && habits[newPos].archived) newPos += direction;
     if (newPos < 0 || newPos >= habits.length) return;
     [habits[pos], habits[newPos]] = [habits[newPos], habits[pos]];
     Storage.save();
@@ -24,7 +95,7 @@ const Habits = (() => {
 
   // Indica si el hábito se puede mover en esa dirección (para deshabilitar el botón en los extremos)
   function canMove(id, direction) {
-    const habits = Storage.get().habits;
+    const habits = Storage.get().habits.filter(h => !h.archived);
     const pos = habits.findIndex(h => h.id === id);
     if (pos === -1) return false;
     if (direction === -1) return pos > 0;
@@ -32,11 +103,17 @@ const Habits = (() => {
     return false;
   }
 
+  // Hoy: ¿entra en el % del día? (ver countsForDate)
   function isHabitForToday(h) {
-    return isHabitForDate(h, new Date());
+    return countsForDate(h, new Date());
   }
 
+  // ¿Se puede registrar el hábito ese día? Semanales: cualquier día.
   function isHabitForDate(h, date) {
+    if (h.archived || h.archivedRanges) {
+      const dk = UI.localDateKey(date);
+      if (archivedOn(h, dk) && !(h.history || []).includes(dk)) return false;
+    }
     const f = h.frequency || { type: 'daily' };
     if (f.type === 'daily') return true;
     if (f.type === 'days' && Array.isArray(f.days)) return f.days.includes(date.getDay());
@@ -148,7 +225,62 @@ const Habits = (() => {
     Goals.renderAll(); Goals.renderWeeklyMini();
   }
 
+  // Semanales: veredicto de una semana para la racha.
+  //  'met'  → cumplida (suma) · 'miss' → no cumplida (rompe) · 'skip' → ni suma ni rompe
+  // No rompen ni suman: semanas con algún día de vacaciones o archivado (sin registro),
+  // la semana en curso mientras siga alcanzable y la semana de creación incompleta.
+  function weekVerdict(h, monday, isCurrent) {
+    const keys = weekKeys(monday);
+    const set = new Set(h.history || []);
+    if (keys.some(k => Vacation.isDateInVacation(k) || (archivedOn(h, k) && !set.has(k)))) return 'skip';
+    if (keys.filter(k => set.has(k)).length >= timesPerWeek(h)) return 'met';
+    if (isCurrent && weekPace(h).state !== 'unreachable') return 'skip';
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+    if (bornKey && keys[0] < bornKey && keys[6] >= bornKey) return 'skip';
+    return 'miss';
+  }
+
+  // Racha semanal: semanas consecutivas cumplidas (se muestra como "N semanas")
+  function weeklyStreak(h) {
+    if (!h.history || h.history.length === 0) return 0;
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+    const base = mondayOf(new Date());
+    let streak = 0;
+    for (let w = 0; w < 260; w++) {
+      const m = new Date(base);
+      m.setDate(base.getDate() - 7 * w);
+      if (bornKey && weekKeys(m)[6] < bornKey) break; // antes de crear el hábito
+      const v = weekVerdict(h, m, w === 0);
+      if (v === 'met') streak++;
+      else if (v === 'miss') break;
+    }
+    return streak;
+  }
+
+  function weeklyBestStreak(h) {
+    if (!h.history || h.history.length === 0) return 0;
+    const first = [...h.history].sort()[0];
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : first;
+    const m = mondayOf(new Date((first < bornKey ? first : bornKey) + 'T12:00:00'));
+    const cur = mondayOf(new Date());
+    let best = 0, run = 0;
+    while (m <= cur) {
+      const v = weekVerdict(h, m, UI.localDateKey(m) === UI.localDateKey(cur));
+      if (v === 'met') { run++; if (run > best) best = run; }
+      else if (v === 'miss') run = 0;
+      m.setDate(m.getDate() + 7);
+    }
+    return best;
+  }
+
+  // Texto de racha: "5🔥" (días) o "2 semanas🔥" (semanales)
+  function streakLabel(h, streak) {
+    if (!isWeekly(h)) return `${streak}🔥`;
+    return `${streak} ${streak === 1 ? 'semana' : 'semanas'}🔥`;
+  }
+
   function calcStreak(h) {
+    if (isWeekly(h)) return weeklyStreak(h);
     if (!h.history || h.history.length === 0) return 0;
     const set = new Set(h.history);
     let streak = 0;
@@ -185,10 +317,10 @@ const Habits = (() => {
     return streak;
   }
 
+  // Racha máxima en días entre hábitos activos (los semanales se miden en semanas: no entran)
   function maxStreakAcrossAll() {
-    const state = Storage.get();
     let max = 0;
-    state.habits.forEach(h => { const s = calcStreak(h); if (s > max) max = s; });
+    activeHabits().filter(h => !isWeekly(h)).forEach(h => { const s = calcStreak(h); if (s > max) max = s; });
     return max;
   }
 
@@ -511,7 +643,7 @@ const Habits = (() => {
     }, 80);
   }
 
-  function remove(id) {
+  function remove(id, onAfter = null) {
     const h = Storage.get().habits.find(x => x.id === id);
     if (!h) return;
     UI.confirm2({
@@ -525,9 +657,51 @@ const Habits = (() => {
         Storage.save();
         renderFull(); renderOverview(); renderHeatmap(); App.refreshKPIs();
         UI.toast('Hábito eliminado');
+        if (onAfter) onAfter();
       }
     });
   }
+
+  // Archivar: deja de aparecer en Hoy, KPIs y estadísticas; conserva el historial
+  function archive(id) {
+    const h = Storage.get().habits.find(x => x.id === id);
+    if (!h || h.archived) return;
+    UI.confirm2({
+      title: '📦 Archivar hábito',
+      message: `"<strong>${escapeHtml(h.name)}</strong>" dejará de aparecer en Hoy y en estadísticas. Su historial se conserva y puedes reactivarlo cuando quieras.`,
+      okText: 'Archivar',
+      onConfirm: () => {
+        h.archived = true;
+        h.archivedAt = Date.now();
+        Storage.save();
+        afterArchiveChange();
+        UI.toast('Hábito archivado');
+      }
+    });
+  }
+
+  // Reactivar: el período archivado queda registrado para que no rompa rachas
+  function unarchive(id) {
+    const h = Storage.get().habits.find(x => x.id === id);
+    if (!h || !h.archived) return;
+    if (h.archivedAt) {
+      const from = UI.localDateKey(new Date(h.archivedAt));
+      const to = dateKeyDaysAgo(1);
+      if (from <= to) h.archivedRanges = [...(h.archivedRanges || []), { from, to }];
+    }
+    h.archived = false;
+    delete h.archivedAt;
+    Storage.save();
+    afterArchiveChange();
+    UI.toast('Hábito reactivado');
+  }
+
+  function afterArchiveChange() {
+    renderFull(); renderOverview(); renderTodayHabits(); renderHeatmap(); renderDetail(); App.refreshKPIs();
+    if (typeof Stats !== 'undefined') Stats.render();
+  }
+
+  let archivedOpen = false;
 
   function renderFull() {
     const c = document.getElementById('habits-full-list');
@@ -537,9 +711,40 @@ const Habits = (() => {
       c.innerHTML = '<div class="empty">No tienes hábitos creados · usa el + de arriba para crear uno</div>';
       return;
     }
+    const active = state.habits.filter(h => !h.archived);
+    const archivedList = state.habits.filter(h => h.archived);
     // Lista plana en el orden de state.habits (el usuario controla con ▲▼)
-    c.innerHTML = state.habits.map(renderItemFull).join('');
+    const activeHTML = active.length
+      ? active.map(renderItemFull).join('')
+      : '<div class="empty">Sin hábitos activos · usa el + de arriba para crear uno</div>';
+    const archivedHTML = archivedList.length ? `
+      <div class="hab-archived ${archivedOpen ? 'open' : ''}">
+        <button type="button" class="hab-archived-head" id="hab-archived-toggle" aria-expanded="${archivedOpen}">
+          <span>📦 Archivados (${archivedList.length})</span>
+          <span class="hab-archived-chevron">▾</span>
+        </button>
+        ${archivedOpen ? `<div class="hab-archived-body">${archivedList.map(renderArchivedItem).join('')}</div>` : ''}
+      </div>` : '';
+    c.innerHTML = activeHTML + archivedHTML;
     bindClicks(c);
+    const tgl = document.getElementById('hab-archived-toggle');
+    if (tgl) tgl.addEventListener('click', () => { archivedOpen = !archivedOpen; renderFull(); });
+  }
+
+  function renderArchivedItem(h) {
+    const when = h.archivedAt ? new Date(h.archivedAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+    return `
+      <div class="item archived-item" data-id="${h.id}">
+        <span class="item-icon" data-action="detail">${h.icon || '⭐'}</span>
+        <div class="item-body" data-action="detail">
+          <div class="item-name">${escapeHtml(h.name)}</div>
+          <div class="item-meta"><span>${formatFreq(h.frequency)}</span><span>Archivado${when ? ' · ' + when : ''}</span></div>
+        </div>
+        <div class="item-actions">
+          <button class="item-reactivate" data-action="unarchive">Reactivar</button>
+          <button class="item-delete" data-action="delete" aria-label="Eliminar">×</button>
+        </div>
+      </div>`;
   }
 
   // Cumplimiento promedio de los últimos 30 días, contando solo los días
@@ -547,6 +752,7 @@ const Habits = (() => {
   function complianceLast30(h) { return complianceWindow(h, 30); }
 
   function complianceWindow(h, nDays) {
+    if (isWeekly(h)) return weeklyComplianceWindow(h, nDays);
     let total = 0, sum = 0, full = 0;
     const base = new Date();
     // No contar días anteriores a la creación del hábito (falsearían el %)
@@ -566,6 +772,27 @@ const Habits = (() => {
     return { pct: total === 0 ? 0 : Math.round(sum / total), full, total };
   }
 
+  // Semanales: sesiones realizadas / sesiones esperadas en el período
+  // (timesPerWeek × días válidos / 7). Sin vacaciones, archivo ni días previos a la creación.
+  function weeklyComplianceWindow(h, nDays) {
+    const set = new Set(h.history || []);
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+    let days = 0, done = 0;
+    const base = new Date();
+    for (let i = 0; i < nDays; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const dk = UI.localDateKey(d);
+      if (bornKey && dk < bornKey) continue;
+      if (typeof Vacation !== 'undefined' && Vacation.isDateInVacation && Vacation.isDateInVacation(dk)) continue;
+      if (archivedOn(h, dk) && !set.has(dk)) continue;
+      days++;
+      if (set.has(dk)) done++;
+    }
+    const expected = timesPerWeek(h) * days / 7;
+    return { pct: expected > 0 ? Math.min(100, Math.round((done / expected) * 100)) : 0, full: done, total: Math.round(expected) };
+  }
+
   // Lista de hábitos de la pestaña "Hábitos" de Enfoque.
   // Barra = progreso de HOY. El cumplimiento a 30 días va como dato secundario.
   function renderOverview() {
@@ -577,7 +804,8 @@ const Habits = (() => {
       c.innerHTML = '<div class="empty">🏖️ De vacaciones · tus hábitos vuelven cuando termines</div>';
       return;
     }
-    if (!state.habits.length) {
+    const list = state.habits.filter(h => !h.archived);
+    if (!list.length) {
       c.innerHTML = '<div class="empty">Sin hábitos · usa el ícono de arriba para crear el primero</div>';
       return;
     }
@@ -585,7 +813,7 @@ const Habits = (() => {
     // Orden: pendientes de hoy → completados de hoy → los que no tocan hoy
     const todayKey = UI.todayKey();
     const pending = [], completed = [], offDay = [];
-    state.habits.forEach(h => {
+    list.forEach(h => {
       if (!isHabitForToday(h)) offDay.push(h);
       else if (isCompletedToday(h)) completed.push(h);
       else pending.push(h);
@@ -600,8 +828,29 @@ const Habits = (() => {
     bindOverviewClicks(c);
   }
 
-  // Lista compacta de hábitos para el panel "Hoy": SOLO los que tocan hoy,
-  // en versión limpia (sin racha ni 30d). Reutiliza el mismo item y binds.
+  // Momento del día actual: mañana < 12:00 · tarde 12:00–18:59 · noche ≥ 19:00
+  function currentMoment(now = new Date()) {
+    const hr = now.getHours();
+    return hr < 12 ? 'mañana' : (hr < 19 ? 'tarde' : 'noche');
+  }
+  // Orden de grupos: el momento actual, los siguientes, "Cualquier momento" y al final los ya pasados
+  function momentOrder(now = new Date()) {
+    const i = MOMENTS.indexOf(currentMoment(now));
+    return [...MOMENTS.slice(i), 'any', ...MOMENTS.slice(0, i)];
+  }
+
+  // Grupos ya completos que el usuario expandió a mano (se colapsan solos al completarse)
+  const expandedGroups = new Set();
+
+  // ¿Un hábito de Hoy se considera hecho? Semanales: hecho hoy o semana ya cumplida.
+  function isDoneForToday(h) {
+    if (isCompletedToday(h)) return true;
+    return isWeekly(h) && weekPace(h).state === 'met';
+  }
+
+  // Lista de hábitos del panel "Hoy", agrupada por momento del día.
+  // Semanales: prioritarios si hoy es día sugerido, si están en alerta de ritmo o si
+  // ya se registró algo hoy; si no, van a "Flexibles esta semana" (salvo semana cumplida).
   function renderTodayHabits() {
     const c = document.getElementById('today-habits-list');
     if (!isLive(c)) return;
@@ -612,30 +861,68 @@ const Habits = (() => {
       return;
     }
 
+    const now = new Date();
     const todayKey = UI.todayKey();
-    const pending = [], completed = [];
+    const dow = now.getDay();
+    const priority = [], flexible = [];
     state.habits.forEach(h => {
-      if (!isHabitForToday(h)) return; // solo los de hoy
-      if (isCompletedToday(h)) completed.push(h);
-      else pending.push(h);
-    });
-    completed.sort((a, b) => {
-      const ta = (a._completedAt && a._completedAt[todayKey]) || 0;
-      const tb = (b._completedAt && b._completedAt[todayKey]) || 0;
-      return ta - tb;
+      if (h.archived) return;
+      if (!isWeekly(h)) {
+        if (isHabitForDate(h, now)) priority.push(h);
+        return;
+      }
+      const pace = weekPace(h, now);
+      const registeredToday = getDailyProgress(h, todayKey) > 0;
+      const suggested = suggestedDays(h).includes(dow);
+      if (registeredToday || pace.state === 'alert' || (suggested && pace.state !== 'met')) priority.push(h);
+      else if (suggested) priority.push(h);            // día sugerido con la semana ya cumplida: se ve como hecho
+      else if (pace.state !== 'met') flexible.push(h);  // otro día: bloque discreto para adelantar o recuperar
     });
 
-    if (pending.length + completed.length === 0) {
+    if (priority.length + flexible.length === 0) {
       c.innerHTML = '<div class="empty">No hay hábitos para hoy · disfruta 🌿</div>';
       return;
     }
 
-    c.innerHTML = [...pending, ...completed].map(h => renderOverviewItem(h, true)).join('');
+    const byCompletion = (a, b) => ((a._completedAt && a._completedAt[todayKey]) || 0) - ((b._completedAt && b._completedAt[todayKey]) || 0);
+    const groupsHTML = momentOrder(now).map(m => {
+      const items = priority.filter(h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any') === m);
+      if (!items.length) return '';
+      const pending = items.filter(h => !isDoneForToday(h));   // respeta el orden manual (moveHabit)
+      const done = items.filter(isDoneForToday).sort(byCompletion);
+      const allDone = pending.length === 0;
+      const collapsed = allDone && !expandedGroups.has(m);
+      return `
+        <div class="hab-group ${allDone ? 'complete' : ''} ${collapsed ? 'collapsed' : ''}">
+          <button type="button" class="hab-group-head" data-group-toggle="${m}" ${allDone ? '' : 'disabled'} aria-expanded="${!collapsed}">
+            <span class="hab-group-name">${MOMENT_LABELS[m]}</span>
+            <span class="hab-group-count">· ${done.length}/${items.length}</span>
+            ${allDone ? '<span class="hab-group-check">✓</span>' : ''}
+          </button>
+          ${collapsed ? '' : `<div class="hab-group-body">${[...pending, ...done].map(h => renderOverviewItem(h, true)).join('')}</div>`}
+        </div>`;
+    }).join('');
+
+    const flexHTML = flexible.length ? `
+      <div class="hab-flex">
+        <div class="hab-flex-title">Flexibles esta semana</div>
+        ${flexible.map(h => renderOverviewItem(h, true)).join('')}
+      </div>` : '';
+
+    c.innerHTML = (priority.length ? groupsHTML : '<div class="empty">No hay hábitos para hoy · disfruta 🌿</div>') + flexHTML;
     bindOverviewClicks(c);
+    c.querySelectorAll('[data-group-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = btn.dataset.groupToggle;
+        if (expandedGroups.has(m)) expandedGroups.delete(m); else expandedGroups.add(m);
+        renderTodayHabits();
+      });
+    });
   }
 
   function renderOverviewItem(h, clean = false) {
-    const today   = isHabitForToday(h);
+    const weekly  = isWeekly(h);
+    const today   = weekly ? true : isHabitForDate(h, new Date());
     const done    = isCompletedToday(h);
     const target  = getDailyTarget(h);
     const unit    = getUnit(h);
@@ -653,9 +940,28 @@ const Habits = (() => {
       const { pct: pct30 } = complianceLast30(h);
       meta = [
         today ? `${cur}/${target} ${unit}` : 'no toca hoy',
-        streak > 0 ? `${streak}🔥` : null,
+        streak > 0 ? streakLabel(h, streak) : null,
         `${pct30}% 30d`,
       ].filter(Boolean).join(' · ');
+    }
+
+    // Semanales: avance de la semana con mini barra y alerta de ritmo
+    let weekHTML = '';
+    if (weekly) {
+      const pace = weekPace(h);
+      const wPct = Math.min(100, Math.round((pace.sessions / pace.target) * 100));
+      let paceHTML = '';
+      if (pace.state === 'alert') {
+        paceHTML = `<div class="hab-pace alert">Te faltan ${pace.missing}, quedan ${pace.available} ${pace.available === 1 ? 'día' : 'días'}</div>`;
+      } else if (pace.state === 'unreachable') {
+        paceHTML = '<div class="hab-pace">Meta semanal no alcanzable esta semana</div>';
+      }
+      weekHTML = `
+          <div class="hab-week">
+            <span class="hab-week-txt ${pace.state === 'met' ? 'met' : ''}">${pace.sessions}/${pace.target} esta semana</span>
+            <div class="hab-week-bar"><div class="hab-week-fill" style="width:${wPct}%"></div></div>
+          </div>
+          ${paceHTML}`;
     }
 
     return `
@@ -665,6 +971,7 @@ const Habits = (() => {
           <div class="hab-ov-name">${escapeHtml(h.name)}${done ? ' <span class="hab-ov-check">✓</span>' : ''}</div>
           <div class="hab-ov-meta">${meta}</div>
           <div class="hab-ov-bar"><div class="hab-ov-bar-fill" style="width:${dayPct}%;background:${color}"></div></div>
+          ${weekHTML}
         </div>
         <div class="hab-ov-actions">
           <button class="hab-ov-btn" data-action="minus" data-step="${step}" ${cur > 0 ? '' : 'disabled'} aria-label="Restar ${step}">−${step}</button>
@@ -710,7 +1017,7 @@ const Habits = (() => {
           <div class="item-name">${escapeHtml(h.name)}${todayNote ? `<span class="note-indicator">📝</span>` : ''}</div>
           <div class="item-meta">
             ${quant ? `<span class="quant-progress">${dailyCur}/${h.dailyTarget} ${h.unit || ''}</span>` : ''}
-            ${streak > 0 ? `<span class="streak">${streak}🔥</span>` : ''}
+            ${streak > 0 ? `<span class="streak">${streakLabel(h, streak)}</span>` : ''}
             ${area ? `<span class="area-tag">${area.name}</span>` : ''}
             <span>${ft}</span>
             ${linkedGoal ? `<span class="goal-link-badge">🎯 ${escapeHtml(linkedGoal.name.length > 18 ? linkedGoal.name.slice(0, 18) + '…' : linkedGoal.name)}</span>` : ''}
@@ -722,7 +1029,8 @@ const Habits = (() => {
         </div>
         <div class="item-actions">
           <button class="item-edit" data-action="edit" aria-label="Editar">✎</button>
-          <button class="item-delete" data-action="delete">×</button>
+          <button class="item-archive" data-action="archive" aria-label="Archivar">📦</button>
+          <button class="item-delete" data-action="delete" aria-label="Eliminar">×</button>
         </div>
       </div>`;
   }
@@ -730,6 +1038,11 @@ const Habits = (() => {
   function formatFreq(f) {
     if (!f || f.type === 'daily') return 'Diario';
     if (f.type === 'days') return f.days.map(d => DAY_NAMES[d]).join(' ');
+    if (f.type === 'weekly') {
+      const n = Math.min(7, Math.max(1, parseInt(f.timesPerWeek, 10) || 1));
+      const sug = Array.isArray(f.suggestedDays) ? [1, 2, 3, 4, 5, 6, 0].filter(d => f.suggestedDays.includes(d)) : [];
+      return `${n}× por semana${sug.length ? ' · ' + sug.map(d => DAY_NAMES[d]).join(' ') : ''}`;
+    }
     return 'Diario';
   }
 
@@ -741,6 +1054,8 @@ const Habits = (() => {
         const a = b.dataset.action;
         if (a === 'toggle') toggleToday(id);
         if (a === 'delete') remove(id);
+        if (a === 'archive') archive(id);
+        if (a === 'unarchive') unarchive(id);
         if (a === 'edit') openEditModal(id);
         if (a === 'detail') openDetail(id);
         if (a === 'up') moveHabit(id, -1);
@@ -841,11 +1156,19 @@ const Habits = (() => {
       const checked = editing ? (editing.color === c ? 'checked' : '') : (i===0 ? 'checked' : '');
       return `<label><input type="radio" name="color" value="${c}" ${checked} /><span class="color-dot" style="background:${c}"></span></label>`;
     }).join('');
-    const tods = [['mañana','◐ Mañana'],['tarde','◑ Tarde'],['noche','◓ Noche']];
-    const todOpts = tods.map(([v,l]) => `<option value="${v}" ${editing && editing.timeOfDay === v ? 'selected' : ''}>${l}</option>`).join('');
-    const freqOpts = [['daily','Todos los días'],['days','Días específicos']]
+    const tods = [['', 'Cualquier momento'], ['mañana','◐ Mañana'],['tarde','◑ Tarde'],['noche','◓ Noche']];
+    const curTod = editing && MOMENTS.includes(editing.timeOfDay) ? editing.timeOfDay : '';
+    const todOpts = tods.map(([v,l]) => `<option value="${v}" ${curTod === v ? 'selected' : ''}>${l}</option>`).join('');
+    const freqOpts = [['daily','Todos los días'],['days','Días específicos'],['weekly','Veces por semana']]
       .map(([v,l]) => `<option value="${v}" ${editing && editing.frequency?.type === v ? 'selected' : ''}>${l}</option>`).join('');
     const showDays = editing && editing.frequency?.type === 'days' ? 'block' : 'none';
+    const editingWeekly = !!(editing && editing.frequency?.type === 'weekly');
+    const showWeekly = editingWeekly ? 'block' : 'none';
+    const timesVal = editingWeekly ? timesPerWeek(editing) : 3;
+    const sugPicker = [1,2,3,4,5,6,0].map(d => {
+      const checked = editingWeekly && suggestedDays(editing).includes(d) ? 'checked' : '';
+      return `<label><input type="checkbox" name="sday" value="${d}" ${checked} /><span class="day-pill">${DAY_NAMES[d]}</span></label>`;
+    }).join('');
 
     // Metas activas para vincular (no archivadas, no cumplidas)
     const linkableGoals = state.goals.filter(g => !g.done && !g.archived);
@@ -880,6 +1203,17 @@ const Habits = (() => {
           <label>Días</label>
           <div class="day-picker">${dayPicker}</div>
         </div>
+        <div id="h-weekly-wrap" style="display:${showWeekly}">
+          <label for="h-times">Veces por semana</label>
+          <input type="number" id="h-times" inputmode="numeric" min="1" max="7" step="1" value="${timesVal}" />
+          <label>Días sugeridos <span style="text-transform:none;color:var(--text-faint)">(opcional)</span></label>
+          <div class="day-picker">${sugPicker}</div>
+          <p style="color:var(--text-dim);font-size:11px;margin-top:6px">Días ideales; puedes cumplir otros días.</p>
+          <p class="qe-error" id="h-weekly-error" hidden></p>
+        </div>
+
+        <label for="h-tod">Momento del día</label>
+        <select id="h-tod">${todOpts}</select>
 
         <label style="margin-top:14px">📊 Cantidad diaria</label>
         <div style="display:flex;gap:8px">
@@ -914,11 +1248,26 @@ const Habits = (() => {
         const defaultIncrement = parseFloat(document.getElementById('h-increment').value) || null;
         const dailyTarget = parseFloat(document.getElementById('h-daily-target').value) || 1;
         const unit = document.getElementById('h-unit').value.trim() || 'sesión';
+        const todSel = document.getElementById('h-tod').value;
+        const timeOfDay = MOMENTS.includes(todSel) ? todSel : null;
         let frequency = { type: 'daily' };
         if (freqType === 'days') {
           const days = [...document.querySelectorAll('input[name=day]:checked')].map(i => +i.value);
           if (days.length === 0) { UI.toast('Selecciona al menos un día'); return false; }
           frequency = { type: 'days', days };
+        }
+        if (freqType === 'weekly') {
+          const errEl = document.getElementById('h-weekly-error');
+          const timesRaw = document.getElementById('h-times').value.trim();
+          const times = Number(timesRaw);
+          const sug = [...document.querySelectorAll('input[name=sday]:checked')].map(i => +i.value);
+          let err = '';
+          if (!Number.isInteger(times) || times < 1 || times > 7) err = 'Las veces por semana deben ser entre 1 y 7';
+          else if (sug.length > 0 && sug.length < times) err = `Elige al menos ${times} días sugeridos (o ninguno)`;
+          errEl.textContent = err;
+          errEl.hidden = !err;
+          if (err) return false;
+          frequency = { type: 'weekly', timesPerWeek: times, suggestedDays: sug };
         }
         if (editing) {
           editing.name = name;
@@ -926,6 +1275,7 @@ const Habits = (() => {
           editing.color = color;
           editing.area = area;
           editing.frequency = frequency;
+          editing.timeOfDay = timeOfDay;
           editing.linkedGoalId = linkedGoalId;
           editing.defaultIncrement = defaultIncrement;
           editing.dailyTarget = dailyTarget;
@@ -933,14 +1283,14 @@ const Habits = (() => {
           UI.toast('Hábito actualizado');
         } else {
           Storage.get().habits.push({
-            id: Storage.uid(), name, icon, color, area, frequency,
+            id: Storage.uid(), name, icon, color, area, frequency, timeOfDay,
             linkedGoalId, defaultIncrement, dailyTarget, unit,
             createdAt: Date.now(), history: [], contributions: {}, dailyProgress: {},
           });
           UI.toast('Hábito creado');
         }
         Storage.save();
-        renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
+        renderOverview(); renderFull(); renderHeatmap(); renderDetail(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
       }
     });
@@ -949,6 +1299,7 @@ const Habits = (() => {
       const sel = document.getElementById('h-freq');
       sel.addEventListener('change', () => {
         document.getElementById('h-days-wrap').style.display = sel.value === 'days' ? 'block' : 'none';
+        document.getElementById('h-weekly-wrap').style.display = sel.value === 'weekly' ? 'block' : 'none';
       });
 
       // Mostrar/ocultar campo de cantidad según meta seleccionada
@@ -1013,7 +1364,11 @@ const Habits = (() => {
       }
       return total === 0 ? 0 : Math.round((done / total) * 100);
     };
-    const pct7 = pct(7), pct30 = pct(30), pct90 = pct(90);
+    const weekly = isWeekly(h);
+    // Semanales: sesiones realizadas / esperadas (proporcional a las semanas)
+    const pct7 = weekly ? complianceWindow(h, 7).pct : pct(7);
+    const pct30 = weekly ? complianceWindow(h, 30).pct : pct(30);
+    const pct90 = weekly ? complianceWindow(h, 90).pct : pct(90);
 
     // Total cumplido
     const totalDone = history.length;
@@ -1038,7 +1393,7 @@ const Habits = (() => {
       else if (isDone) classes.push('done');
       if (isToday) classes.push('today');
       const dateLabel = d.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
-      const stateLabel = !applies ? ' (no aplica)' : (onVac ? ' (vacaciones)' : (isDone ? ' · ✓ hecho' : ' · sin marcar'));
+      const stateLabel = !applies ? (archivedOn(h, key) ? ' (archivado)' : ' (no aplica)') : (onVac ? ' (vacaciones)' : (isDone ? ' · ✓ hecho' : ' · sin marcar'));
       heatmapCells.push(`<div class="heatmap-cell ${classes.join(' ')}" title="${dateLabel}${stateLabel}"></div>`);
     }
 
@@ -1062,7 +1417,15 @@ const Habits = (() => {
           `;
         }).join('');
 
+    const archivedBanner = h.archived ? `
+      <div class="habit-archived-banner">📦 Archivado${h.archivedAt ? ' el ' + new Date(h.archivedAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : ''} · no aparece en Hoy ni en estadísticas</div>` : '';
+    const detailActions = h.archived
+      ? `<button class="btn-secondary" data-detail-action="unarchive">↩︎ Reactivar</button>
+         <button class="btn-danger" data-detail-action="delete">Eliminar</button>`
+      : `<button class="btn-secondary" data-detail-action="archive">📦 Archivar hábito</button>`;
+
     c.innerHTML = `
+      ${archivedBanner}
       <div class="habit-detail-hero">
         <span class="habit-detail-icon">${h.icon || '⭐'}</span>
         <div class="habit-detail-name">${escapeHtml(h.name)}</div>
@@ -1075,11 +1438,11 @@ const Habits = (() => {
 
       <div class="habit-stats-grid">
         <div class="stat-card" style="--stat-color:var(--accent-orange)">
-          <div class="stat-label">Racha 🔥</div>
+          <div class="stat-label">${weekly ? 'Racha (semanas) 🔥' : 'Racha 🔥'}</div>
           <div class="stat-value">${streak}</div>
         </div>
         <div class="stat-card" style="--stat-color:var(--accent-yellow)">
-          <div class="stat-label">Mejor 🏆</div>
+          <div class="stat-label">${weekly ? 'Mejor (semanas) 🏆' : 'Mejor 🏆'}</div>
           <div class="stat-value">${bestStreak}</div>
         </div>
         <div class="stat-card" style="--stat-color:var(--accent-green)">
@@ -1092,7 +1455,7 @@ const Habits = (() => {
         <div class="section-head">
           <div>
             <div class="section-title">📊 Cumplimiento</div>
-            <div class="section-subtitle">% sobre días aplicables</div>
+            <div class="section-subtitle">${weekly ? '% sobre sesiones esperadas' : '% sobre días aplicables'}</div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
@@ -1114,9 +1477,9 @@ const Habits = (() => {
       <div class="detail-heatmap-wrap">
         <div class="detail-heatmap-header">
           <div class="heatmap-block-title">📅 Últimos 90 días</div>
-          <button class="heatmap-edit-btn" id="heatmap-retro-edit-btn" data-habit-id="${h.id}" aria-label="Editar últimos 7 días" title="Editar últimos 7 días">
+          ${h.archived ? '' : `<button class="heatmap-edit-btn" id="heatmap-retro-edit-btn" data-habit-id="${h.id}" aria-label="Editar últimos 7 días" title="Editar últimos 7 días">
             <span class="edit-icon">✎</span>
-          </button>
+          </button>`}
         </div>
         <div class="detail-heatmap-cells">${heatmapCells.join('')}</div>
       </div>
@@ -1130,7 +1493,18 @@ const Habits = (() => {
         </div>
         <div class="history-list">${historyHTML}</div>
       </div>
+
+      <div class="habit-detail-actions">${detailActions}</div>
     `;
+
+    c.querySelectorAll('[data-detail-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const a = btn.dataset.detailAction;
+        if (a === 'archive') archive(h.id);
+        if (a === 'unarchive') unarchive(h.id);
+        if (a === 'delete') remove(h.id, () => UI.goBack('habits-manage'));
+      });
+    });
 
     // Botón para editar últimos 7 días (modal con lista)
     const editBtn = document.getElementById('heatmap-retro-edit-btn');
@@ -1255,6 +1629,7 @@ const Habits = (() => {
   }
 
   function calcBestStreak(h) {
+    if (isWeekly(h)) return weeklyBestStreak(h);
     if (!h.history || h.history.length === 0) return 0;
     const set = new Set(h.history);
     const sortedDates = [...set].sort();
@@ -1284,8 +1659,8 @@ const Habits = (() => {
   function renderHeatmap() {
     const c = document.getElementById('heatmap-list');
     if (!isLive(c)) return;
-    const state = Storage.get();
-    if (state.habits.length === 0) {
+    const list = activeHabits();
+    if (list.length === 0) {
       c.innerHTML = '<div class="empty">No hay hábitos para mostrar</div>';
       return;
     }
@@ -1298,7 +1673,7 @@ const Habits = (() => {
     }
     const todayKey = UI.todayKey();
 
-    c.innerHTML = state.habits.map(h => {
+    c.innerHTML = list.map(h => {
       const set = new Set(h.history || []);
       // Generamos las celdas con información de "aplica o no" para este hábito
       const cells = days.map(dk => {
@@ -1318,18 +1693,22 @@ const Habits = (() => {
       const applicableDays = days.filter(dk => isHabitForDate(h, new Date(dk + 'T12:00:00')));
       const completed = applicableDays.filter(dk => set.has(dk)).length;
       const totalApplicable = applicableDays.length;
-      const pct = totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0;
+      const weekly = isWeekly(h);
+      // Semanales: % = sesiones realizadas / esperadas en los 30 días
+      const pct = weekly ? complianceWindow(h, 30).pct : (totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0);
       const streak = calcStreak(h);
       return `
         <div class="heatmap-block">
           <div class="heatmap-block-title">
             <span>${h.icon || '⭐'}</span>
             <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(h.name)}</span>
-            ${streak > 0 ? `<span class="streak">${streak}🔥</span>` : ''}
+            ${streak > 0 ? `<span class="streak">${streakLabel(h, streak)}</span>` : ''}
           </div>
           <div class="heatmap-cells">${cells}</div>
           <div class="heatmap-stats">
-            <span><strong>${completed}</strong>/${totalApplicable} días aplicables</span>
+            ${weekly
+              ? `<span><strong>${completed}</strong> sesiones · meta ${timesPerWeek(h)}× por semana</span>`
+              : `<span><strong>${completed}</strong>/${totalApplicable} días aplicables</span>`}
             <span><strong>${pct}%</strong> cumplimiento</span>
           </div>
         </div>`;
@@ -1344,5 +1723,5 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { countsForDate, isWeekly, weekPace, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();

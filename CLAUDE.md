@@ -16,7 +16,7 @@ HTML, CSS y JS **vanilla**. Scripts clásicos (`<script src="...">`, sin `type="
 2. `ui.js` — `UI`: navegación entre vistas (`go`/`goBack`), modal genérico, toast, helpers de fecha.
 3. `helpers.js` — `escapeHtml`, `escapeAttr`, `isLive` (funciones sueltas, no un módulo).
 4. `animate.js` — `Animate`: animaciones de entrada (barras, anillos, gráficos SVG, mapa de calor, números y listas). Solo visual; se engancha automáticamente vía `MutationObserver` + `UI.go`.
-5. `habits.js` — `Habits`: hábitos cuantitativos, streaks, heatmap, progreso diario.
+5. `habits.js` — `Habits`: hábitos cuantitativos (diarios, días específicos o X veces por semana), rachas, heatmap, progreso diario, archivado y la lista de Hoy agrupada por momento del día.
 6. `tasks.js` — `Tasks`: tareas puntuales y recurrentes.
 7. `goals.js` — `Goals`: metas por horizonte (semana/mes/año), jerarquía padre-hijo.
 8. `goal-archive.js` — `GoalArchive`: vista de solo lectura de metas archivadas.
@@ -55,6 +55,9 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 - Volver atrás: `data-back` dispara `UI.goBack()` (pila de historial interna).
 - Cada vista es una sección `<section id="view-nombre-de-vista" class="view">` en `index.html`.
 - Bottom-nav: solo **Enfoque** (`today`) y **Estadísticas** (`stats`). Finanzas no tiene pestaña propia.
+- Hábitos en Hoy (`Habits.renderTodayHabits`): agrupados por `timeOfDay` (Mañana, Tarde, Noche y "Cualquier momento" si no tiene). Orden: el momento actual (mañana < 12:00, tarde 12:00–18:59, noche ≥ 19:00), los siguientes, "Cualquier momento" y al final los ya pasados. Encabezado "Mañana · 2/3"; dentro, pendientes arriba (orden manual de `moveHabit`) y completados abajo. Un grupo completo se colapsa con ✓ (tocar para expandir); los grupos vacíos no se muestran.
+- Hábitos semanales en Hoy: prioritarios (en su grupo) si hoy es día sugerido, si están en alerta de ritmo ("Te faltan N, quedan M días" en ámbar) o si ya se registró algo hoy. Si no, van al bloque atenuado "Flexibles esta semana" al final; con la semana cumplida no aparecen en días no sugeridos. Muestran "2/3 esta semana" con mini barra. Si la meta ya no es alcanzable: texto neutro, nunca rojo.
+- Archivar hábitos: desde el detalle o la gestión (📦, con confirmación). Los archivados viven en la sección colapsable "Archivados" de la gestión, con "Reactivar" y "Eliminar"; no aparecen en Hoy ni cuentan en KPIs/estadísticas/rachas globales. Para saber si un hábito cuenta un día usar siempre `Habits.countsForDate` / `isHabitForToday`, nunca leer `frequency` directo.
 - Finanzas en Hoy: la tarjeta **"💰 Finanzas"** (`Finance.renderTodayPending`, contenedor `#today-pending`) se muestra siempre. Si hay presupuesto o meta de ahorro, muestra sus barras ("Gastado $X de $Y", "Ahorro $A de $B"). Con pagos programados por vencer lista cada uno con "Pagar"; si no hay, muestra "Gastado este mes" (sin Ahorro) y "No hay gastos pendientes". Su "+" abre el modal de registro rápido y la billetera ("Ver movimientos") lleva a **"🧾 Movimientos"** (vista `finance-settings`), cuyo "volver" regresa a donde se entró.
 - Subpestañas de Movimientos: **Pagos programados, Puntuales, Archivo, Plan**. En **Plan** se definen presupuesto mensual, meta de ahorro mensual y presupuesto por categoría (`Finance.openPlan()` abre directo esa pestaña).
 - El análisis mensual vive en Estadísticas › Finanzas: resumen Gastado/Ahorrado/%, bloques Presupuesto y Meta de ahorro (o estado vacío con link a Plan), dona, "Gastos y ahorro · 6 meses" (con línea punteada del presupuesto) y "Registros del mes" con editar/eliminar.
