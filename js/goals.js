@@ -54,6 +54,272 @@ const Goals = (() => {
     return g.done ? 100 : 0;
   }
 
+  const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const fmtNum = n => String(Math.round(n * 10) / 10);
+
+  // Período calendario de un horizonte que contiene `ref`: semana lunes→domingo
+  // (igual que UI.weekKey), mes o año. elapsed incluye el día de `ref`.
+  function periodRange(horizon, ref = new Date()) {
+    const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 12);
+    let start, end;
+    if (horizon === 'week') {
+      start = new Date(d); start.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      end = new Date(start); end.setDate(start.getDate() + 6);
+    } else if (horizon === 'month') {
+      start = new Date(d.getFullYear(), d.getMonth(), 1, 12);
+      end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 12);
+    } else {
+      start = new Date(d.getFullYear(), 0, 1, 12);
+      end = new Date(d.getFullYear(), 11, 31, 12);
+    }
+    return {
+      start, end,
+      startKey: UI.localDateKey(start), endKey: UI.localDateKey(end),
+      total: Math.round((end - start) / 86400000) + 1,
+      elapsed: Math.round((d - start) / 86400000) + 1,
+    };
+  }
+
+  // Ritmo esperado (solo metas cuantitativas activas no cumplidas):
+  // esperado = target × días transcurridos (con hoy) / días del período.
+  function goalPace(g, now = new Date()) {
+    if (!(g.target > 0) || g.done || g.archived) return null;
+    const r = periodRange(g.horizon, now);
+    const expected = g.target * r.elapsed / r.total;
+    const cur = g.current || 0;
+    const pct = Math.min(100, Math.round((r.elapsed / r.total) * 1000) / 10);
+    const unit = g.unit ? ' ' + g.unit : '';
+    if (cur > Math.ceil(expected)) {
+      return { state: 'ahead', pct, expected, n: cur - Math.ceil(expected), text: `Vas ${fmtNum(cur - Math.ceil(expected))}${unit} adelante` };
+    }
+    if (cur < Math.floor(expected)) {
+      return { state: 'behind', pct, expected, n: Math.floor(expected) - cur, text: `Vas ${fmtNum(Math.floor(expected) - cur)}${unit} atrás` };
+    }
+    return { state: 'ok', pct, expected, n: 0, text: 'Al día' };
+  }
+
+  // Barra de progreso + marca vertical del esperado (ambas animadas por Animate)
+  function goalBarHTML(pct, pace, style = '') {
+    return `<div class="goal-bar ${pace ? 'has-pace' : ''}" ${style ? `style="${style}"` : ''}>` +
+      `<div class="goal-bar-fill" style="width:${pct}%"></div>` +
+      (pace ? `<div class="goal-pace-mark" style="width:${pace.pct}%"></div>` : '') +
+      `</div>`;
+  }
+  const paceHTML = pace => pace ? `<div class="goal-pace ${pace.state}">${pace.text}</div>` : '';
+
+  // Etiqueta corta del período de una meta (por su fecha de creación)
+  function shortPeriodLabel(g) {
+    const r = periodRange(g.horizon, new Date(g.createdAt));
+    if (g.horizon === 'week') {
+      const a = r.start, b = r.end;
+      return a.getMonth() === b.getMonth()
+        ? `semana ${a.getDate()}–${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`
+        : `semana ${a.getDate()} ${MONTHS_SHORT[a.getMonth()]}–${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`;
+    }
+    if (g.horizon === 'month') return `${MONTHS_SHORT[r.start.getMonth()]} ${r.start.getFullYear()}`;
+    return String(r.start.getFullYear());
+  }
+
+  /**
+   * Origen del avance de una meta cuantitativa: hábitos (contributions dentro del
+   * período que cayeron en esta meta), tareas completadas vinculadas, metas hijas
+   * (current si está activa, propagatedCurrent si está archivada) y "Manual" (el resto).
+   */
+  function originBreakdown(g) {
+    const s = Storage.get();
+    const r = periodRange(g.horizon, new Date(g.createdAt));
+    const inRange = dk => dk >= r.startKey && dk <= r.endKey;
+    const today = UI.todayKey();
+    const refKey = inRange(today) ? today : r.endKey;
+    const rows = [];
+    let linked = false;
+
+    s.habits.forEach(h => {
+      if (!h.linkedGoalId) return;
+      let sum = 0;
+      Object.keys(h.contributions || {}).forEach(dk => {
+        const v = h.contributions[dk] || 0;
+        if (!v || !inRange(dk)) return;
+        const tg = Habits.findGoalForDate(h, dk);
+        if (tg && tg.id === g.id) sum += v;
+      });
+      const feeds = Habits.findGoalForDate(h, refKey);
+      if ((feeds && feeds.id === g.id) || sum > 0) {
+        linked = true;
+        rows.push({ kind: 'habit', label: h.name, value: sum });
+      }
+    });
+
+    const linkedTasks = s.tasks.filter(t => t.goalId === g.id);
+    if (linkedTasks.length) {
+      linked = true;
+      const n = linkedTasks.filter(t => t.done && t.doneAt && inRange(UI.localDateKey(new Date(t.doneAt)))).length;
+      rows.push({ kind: 'tasks', label: 'Tareas', value: n });
+    }
+
+    s.goals
+      .filter(c => c.parentGoalId === g.id && c.target > 0)
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+      .forEach(c => {
+        linked = true;
+        const v = c.archived ? (c.propagatedCurrent != null ? c.propagatedCurrent : (c.current || 0)) : (c.current || 0);
+        if (!c.archived || v > 0) rows.push({ kind: 'child', label: `${c.name} · ${shortPeriodLabel(c)}`, value: v });
+      });
+
+    const sum = rows.reduce((a, x) => a + x.value, 0);
+    const manual = Math.round(((g.current || 0) - sum) * 100) / 100;
+    if (manual > 0) rows.push({ kind: 'manual', label: 'Manual', value: manual });
+    return { rows, linked };
+  }
+
+  function originHTML(g) {
+    const { rows, linked } = originBreakdown(g);
+    return `
+          <div class="goal-origin">
+            <div class="goal-origin-title">Aporta a esta meta</div>
+            ${rows.map(x => `<div class="goal-origin-row ${x.kind}">${escapeHtml(x.label)} · <strong>${fmtNum(x.value)}</strong></div>`).join('')}
+            ${linked ? '' : '<div class="goal-origin-empty">Sin acciones vinculadas</div>'}
+          </div>`;
+  }
+
+  // ---- División en cascada (anual → mensual + semanal; mensual → semanal) ----
+  function splitSuggestions(horizon, target, now = new Date()) {
+    if (horizon === 'year') return { month: Math.ceil(target / 12), week: Math.ceil(target / 52) };
+    const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return { week: Math.ceil(target / (days / 7)) };
+  }
+  const canSplit = g => !g.archived && (g.horizon === 'year' || g.horizon === 'month') && g.target > 0 &&
+    !Storage.get().goals.some(c => c.parentGoalId === g.id && !c.archived);
+
+  // Campos de las secciones "Mensual"/"Semanal" + hábito opcional (ids gs-*)
+  function splitFieldsHTML() {
+    const habits = Storage.get().habits.filter(h => !h.archived);
+    const sec = (h, title) => `
+      <div class="g-split-sec" data-split-sec="${h}">
+        <div class="g-split-title">${title}</div>
+        <label for="gs-${h}-name">Nombre</label>
+        <input type="text" id="gs-${h}-name" autocomplete="off" />
+        <div class="g-split-row">
+          <div><label for="gs-${h}-target">Objetivo</label><input type="number" id="gs-${h}-target" min="1" step="1" /></div>
+          <div><label for="gs-${h}-unit">Unidad</label><input type="text" id="gs-${h}-unit" autocomplete="off" /></div>
+        </div>
+      </div>`;
+    return `
+      ${sec('month', 'Mensual · este mes')}
+      ${sec('week', 'Semanal · esta semana')}
+      ${habits.length ? `
+        <label for="gs-habit">Vincular hábito (opcional)</label>
+        <select id="gs-habit">
+          <option value="">— Ninguno —</option>
+          ${habits.map(h => `<option value="${h.id}">${h.icon || '⭐'} ${escapeHtml(h.name)}</option>`).join('')}
+        </select>
+        <p class="g-split-warn" id="gs-habit-warn" hidden></p>` : ''}
+      <p class="qe-error" id="gs-error" hidden></p>`;
+  }
+
+  // Enlaza los campos de división. getParent() → { horizon, name, target, unit }.
+  // Los valores sugeridos se recalculan mientras el usuario no edite ese campo.
+  function bindSplitFields(getParent) {
+    const $ = id => document.getElementById(id);
+    ['month', 'week'].forEach(h => ['name', 'target', 'unit'].forEach(f => {
+      const el = $(`gs-${h}-${f}`);
+      el.addEventListener('input', () => { el.dataset.dirty = '1'; $('gs-error').hidden = true; });
+    }));
+    const habitSel = $('gs-habit');
+    if (habitSel) {
+      habitSel.addEventListener('change', () => {
+        const warn = $('gs-habit-warn');
+        const h = Storage.get().habits.find(x => x.id === habitSel.value);
+        const old = h && h.linkedGoalId ? Storage.get().goals.find(g => g.id === h.linkedGoalId) : null;
+        warn.textContent = old ? `Reemplazará el vínculo con ${old.name}` : '';
+        warn.hidden = !old;
+      });
+    }
+    const setDefault = (el, v) => { if (!el.dataset.dirty) el.value = v; };
+    function refresh() {
+      const p = getParent();
+      document.querySelector('[data-split-sec="month"]').hidden = p.horizon !== 'year';
+      const sug = p.target > 0 ? splitSuggestions(p.horizon, p.target) : {};
+      ['month', 'week'].forEach(h => {
+        setDefault($(`gs-${h}-name`), p.name);
+        setDefault($(`gs-${h}-unit`), p.unit);
+        setDefault($(`gs-${h}-target`), sug[h] || '');
+      });
+    }
+    function read() {
+      const p = getParent();
+      const levels = p.horizon === 'year' ? ['month', 'week'] : ['week'];
+      const out = { habitId: habitSel ? (habitSel.value || null) : null };
+      for (const h of levels) {
+        const target = +$(`gs-${h}-target`).value || 0;
+        if (target <= 0) {
+          const err = $('gs-error');
+          err.textContent = `Define un objetivo mayor a 0 para la meta ${h === 'month' ? 'mensual' : 'semanal'}`;
+          err.hidden = false;
+          return null;
+        }
+        out[h] = {
+          name: $(`gs-${h}-name`).value.trim() || p.name,
+          target,
+          unit: $(`gs-${h}-unit`).value.trim(),
+        };
+      }
+      return out;
+    }
+    refresh();
+    return { refresh, read };
+  }
+
+  // Crea SOLO las metas del período actual, recurrentes y vinculadas a la padre.
+  function createSplitChildren(parent, v) {
+    const s = Storage.get();
+    const now = Date.now();
+    const mk = (horizon, data, parentGoalId) => ({
+      id: Storage.uid(), name: data.name, horizon, area: parent.area,
+      target: data.target, unit: data.unit, parentGoalId,
+      recurrence: horizon === 'month' ? 'monthly' : 'weekly', seriesId: Storage.uid(),
+      current: 0, done: false, createdAt: now,
+    });
+    let weekParentId = parent.id;
+    const created = [];
+    if (parent.horizon === 'year' && v.month) {
+      const m = mk('month', v.month, parent.id);
+      s.goals.push(m); created.push(m);
+      weekParentId = m.id;
+    }
+    const w = mk('week', v.week, weekParentId);
+    s.goals.push(w); created.push(w);
+    if (v.habitId) {
+      const h = s.habits.find(x => x.id === v.habitId);
+      if (h) h.linkedGoalId = w.id;
+    }
+    return created;
+  }
+
+  // Acción "Dividir" sobre una meta anual/mensual activa sin hijas activas
+  function openSplitModal(id) {
+    const g = Storage.get().goals.find(x => x.id === id);
+    if (!g || !canSplit(g)) return;
+    let fields;
+    UI.openModal({
+      title: `✂️ Dividir "${g.name}"`,
+      okText: 'Crear metas',
+      bodyHTML: `
+        <p class="qe-help" style="margin-top:0">Se crean solo las metas del período actual; las siguientes se generan solas y quedan vinculadas.</p>
+        ${splitFieldsHTML()}`,
+      onSave: () => {
+        const v = fields.read();
+        if (!v) return false;
+        const created = createSplitChildren(g, v);
+        Storage.save();
+        renderAll(); renderWeeklyMini(); renderTodayGoals(); App.refreshKPIs();
+        if (typeof Habits !== 'undefined') { Habits.renderFull(); }
+        UI.toast(`✂️ Dividida en ${created.length} meta${created.length > 1 ? 's' : ''}`);
+      }
+    });
+    fields = bindSplitFields(() => ({ horizon: g.horizon, name: g.name, target: g.target, unit: g.unit || '' }));
+  }
+
   /**
    * Devuelve metas que pueden ser "padres" de la meta dada
    * (mismo área, horizonte mayor, cuantitativas, no archivadas).
@@ -308,13 +574,16 @@ const Goals = (() => {
   function renderGoalMini(g) {
     const pct = g.done ? 100 : getProgress(g);
     const tt = g.done ? '✓' : (g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : `${pct}%`);
+    // Enfoque limpio: nombre, avance y ritmo (sin área, período ni recurrencia)
+    const pace = goalPace(g);
     return `
       <div class="goal-mini-item ${g.done ? 'done' : ''}" data-goal-quick="${g.id}">
         <div class="goal-mini-row">
           <span class="goal-mini-name">${escapeHtml(g.name)}</span>
           <span class="goal-mini-progress">${tt}</span>
         </div>
-        <div class="goal-bar"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+        ${goalBarHTML(pct, pace)}
+        ${paceHTML(pace)}
       </div>`;
   }
 
@@ -668,6 +937,7 @@ const Goals = (() => {
 
     const canUp = canMoveGoal(g.id, -1);
     const canDown = canMoveGoal(g.id, 1);
+    const pace = goalPace(g);
 
     return `
       <div class="goal-card ${g.done ? 'done' : ''}" data-id="${g.id}">
@@ -690,12 +960,15 @@ const Goals = (() => {
           ${archivedChildrenBadge}
           ${recurrenceBadge}
         </div>
-        <div class="goal-bar" style="margin-top:8px"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+        ${goalBarHTML(pct, pace, 'margin-top:8px')}
+        ${paceHTML(pace)}
         ${isQuant ? `
           <div class="goal-card-progress">
             <input type="number" data-action="current" value="${g.current || 0}" min="0" step="0.5" />
             <span>/ ${g.target} ${g.unit || ''}</span>
+            ${canSplit(g) ? '<button type="button" class="goal-split-btn" data-action="split">✂️ Dividir</button>' : ''}
           </div>
+          ${originHTML(g)}
         ` : `
           <div class="goal-card-progress">
             <button class="btn-secondary" data-action="toggle-done" style="margin:0;width:auto;padding:8px 14px;font-size:12px;">
@@ -716,6 +989,7 @@ const Goals = (() => {
       else if (a === 'edit') el.addEventListener('click', () => openCreateModal(id));
       else if (a === 'up') el.addEventListener('click', () => moveGoal(id, -1));
       else if (a === 'down') el.addEventListener('click', () => moveGoal(id, 1));
+      else if (a === 'split') el.addEventListener('click', () => openSplitModal(id));
     });
   }
 
@@ -779,6 +1053,14 @@ const Goals = (() => {
             Cuando esta meta se cumpla, sumará su objetivo a la meta padre. Ej: si esta meta es "Leer 1 libro este mes" vinculada a "Leer 12 libros este año", al cumplir esta sumará 1 a la anual.
           </p>
         </div>
+        ${editing ? '' : `
+          <div class="g-split" id="g-split" hidden>
+            <label class="g-split-toggle">
+              <input type="checkbox" id="g-split-on" />
+              <span>Dividir en metas más pequeñas</span>
+            </label>
+            <div class="g-split-body" id="g-split-body" hidden>${splitFieldsHTML()}</div>
+          </div>`}
         ${isArchived ? '' : `
           <label>🔁 Recurrencia</label>
           <select id="g-recurrence">${recOpts}</select>
@@ -804,6 +1086,11 @@ const Goals = (() => {
         const parentGoalId = parentSel ? (parentSel.value || null) : null;
         const recurrenceSel = document.getElementById('g-recurrence');
         const recurrence = recurrenceSel ? recurrenceSel.value : 'none';
+        // División en cascada (solo al crear una anual/mensual cuantitativa)
+        const splitOn = !editing && splitFields && document.getElementById('g-split-on').checked &&
+          !document.getElementById('g-split').hidden;
+        const splitValues = splitOn ? splitFields.read() : null;
+        if (splitOn && !splitValues) return false;
 
         if (editing) {
           if (isArchived) {
@@ -899,12 +1186,43 @@ const Goals = (() => {
             current: 0, done: false, createdAt: Date.now(),
           };
           Storage.get().goals.push(newGoal);
-          UI.toast(recurrence !== 'none' ? `🔁 Meta recurrente creada (${recurrenceLabel(recurrence)})` : 'Meta creada');
+          if (splitValues) {
+            const created = createSplitChildren(newGoal, splitValues);
+            UI.toast(`Meta creada · dividida en ${created.length} meta${created.length > 1 ? 's' : ''}`);
+          } else {
+            UI.toast(recurrence !== 'none' ? `🔁 Meta recurrente creada (${recurrenceLabel(recurrence)})` : 'Meta creada');
+          }
         }
         Storage.save();
         renderAll(); renderWeeklyMini(); App.refreshKPIs();
+        if (splitValues && splitValues.habitId && typeof Habits !== 'undefined') Habits.renderFull();
       }
     });
+
+    // Interruptor "Dividir en metas más pequeñas": solo anual/mensual con objetivo > 0
+    let splitFields = null;
+    if (!editing) {
+      const val = id => document.getElementById(id).value;
+      splitFields = bindSplitFields(() => ({
+        horizon: val('g-horizon'),
+        name: val('g-name').trim(),
+        target: val('g-type') === 'quant' ? (+val('g-target') || 0) : 0,
+        unit: val('g-unit').trim(),
+      }));
+      const refreshSplit = () => {
+        const p = { horizon: val('g-horizon'), quant: val('g-type') === 'quant', target: +val('g-target') || 0 };
+        const show = (p.horizon === 'year' || p.horizon === 'month') && p.quant && p.target > 0;
+        document.getElementById('g-split').hidden = !show;
+        document.getElementById('g-split-body').hidden = !(show && document.getElementById('g-split-on').checked);
+        splitFields.refresh();
+      };
+      ['g-horizon', 'g-type', 'g-target', 'g-name', 'g-unit', 'g-split-on'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', refreshSplit);
+        el.addEventListener('change', refreshSplit);
+      });
+      refreshSplit();
+    }
 
     setTimeout(() => {
       const typeSel = document.getElementById('g-type');
@@ -971,5 +1289,5 @@ const Goals = (() => {
     }[rec] || '';
   }
 
-  return { renderAll, renderWeeklyMini, renderTodayGoals, openCreateModal, setInnerHorizon, openQuickProgressModal, updateCurrent };
+  return { renderAll, renderWeeklyMini, renderTodayGoals, openCreateModal, setInnerHorizon, openQuickProgressModal, updateCurrent, goalPace, originBreakdown, openSplitModal, periodRange };
 })();

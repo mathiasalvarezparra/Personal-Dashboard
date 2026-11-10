@@ -124,22 +124,11 @@ const GoalRollover = (() => {
       const goalPeriod = periodKey(horizon, new Date(g.createdAt));
       if (goalPeriod === currentKey) return; // todavía del período actual
 
-      // Propagar avance real al padre antes de archivar
+      // El avance ya subió al padre en tiempo real (Goals.updateCurrent propaga cada
+      // cambio por la cadena parentGoalId). Al archivar solo se registra cuánto aportó;
+      // volver a sumarlo aquí lo duplicaría.
       if (g.parentGoalId && g.target > 0) {
-        if (g.done) {
-          g.propagatedCurrent = g.target;
-        } else if ((g.current || 0) > 0) {
-          const delta = g.current;
-          const parent = state.goals.find(p => p.id === g.parentGoalId);
-          if (parent && parent.target) {
-            parent.current = Math.max(0, (parent.current || 0) + delta);
-            parent.done = parent.current >= parent.target;
-            g.propagatedCurrent = delta;
-            totalPropagated += delta;
-          }
-        } else {
-          g.propagatedCurrent = 0;
-        }
+        g.propagatedCurrent = g.current || 0;
       }
 
       g.archived = true;
