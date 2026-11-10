@@ -24,10 +24,6 @@ const UI = (() => {
       b.classList.toggle('active', b.dataset.go === view);
     });
     window.scrollTo({ top: 0, behavior: 'instant' });
-    // Refrescar dashboard de finanzas al entrar
-    if (view === 'finance' && typeof Finance !== 'undefined' && Finance.renderDashboard) {
-      Finance.renderDashboard();
-    }
     if (view === 'finance-settings' && typeof Finance !== 'undefined' && Finance.render) {
       Finance.render();
     }

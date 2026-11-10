@@ -135,7 +135,7 @@ Leído/escrito por: `Goals` (dueño, activas), `GoalArchive` (solo lectura de ar
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `category` | string | id de `Finance.EXPENSE_CATEGORIES` |
+| `category` | string | id de `Finance.EXPENSE_CATEGORIES` (ver `movements` para Ahorro) |
 | `recurrence` | string | `'monthly'` \| `'quarterly'` \| `'yearly'` (`'once'` es para movimientos puntuales, no vive acá) |
 | `defaultAmount` | number | monto estimado por ciclo (o monto de la cuota, si tiene cuotas) |
 | `dueDay` | number\|null | día del mes en que vence (para ordenar "próximos a vencer") |
@@ -143,7 +143,12 @@ Leído/escrito por: `Goals` (dueño, activas), `GoalArchive` (solo lectura de ar
 
 Leído/escrito por: `Finance` (dueño). No lo lee ningún otro módulo.
 
-### `movements` (array) — gastos puntuales, ingresos y pagos registrados
+### `movements` (array) — gastos puntuales y pagos registrados (+ ingresos/ajustes legados)
+
+Finanzas es **solo seguimiento de gastos y ahorro**. Un movimiento cuenta en la app si y solo si `Finance.isTrackedExpense(m)`: `type === 'expense'`, sin `isAdjustment` y con `category !== 'ajuste'`.
+
+- **Datos legados ocultos:** los movimientos con `type: 'income'` y los ajustes de saldo (`isAdjustment: true` o `category: 'ajuste'`) ya no se pueden crear ni se muestran en ninguna vista, lista, total ni gráfico (Hoy, Estadísticas, gestión, Archivo, resumen del día). **No se borran:** siguen en el estado y exportar/importar JSON los conserva intactos.
+- **Ahorro:** la categoría de gasto con id `'inversion'` se muestra como **"🏦 Ahorro"** (el id no cambia para no romper datos). Cuenta como "Ahorrado", no como "Gastado"; el % ahorrado del mes es ahorrado ÷ (gastado + ahorrado).
 
 ```json
 {
@@ -156,13 +161,13 @@ Leído/escrito por: `Finance` (dueño). No lo lee ningún otro módulo.
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `type` | string | `'expense'` \| `'income'` |
-| `category` | string | id de `EXPENSE_CATEGORIES` o `INCOME_CATEGORIES` según `type` |
+| `type` | string | `'expense'` (único tipo que se crea hoy) \| `'income'` (legado, oculto) |
+| `category` | string | id de `Finance.EXPENSE_CATEGORIES` (`'inversion'` = Ahorro). Legado: ids de ingreso y `'ajuste'` |
 | `recurringExpenseId` | string\|null | → `recurringExpenses[].id` si este movimiento es el pago de un gasto programado |
 | `periodMk` | string\|null | `monthKey` del ciclo que se está pagando, si es distinto al mes real del pago |
-| `isAdjustment` | boolean | `true` si viene de "⚖️ Ajustar saldo" (no de un gasto/ingreso real) |
+| `isAdjustment` | boolean | legado: `true` si vino del antiguo "⚖️ Ajustar saldo" (ya no existe). Oculto |
 
-Leído/escrito por: `Finance` (dueño). Leído por `Stats` (análisis financiero), `App` (pagos pendientes en "Hoy").
+Leído/escrito por: `Finance` (dueño; incluye la tarjeta "💰 Gastos" de Hoy y Estadísticas › Finanzas vía `Finance.openAnalysis`). Leído por `App` (pagos del día en el resumen de un día, filtrado con `Finance.isTrackedExpense`).
 
 ### `focus` (objeto único)
 
@@ -208,6 +213,6 @@ Cierre de semana. Dueño: `App`. Leído por `Stats`.
 | `tasks` | `Tasks` | `App`, `Stats` |
 | `goals` | `Goals`, `GoalRollover` | `GoalArchive`, `Habits`, `Tasks`, `Stats` |
 | `recurringExpenses` | `Finance` | — |
-| `movements` | `Finance` | `Stats`, `App` |
+| `movements` | `Finance` (solo gastos; ingresos/ajustes legados ocultos) | `App` (resumen del día) |
 | `focus`, `closures`, `weekClosures`, `dailySnapshots` | `App` | `Stats` |
 | `user` | `Onboarding` / Configuración | — |

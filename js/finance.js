@@ -1,5 +1,5 @@
 /* ============================================
-   FINANCE (gastos recurrentes, gastos puntuales e ingresos)
+   FINANCE (solo gastos y ahorro: pagos programados y gastos registrados)
    ============================================ */
 const Finance = (() => {
 
@@ -18,23 +18,20 @@ const Finance = (() => {
     { id: 'mascotas',     name: 'Mascotas',          icon: '🐾' },
     { id: 'regalos',      name: 'Regalos',           icon: '🎁' },
     { id: 'tecnologia',   name: 'Tecnología',        icon: '💻' },
-    { id: 'inversion',    name: 'Inversión/Ahorro',  icon: '🏦' },
+    { id: 'inversion',    name: 'Ahorro',            icon: '🏦' }, // id histórico: no cambiar
     { id: 'otros',        name: 'Otros',             icon: '📦' },
-    { id: 'ajuste',       name: 'Ajuste',            icon: '⚖️' },
   ];
 
-  // Categorías de ingresos
-  const INCOME_CATEGORIES = [
-    { id: 'sueldo',     name: 'Sueldo',     icon: '💼' },
-    { id: 'freelance',  name: 'Freelance',  icon: '🧑‍💻' },
-    { id: 'inversion',  name: 'Inversión',  icon: '📈' },
-    { id: 'venta',      name: 'Venta',      icon: '🏷️' },
-    { id: 'reembolsos', name: 'Reembolsos', icon: '↩️' },
-    { id: 'arriendo',   name: 'Arriendo',   icon: '🏘️' },
-    { id: 'bonos',      name: 'Bonos',      icon: '🏅' },
-    { id: 'otros',      name: 'Otros',      icon: '💵' },
-    { id: 'ajuste',     name: 'Ajuste',     icon: '⚖️' },
-  ];
+  // Categoría de ahorro (id legado 'inversion'): se suma aparte de lo gastado
+  const SAVINGS_CAT = 'inversion';
+  const isSavings = m => m.category === SAVINGS_CAT;
+
+  // Finanzas es solo seguimiento de gastos. Los ingresos y los ajustes de saldo
+  // son datos legados: se conservan en el estado (export/import) pero ninguna
+  // vista, total ni gráfico los considera.
+  function isTrackedExpense(m) {
+    return m.type === 'expense' && !m.isAdjustment && m.category !== 'ajuste';
+  }
 
   // Recurrencias para gastos (puntual = solo evento, los otros son configurables y se repiten)
   const RECURRENCES = [
@@ -47,7 +44,6 @@ const Finance = (() => {
   // Sub-tabs (orden visible)
   const SUB_TABS = [
     { id: 'scheduled', label: 'Pagos programados' },
-    { id: 'income',    label: 'Ingresos' },
     { id: 'once',      label: 'Gastos' },
     { id: 'archive',   label: 'Archivo' },
   ];
@@ -56,9 +52,6 @@ const Finance = (() => {
 
   function getExpenseCategory(id) {
     return EXPENSE_CATEGORIES.find(c => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
-  }
-  function getIncomeCategory(id) {
-    return INCOME_CATEGORIES.find(c => c.id === id) || INCOME_CATEGORIES[INCOME_CATEGORIES.length - 1];
   }
   function getRecurrence(id) {
     return RECURRENCES.find(r => r.id === id) || RECURRENCES[0];
@@ -111,9 +104,7 @@ const Finance = (() => {
   function renderActiveList() {
     const c = document.getElementById('finance-list');
     if (!c) return;
-    if (activeSubTab === 'income') {
-      renderIncomeList(c);
-    } else if (activeSubTab === 'once') {
+    if (activeSubTab === 'once') {
       renderOnceExpensesList(c);
     } else if (activeSubTab === 'archive') {
       // El archivo histórico se renderiza dentro de su propio contenedor,
@@ -147,40 +138,32 @@ const Finance = (() => {
   // (ambos comparten naturaleza de "movimiento real registrado" y deben ser editables/eliminables)
   function renderOnceExpensesList(c) {
     const { start, end } = getMonthRange(getCurrentMonthKey());
-    const list = (Storage.get().movements || []).filter(m =>
-      m.type === 'expense' && m.date && m.date >= start && m.date <= end
-    );
+    const list = monthExpenses(start, end);
     if (list.length === 0) {
       c.innerHTML = '<div class="empty">Sin gastos este mes · los de meses anteriores están en Archivo</div>';
       return;
     }
-    list.sort((a, b) => {
-      const dateCmp = (b.date || '').localeCompare(a.date || '');
-      if (dateCmp !== 0) return dateCmp;
-      return (b.createdAt || 0) - (a.createdAt || 0);
-    });
-    c.innerHTML = list.map(m => renderMovementItem(m)).join('');
+    c.innerHTML = sortByRecent(list).map(m => renderMovementItem(m)).join('');
     bindMovementActions(c);
   }
 
-  // --- Ingresos del mes en curso (los de otros meses están en Archivo)
-  function renderIncomeList(c) {
-    const { start, end } = getMonthRange(getCurrentMonthKey());
-    const list = (Storage.get().movements || []).filter(m =>
-      m.type === 'income' && m.date && m.date >= start && m.date <= end
+  // Gastos registrados (sin ingresos ni ajustes legados) dentro de un rango de fechas
+  function monthExpenses(start, end) {
+    return (Storage.get().movements || []).filter(m =>
+      isTrackedExpense(m) && m.date && m.date >= start && m.date <= end
     );
-    if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin ingresos este mes · toca "+ Nuevo movimiento" para registrar</div>';
-      return;
-    }
-    list.sort((a, b) => {
+  }
+
+  // Más reciente arriba; mismo día: último ingresado primero
+  function sortByRecent(list) {
+    return list.slice().sort((a, b) => {
       const dateCmp = (b.date || '').localeCompare(a.date || '');
       if (dateCmp !== 0) return dateCmp;
       return (b.createdAt || 0) - (a.createdAt || 0);
     });
-    c.innerHTML = list.map(m => renderMovementItem(m)).join('');
-    bindMovementActions(c);
   }
+
+  const sumAmount = list => list.reduce((s, m) => s + (m.amount || 0), 0);
 
   // --- Gastos recurrentes (recurringExpenses por tipo, ordenados por proximidad a fecha de pago)
 
@@ -228,15 +211,14 @@ const Finance = (() => {
     `;
   }
 
-  // ===== Item de movimiento (gasto puntual o ingreso) =====
+  // ===== Item de movimiento (gasto registrado; Ahorro se marca aparte) =====
   function renderMovementItem(m, opts = {}) {
-    const isIncome = m.type === 'income';
-    const cat = isIncome ? getIncomeCategory(m.category) : getExpenseCategory(m.category);
+    const cat = getExpenseCategory(m.category);
     const dateLabel = m.date
       ? new Date(m.date + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()
       : '—';
-    const amountClass = isIncome ? 're-amount income' : 're-amount expense';
-    const sign = isIncome ? '+' : '−';
+    const amountClass = isSavings(m) ? 're-amount savings' : 're-amount expense';
+    const sign = isSavings(m) ? '' : '− ';
     const noteBlock = m.note ? `<div class="task-note">${escapeHtml(m.note)}</div>` : '';
     const actionsBlock = opts.readonly ? '' : `
         <div class="re-actions">
@@ -250,7 +232,7 @@ const Finance = (() => {
           <div class="re-meta">
             <span class="re-due">${dateLabel}</span>
             <span class="re-cat">${cat.name}</span>
-            <span class="${amountClass}">${sign} ${formatCLP(m.amount)}</span>
+            <span class="${amountClass}">${sign}${formatCLP(m.amount)}</span>
           </div>
           ${noteBlock}
         </div>
@@ -291,14 +273,13 @@ const Finance = (() => {
     });
   }
 
-  // ====== MODAL UNIFICADO: NUEVO MOVIMIENTO ======
-  // Opciones:
-  //  - prefillType: 'expense' | 'income' (para shortcuts del FAB)
+  // ====== MODAL UNIFICADO: NUEVO GASTO ======
+  // Solo gastos (type 'expense'). Opciones:
   //  - editRecurringId: editar un recurringExpense existente
   //  - editMovementId: editar un movement existente
   function openMovementModal(opts = {}) {
     const state = Storage.get();
-    let editing = null;       // un movement (expense puntual o income)
+    let editing = null;       // un movement (gasto puntual o pago registrado)
     let editingRecurring = null; // un recurringExpense
 
     if (opts.editMovementId) {
@@ -308,36 +289,24 @@ const Finance = (() => {
       editingRecurring = (state.recurringExpenses || []).find(x => x.id === opts.editRecurringId) || null;
     }
 
-    // Tipo inicial
-    let initialType = 'expense';
-    if (editing) initialType = editing.type;
-    else if (editingRecurring) initialType = 'expense'; // los recurrentes son siempre gastos
-    else if (opts.prefillType) initialType = opts.prefillType;
-
     // Recurrencia inicial
     let initialRec = 'once';
     if (editingRecurring) initialRec = editingRecurring.recurrence;
     else if (editing) initialRec = 'once'; // movement = siempre puntual
 
     // Estado del modal (mutable mientras está abierto)
-    const modalState = { type: initialType, recurrence: initialRec };
+    const modalState = { recurrence: initialRec };
 
     const isEditingSomething = editing || editingRecurring;
-    const title = isEditingSomething ? 'Editar movimiento' : 'Nuevo movimiento';
+    const title = isEditingSomething ? 'Editar gasto' : 'Nuevo gasto';
     const okText = isEditingSomething ? 'Guardar cambios' : 'Registrar';
 
     UI.openModal({
       title,
       okText,
       bodyHTML: `
-        <label>Tipo</label>
-        <div class="finance-type-toggle" id="mv-type-toggle">
-          <button type="button" class="finance-type-btn ${modalState.type === 'expense' ? 'active' : ''}" data-type="expense">− Gasto</button>
-          <button type="button" class="finance-type-btn ${modalState.type === 'income' ? 'active' : ''}" data-type="income">+ Ingreso</button>
-        </div>
-
         <label>Nombre</label>
-        <input type="text" id="mv-name" placeholder="Ej: Luz, Sueldo, Bencina"
+        <input type="text" id="mv-name" placeholder="Ej: Luz, Supermercado, Bencina"
           value="${(editing && escapeAttr(editing.name)) || (editingRecurring && escapeAttr(editingRecurring.name)) || ''}" />
 
         <label>Categoría</label>
@@ -422,15 +391,13 @@ const Finance = (() => {
       }
     };
 
-    // Setup inicial: completar categorías y aplicar visibilidad según tipo/recurrencia
+    // Setup inicial: completar categorías y aplicar visibilidad según recurrencia
     const refreshUI = () => {
-      const isIncome = modalState.type === 'income';
       const isRecurring = modalState.recurrence !== 'once';
 
-      // Categorías según tipo
       const catSel = document.getElementById('mv-category');
-      const cats = isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-      // Preservar lo que el usuario tenga elegido (si sigue siendo válido para el tipo);
+      const cats = EXPENSE_CATEGORIES;
+      // Preservar lo que el usuario tenga elegido (si sigue siendo válido);
       // si no, caer en la categoría del ítem editado o la primera.
       const prevCat = catSel.value;
       const currentCat = (prevCat && cats.some(c => c.id === prevCat))
@@ -440,12 +407,6 @@ const Finance = (() => {
         `<option value="${c.id}" ${currentCat === c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`
       ).join('');
 
-      // Toggle tipo (estado visual de los botones)
-      document.querySelectorAll('.finance-type-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.type === modalState.type);
-      });
-
-      // Ingresos: sin recurrencia, sin fecha de referencia
       const recurrenceWrap = document.getElementById('mv-recurrence-wrap');
       const dueWrap = document.getElementById('mv-due-wrap');
       const dueLabel = document.getElementById('mv-due-label');
@@ -459,45 +420,37 @@ const Finance = (() => {
       const instToggleWrap = document.getElementById('mv-inst-toggle-wrap');
       const instToggle = document.getElementById('mv-inst-toggle');
       const instWrap = document.getElementById('mv-installments-wrap');
-      const showToggle = !isIncome && modalState.recurrence === 'monthly';
+      const showToggle = modalState.recurrence === 'monthly';
       if (instToggleWrap) instToggleWrap.hidden = !showToggle;
       if (instWrap) instWrap.hidden = !(showToggle && instToggle && instToggle.checked);
       if (!showToggle && instToggle) instToggle.checked = false;
       updateInstComputed();
-      const instOn = !isIncome && showToggle && instToggle && instToggle.checked;
+      const instOn = showToggle && instToggle && instToggle.checked;
 
-      if (isIncome) {
-        recurrenceWrap.hidden = true;
-        dueWrap.hidden = true;
-        dateWrap.hidden = false;
-        amountLabel.textContent = 'Monto recibido (CLP)';
-        amountHelp.textContent = '';
-      } else {
-        recurrenceWrap.hidden = false;
-        if (isRecurring) {
-          // Gasto recurrente: ocultar fecha puntual, mostrar fecha de referencia
-          dateWrap.hidden = true;
-          dueWrap.hidden = false;
-          amountLabel.textContent = 'Monto estimado (CLP, opcional)';
-          amountHelp.textContent = 'Sirve como referencia. El monto real se registra al pagar (en pestaña Finanzas).';
-          // Texto contextual según recurrencia
-          if (modalState.recurrence === 'monthly') {
-            dueLabel.textContent = 'Fecha de referencia';
-            dueHelp.textContent = 'Selecciona una fecha. Se repetirá el mismo día cada mes (ej: día 15 cada mes).';
-          } else if (modalState.recurrence === 'quarterly') {
-            dueLabel.textContent = 'Fecha del primer pago';
-            dueHelp.textContent = 'Selecciona una fecha. Se repetirá cada 3 meses a partir de esa fecha.';
-          } else if (modalState.recurrence === 'yearly') {
-            dueLabel.textContent = 'Fecha del pago anual';
-            dueHelp.textContent = 'Selecciona la fecha del año. Se repetirá cada año en ese mismo día y mes.';
-          }
-        } else {
-          // Gasto puntual: mostrar fecha, ocultar fecha de referencia
-          dateWrap.hidden = false;
-          dueWrap.hidden = true;
-          amountLabel.textContent = 'Monto (CLP)';
-          amountHelp.textContent = '';
+      recurrenceWrap.hidden = false;
+      if (isRecurring) {
+        // Gasto recurrente: ocultar fecha puntual, mostrar fecha de referencia
+        dateWrap.hidden = true;
+        dueWrap.hidden = false;
+        amountLabel.textContent = 'Monto estimado (CLP, opcional)';
+        amountHelp.textContent = 'Sirve como referencia. El monto real se registra al pagar (desde la tarjeta Gastos en Hoy).';
+        // Texto contextual según recurrencia
+        if (modalState.recurrence === 'monthly') {
+          dueLabel.textContent = 'Fecha de referencia';
+          dueHelp.textContent = 'Selecciona una fecha. Se repetirá el mismo día cada mes (ej: día 15 cada mes).';
+        } else if (modalState.recurrence === 'quarterly') {
+          dueLabel.textContent = 'Fecha del primer pago';
+          dueHelp.textContent = 'Selecciona una fecha. Se repetirá cada 3 meses a partir de esa fecha.';
+        } else if (modalState.recurrence === 'yearly') {
+          dueLabel.textContent = 'Fecha del pago anual';
+          dueHelp.textContent = 'Selecciona la fecha del año. Se repetirá cada año en ese mismo día y mes.';
         }
+      } else {
+        // Gasto puntual: mostrar fecha, ocultar fecha de referencia
+        dateWrap.hidden = false;
+        dueWrap.hidden = true;
+        amountLabel.textContent = 'Monto (CLP)';
+        amountHelp.textContent = '';
       }
 
       // Si el interruptor de cuotas está encendido, el monto pasa a ser el TOTAL
@@ -511,20 +464,6 @@ const Finance = (() => {
     };
 
     setTimeout(() => {
-      // Bind toggle de tipo
-      document.querySelectorAll('.finance-type-btn').forEach(b => {
-        b.addEventListener('click', () => {
-          if (b.disabled) return;
-          modalState.type = b.dataset.type;
-          // Al cambiar a ingreso, forzar recurrencia 'once'
-          if (modalState.type === 'income') {
-            modalState.recurrence = 'once';
-            const recSel = document.getElementById('mv-recurrence');
-            if (recSel) recSel.value = 'once';
-          }
-          refreshUI();
-        });
-      });
       // Bind cambio de recurrencia
       const recSel = document.getElementById('mv-recurrence');
       if (recSel) {
@@ -543,14 +482,6 @@ const Finance = (() => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', updateInstComputed);
       });
-      // Si estamos editando, deshabilitar el toggle de tipo (no cambias gasto↔ingreso al editar)
-      if (isEditingSomething) {
-        document.querySelectorAll('.finance-type-btn').forEach(b => {
-          b.disabled = true;
-          b.style.opacity = '0.5';
-          b.style.pointerEvents = 'none';
-        });
-      }
       // Si estamos editando un recurringExpense, fijar la recurrencia (no cambiar entre tipos)
       // Pero permitir cambiar entre mensual/trimestral/anual y bloquear "once" para no confundir
       if (editingRecurring) {
@@ -608,15 +539,14 @@ const Finance = (() => {
     const amountRaw = document.getElementById('mv-amount').value.trim();
     const note = document.getElementById('mv-note').value.trim() || null;
 
-    const isIncome = modalState.type === 'income';
-    const isRecurring = modalState.recurrence !== 'once' && !isIncome;
+    const isRecurring = modalState.recurrence !== 'once';
 
     let amount = null;
     if (amountRaw !== '') {
       const n = Number(amountRaw);
       if (!isNaN(n) && n >= 0) amount = n;
     }
-    // Para gastos puntuales e ingresos, monto es obligatorio
+    // Para gastos puntuales, monto es obligatorio
     if (!isRecurring && (amount == null || amount === 0)) {
       UI.toast('Falta el monto');
       return false;
@@ -627,14 +557,14 @@ const Finance = (() => {
     s.recurringExpenses = s.recurringExpenses || [];
 
     if (editing) {
-      // Editar movement existente (gasto puntual o ingreso)
+      // Editar movement existente (gasto puntual o pago registrado)
       editing.name = name;
       editing.category = category;
       editing.amount = amount;
       editing.note = note;
       const dateEl = document.getElementById('mv-date');
       if (dateEl && !dateEl.closest('[hidden]')) editing.date = dateEl.value;
-      UI.toast('Movimiento actualizado');
+      UI.toast('Gasto actualizado');
     } else if (editingRecurring) {
       // Editar recurring existente
       editingRecurring.name = name;
@@ -697,11 +627,11 @@ const Finance = (() => {
       activeSubTab = 'scheduled';
       UI.toast('Gasto recurrente creado');
     } else {
-      // Nuevo movement (gasto puntual o ingreso)
+      // Nuevo gasto puntual
       const date = document.getElementById('mv-date').value || UI.todayKey();
       s.movements.push({
         id: Storage.uid(),
-        type: isIncome ? 'income' : 'expense',
+        type: 'expense',
         name,
         category,
         amount,
@@ -710,12 +640,19 @@ const Finance = (() => {
         recurringExpenseId: null,
         createdAt: Date.now(),
       });
-      activeSubTab = isIncome ? 'income' : 'once';
-      UI.toast(isIncome ? 'Ingreso registrado' : 'Gasto registrado');
+      activeSubTab = 'once';
+      UI.toast(isSavings({ category }) ? 'Ahorro registrado' : 'Gasto registrado');
     }
     Storage.save();
+    refreshViews();
+  }
+
+  // Tras cualquier cambio: gestión, tarjeta "Gastos" de Hoy y Estadísticas › Finanzas
+  function refreshViews() {
     render();
-    renderDashboard();
+    renderTodayPending();
+    if (isLive(document.getElementById('finance-analysis-card'))) renderAnalysis();
+    if (typeof App !== 'undefined' && App.refreshKPIs) App.refreshKPIs();
   }
 
   function deleteRecurring(id) {
@@ -730,8 +667,7 @@ const Finance = (() => {
       onConfirm: () => {
         s.recurringExpenses = s.recurringExpenses.filter(x => x.id !== id);
         Storage.save();
-        render();
-        renderDashboard();
+        refreshViews();
         UI.toast('Eliminado');
       }
     });
@@ -742,26 +678,24 @@ const Finance = (() => {
     const m = (s.movements || []).find(x => x.id === id);
     if (!m) return;
     UI.confirm2({
-      title: 'Eliminar movimiento',
+      title: 'Eliminar gasto',
       message: `¿Eliminar "${m.name}"?`,
       okText: 'Eliminar',
       danger: true,
       onConfirm: () => {
         s.movements = s.movements.filter(x => x.id !== id);
         Storage.save();
-        render();
-        renderDashboard();
+        refreshViews();
         UI.toast('Eliminado');
       }
     });
   }
 
-  // Shortcut para abrir desde el FAB con tipo prellenado
-  function openNewExpense() { openMovementModal({ prefillType: 'expense' }); }
-  function openNewIncome()  { openMovementModal({ prefillType: 'income' }); }
+  // Atajo del botón "+" de la tarjeta Gastos en Hoy
+  function openNewExpense() { openMovementModal(); }
 
   // ============================================
-  // PESTAÑA "MIS FINANZAS" (dashboard mes en curso)
+  // FECHAS Y PENDIENTES
   // ============================================
 
   function getCurrentMonthKey() {
@@ -948,153 +882,9 @@ const Finance = (() => {
     return result;
   }
 
-  // ====== RENDER PRINCIPAL DASHBOARD ======
-  function renderDashboard() {
-    renderMonthBanner();
-    renderBalance();
-    renderMonthMovements();
-  }
-
-  function renderMonthBanner() {
-    const c = document.getElementById('finance-month-banner');
-    if (!c) return;
-    const mk = getCurrentMonthKey();
-    const [y, m] = mk.split('-').map(Number);
-    const d = new Date(y, m - 1, 15);
-    const txt = d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
-    c.textContent = txt;
-  }
-
-  function renderBalance() {
-    const c = document.getElementById('finance-balance');
-    if (!c) return;
-    const mk = getCurrentMonthKey();
-    const { start, end } = getMonthRange(mk);
-    const all = (Storage.get().movements || []);
-
-    // Saldo arrastrado: todos los movimientos ANTERIORES al mes en curso.
-    // Se calcula dinámico para que se autocorrija si editas/borras algo viejo.
-    const carried = all
-      .filter(m => m.date && m.date < start)
-      .reduce((s, m) => s + (m.type === 'income' ? (m.amount || 0) : -(m.amount || 0)), 0);
-
-    const movs = all.filter(m => m.date && m.date >= start && m.date <= end);
-    const income = movs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
-    const expense = movs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
-
-    const net = carried + income - expense;
-    const netClass = net > 0 ? 'positive' : (net < 0 ? 'negative' : 'zero');
-    const netSign = net > 0 ? '+ ' : (net < 0 ? '− ' : '');
-
-    const carrySign = carried < 0 ? '− ' : '';
-    const carryRow = carried !== 0 ? `
-      <div class="finance-balance-row carry">
-        <span class="fb-label">Saldo anterior</span>
-        <span class="fb-amount">${carrySign}${formatCLP(Math.abs(carried))}</span>
-      </div>` : '';
-
-    c.innerHTML = `
-      ${carryRow}
-      <div class="finance-balance-row income">
-        <span class="fb-label">Ingresos</span>
-        <span class="fb-amount">+ ${formatCLP(income)}</span>
-      </div>
-      <div class="finance-balance-row expense">
-        <span class="fb-label">Gastos</span>
-        <span class="fb-amount">− ${formatCLP(expense)}</span>
-      </div>
-      <div class="finance-balance-divider"></div>
-      <div class="finance-balance-row net ${netClass}">
-        <span class="fb-label">Balance</span>
-        <span class="fb-amount">${netSign}${formatCLP(Math.abs(net))}</span>
-      </div>
-    `;
-  }
-
-  // Saldo neto actual = arrastre de meses anteriores + ingresos − gastos del mes
-  function getCurrentNet() {
-    const { start, end } = getMonthRange(getCurrentMonthKey());
-    const all = Storage.get().movements || [];
-    const carried = all.filter(m => m.date && m.date < start)
-      .reduce((s, m) => s + (m.type === 'income' ? (m.amount || 0) : -(m.amount || 0)), 0);
-    const movs = all.filter(m => m.date && m.date >= start && m.date <= end);
-    const income = movs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
-    const expense = movs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
-    return carried + income - expense;
-  }
-
-  // Cuadra el saldo declarando cuánto tienes de verdad.
-  // No edita el balance: registra un movimiento de ajuste por la diferencia.
-  function openAdjustBalanceModal() {
-    const current = getCurrentNet();
-
-    UI.openModal({
-      title: '⚖️ Ajustar saldo',
-      okText: 'Registrar ajuste',
-      bodyHTML: `
-        <div class="adj-current">
-          <span class="adj-current-lbl">Saldo según la app</span>
-          <span class="adj-current-val">${formatCLP(current)}</span>
-        </div>
-        <label>¿Cuánto tienes realmente? (CLP)</label>
-        <input type="number" id="adj-real" inputmode="numeric" placeholder="0" value="${current}" />
-        <div class="adj-diff" id="adj-diff"></div>
-        <label>Nota (opcional)</label>
-        <input type="text" id="adj-note" placeholder="Ej: efectivo sin registrar" />
-        <p class="settings-help" style="margin-top:10px">Se registrará como un movimiento de ajuste con la fecha de hoy. Puedes editarlo o borrarlo después.</p>
-      `,
-      onSave: () => {
-        const real = parseFloat(document.getElementById('adj-real').value);
-        if (isNaN(real)) { UI.toast('Ingresa un monto válido'); return false; }
-        const diff = Math.round(real - current);
-        if (diff === 0) { UI.toast('El saldo ya está cuadrado'); return; }
-        const note = document.getElementById('adj-note').value.trim();
-        const s = Storage.get();
-        s.movements.push({
-          id: Storage.uid(),
-          type: diff > 0 ? 'income' : 'expense',
-          name: 'Ajuste de saldo',
-          category: 'ajuste',
-          amount: Math.abs(diff),
-          date: UI.todayKey(),
-          note,
-          recurringExpenseId: null,
-          isAdjustment: true,
-          createdAt: Date.now(),
-        });
-        Storage.save();
-        render();
-        renderDashboard();
-        UI.toast(`Ajuste de ${diff > 0 ? '+' : '−'} ${formatCLP(Math.abs(diff))}`);
-      }
-    });
-
-    setTimeout(() => {
-      const input = document.getElementById('adj-real');
-      const out = document.getElementById('adj-diff');
-      if (!input || !out) return;
-      const refresh = () => {
-        const real = parseFloat(input.value);
-        if (isNaN(real)) { out.textContent = ''; out.className = 'adj-diff'; return; }
-        const diff = Math.round(real - current);
-        if (diff === 0) {
-          out.textContent = 'Sin diferencia · ya está cuadrado';
-          out.className = 'adj-diff zero';
-        } else {
-          out.textContent = `Se registrará ${diff > 0 ? '+' : '−'} ${formatCLP(Math.abs(diff))}`;
-          out.className = 'adj-diff ' + (diff > 0 ? 'positive' : 'negative');
-        }
-      };
-      input.addEventListener('input', refresh);
-      refresh();
-      input.focus(); input.select();
-    }, 80);
-  }
-
-
-  // Pagos pendientes en la vista "Hoy": solo lo que está vencido, vence hoy
-  // o vence dentro de los próximos 3 días. Ordenado por urgencia. Aparece
-  // únicamente si hay algo por pagar (si no, no muestra nada).
+  // Tarjeta "💰 Gastos" en Hoy. Siempre visible. Con pagos programados
+  // vencidos, que vencen hoy o en los próximos 3 días, los lista (con "Pagar")
+  // ordenados por urgencia; si no hay, muestra lo gastado en el mes.
   function renderTodayPending() {
     const c = document.getElementById('today-pending');
     if (!isLive(c)) return;
@@ -1127,7 +917,7 @@ const Finance = (() => {
     });
 
     // En Hoy basta una línea por gasto recurrente: la de su período más
-    // urgente (más atrasado). El desglose mes a mes vive en Finanzas.
+    // urgente (más atrasado). El desglose vive en la vista de gestión.
     const byRe = new Map();
     items.forEach(it => {
       const prev = byRe.get(it.re.id);
@@ -1135,15 +925,50 @@ const Finance = (() => {
     });
     const collapsed = [...byRe.values()];
 
-    if (collapsed.length === 0) { c.innerHTML = ''; return; }
-
     // Orden por urgencia: más atrasado primero
     collapsed.sort((a, b) => a.daysLeft - b.daysLeft);
 
-    const total = collapsed.reduce((sum, it) => sum + (it.re.defaultAmount || 0), 0);
-    const subtitle = `${collapsed.length} ${collapsed.length === 1 ? 'pendiente' : 'pendientes'}${total ? ` · ${formatCLP(total)}` : ''}`;
+    let subtitle, body;
+    if (collapsed.length === 0) {
+      const { start, end } = getMonthRange(curMk);
+      const spent = sumAmount(monthExpenses(start, end).filter(m => !isSavings(m)));
+      subtitle = `Gastado este mes · ${formatCLP(spent)}`;
+      body = '<div class="empty">No hay gastos pendientes</div>';
+    } else {
+      const total = collapsed.reduce((sum, it) => sum + (it.re.defaultAmount || 0), 0);
+      subtitle = `${collapsed.length} ${collapsed.length === 1 ? 'pendiente' : 'pendientes'}${total ? ` · ${formatCLP(total)}` : ''}`;
+      body = `<div class="tp-list">${renderPendingRows(collapsed)}</div>`;
+    }
 
-    const rows = collapsed.map(it => {
+    c.innerHTML = `
+      <div class="section-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">💰 Gastos</div>
+            <div class="section-subtitle">${subtitle}</div>
+          </div>
+          <div class="section-head-actions">
+            <button class="section-icon-btn" id="today-expense-add" aria-label="Nuevo gasto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="section-icon-btn" data-go="finance-settings" aria-label="Gestionar gastos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
+          </div>
+        </div>
+        ${body}
+      </div>`;
+
+    c.querySelector('#today-expense-add').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNewExpense();
+    });
+    c.querySelectorAll('[data-tp-pay]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openPayRecurringModal(btn.dataset.tpPay, btn.dataset.tpPeriod);
+      });
+    });
+  }
+
+  function renderPendingRows(collapsed) {
+    return collapsed.map(it => {
       const cat = getExpenseCategory(it.re.category);
       let tagClass, tagText;
       if (it.daysLeft < 0) { tagClass = 'overdue'; tagText = `Atrasado ${Math.abs(it.daysLeft)}d`; }
@@ -1166,50 +991,6 @@ const Finance = (() => {
           <button class="tp-pay" data-tp-pay="${it.re.id}" data-tp-period="${it.mk}">Pagar</button>
         </div>`;
     }).join('');
-
-    c.innerHTML = `
-      <div class="section-card">
-        <div class="section-head">
-          <div>
-            <div class="section-title">💰 Pagos pendientes</div>
-            <div class="section-subtitle">${subtitle}</div>
-          </div>
-          <button class="section-icon-btn" data-go="finance" aria-label="Ir a Finanzas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
-        </div>
-        <div class="tp-list">${rows}</div>
-      </div>`;
-
-    c.querySelectorAll('[data-tp-pay]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openPayRecurringModal(btn.dataset.tpPay, btn.dataset.tpPeriod);
-      });
-    });
-  }
-
-  function renderMonthMovements() {
-    const c = document.getElementById('finance-movements-list');
-    if (!isLive(c)) return;
-    const mk = getCurrentMonthKey();
-    const { start, end } = getMonthRange(mk);
-    const movs = (Storage.get().movements || []).filter(m =>
-      m.date && m.date >= start && m.date <= end
-    );
-    if (movs.length === 0) {
-      c.innerHTML = '<div class="empty">Sin movimientos registrados este mes</div>';
-      return;
-    }
-    movs.sort((a, b) => {
-      // Primero por fecha descendente (más reciente arriba)
-      const dateCmp = (b.date || '').localeCompare(a.date || '');
-      if (dateCmp !== 0) return dateCmp;
-      // Mismo día: por orden de creación descendente (último ingresado primero)
-      const ca = a.createdAt || 0;
-      const cb = b.createdAt || 0;
-      return cb - ca;
-    });
-    // Modo solo lectura: edición/eliminación se hace desde Mi Sistema → Finanzas
-    c.innerHTML = movs.map(m => renderMovementItem(m, { readonly: true })).join('');
   }
 
   // Modal "Pagar recurrente"
@@ -1219,7 +1000,7 @@ const Finance = (() => {
     if (!re) return;
     let zeroConfirmed = false; // para confirmar un pago de $0
     const cat = getExpenseCategory(re.category);
-    // Si es del mes en curso → fecha de hoy. Si es atrasado → hoy igualmente (el pago se hace HOY, va al balance de HOY).
+    // Si es del mes en curso → fecha de hoy. Si es atrasado → hoy igualmente (el pago se registra con la fecha de HOY).
     const defaultDate = UI.todayKey();
 
     const curMk = getCurrentMonthKey();
@@ -1296,9 +1077,7 @@ const Finance = (() => {
         }
 
         Storage.save();
-        renderDashboard();
-        render();
-        if (typeof App !== 'undefined' && App.refreshKPIs) App.refreshKPIs();
+        refreshViews();
         UI.toast(amount === 0 ? 'Pago de $0 registrado' : 'Pago registrado');
       }
     });
@@ -1332,17 +1111,12 @@ const Finance = (() => {
     const curMk = getCurrentMonthKey();
     const { start, end } = getMonthRange(mk);
 
-    // Los ajustes de saldo quedan fuera del análisis: son descuadres, no hábitos de gasto
-    const movs = (Storage.get().movements || []).filter(m =>
-      m.date && m.date >= start && m.date <= end && !m.isAdjustment
-    );
-    const expenses = movs.filter(m => m.type === 'expense');
-    const incomes = movs.filter(m => m.type === 'income');
-
-    const income = incomes.reduce((s2, m) => s2 + (m.amount || 0), 0);
-    const expense = expenses.reduce((s2, m) => s2 + (m.amount || 0), 0);
-    const net = income - expense;
-    const netCls = net > 0 ? 'positive' : (net < 0 ? 'negative' : 'zero');
+    // Solo gastos registrados: ingresos y ajustes de saldo (legados) quedan fuera
+    const expenses = monthExpenses(start, end);
+    const spent = sumAmount(expenses.filter(m => !isSavings(m)));
+    const saved = sumAmount(expenses.filter(isSavings));
+    const out = spent + saved;
+    const savedPct = out > 0 ? Math.round((saved / out) * 100) : null;
 
     // Navegador de meses
     const firstMk = firstMonthWithData();
@@ -1358,23 +1132,25 @@ const Finance = (() => {
         <button class="mnav-btn" data-mnav="next" ${canNext ? '' : 'disabled'} aria-label="Mes siguiente">›</button>
       </div>`;
 
-    // Sin movimientos: no tiene sentido pintar gráficos en cero
-    if (movs.length === 0) {
+    const chart = `
+      <div class="analysis-block">
+        <div class="analysis-block-title">Gastos y ahorro · 6 meses hasta ${monthShort(mk)}</div>
+        ${renderSpendSaveBars(mk)}
+      </div>`;
+
+    // Sin registros: no tiene sentido pintar el resumen ni la dona en cero
+    if (expenses.length === 0) {
       c.innerHTML = nav +
-        '<div class="empty" style="margin:22px 0">Sin movimientos registrados en este mes</div>' +
-        `<div class="analysis-block">
-           <div class="analysis-block-title">Ingresos vs gastos · 6 meses hasta ${monthShort(mk)}</div>
-           ${renderCompareBars(mk)}
-         </div>`;
+        '<div class="empty" style="margin:22px 0">Sin gastos registrados en este mes</div>' + chart;
       bindAnalysis(c);
       return;
     }
 
     const summary = `
       <div class="m-summary">
-        <div class="ms-cell"><span class="ms-val income">+ ${formatCLP(income)}</span><span class="ms-lbl">Ingresos</span></div>
-        <div class="ms-cell"><span class="ms-val expense">− ${formatCLP(expense)}</span><span class="ms-lbl">Gastos</span></div>
-        <div class="ms-cell"><span class="ms-val ${netCls}">${net > 0 ? '+ ' : (net < 0 ? '− ' : '')}${formatCLP(Math.abs(net))}</span><span class="ms-lbl">Balance</span></div>
+        <div class="ms-cell"><span class="ms-val expense">${formatCLP(spent)}</span><span class="ms-lbl">Gastado</span></div>
+        <div class="ms-cell"><span class="ms-val savings">${formatCLP(saved)}</span><span class="ms-lbl">Ahorrado</span></div>
+        <div class="ms-cell"><span class="ms-val ${savedPct ? 'savings' : 'zero'}">${savedPct === null ? '—' : savedPct + '%'}</span><span class="ms-lbl">% ahorrado</span></div>
       </div>`;
 
     c.innerHTML = `
@@ -1384,16 +1160,14 @@ const Finance = (() => {
         <div class="analysis-block-title">Gastos por categoría</div>
         ${renderExpenseDonut(expenses, mk)}
       </div>
+      ${chart}
       <div class="analysis-block">
-        <div class="analysis-block-title">Ingresos del mes</div>
-        ${renderIncomeTable(incomes)}
-      </div>
-      <div class="analysis-block">
-        <div class="analysis-block-title">Ingresos vs gastos · 6 meses hasta ${monthShort(mk)}</div>
-        ${renderCompareBars(mk)}
+        <div class="analysis-block-title">Registros del mes</div>
+        <div class="month-records">${sortByRecent(expenses).map(m => renderMovementItem(m)).join('')}</div>
       </div>
     `;
     bindAnalysis(c);
+    bindMovementActions(c);
   }
 
   function bindAnalysis(c) {
@@ -1430,13 +1204,19 @@ const Finance = (() => {
     const total = Object.values(byCat).reduce((s, v) => s + v, 0);
     if (total === 0) return '<div class="empty" style="margin:6px 0">Sin datos</div>';
 
-    // Construir slices ordenados por monto desc
-    const entries = Object.entries(byCat)
-      .map(([id, val]) => ({ cat: { ...getExpenseCategory(id), id }, val, pct: val / total }))
-      .sort((a, b) => b.val - a.val);
+    // Gastos ordenados por monto desc; Ahorro siempre al final, separado del resto
+    const all = Object.entries(byCat)
+      .map(([id, val]) => ({ cat: { ...getExpenseCategory(id), id }, val, pct: val / total, savings: id === SAVINGS_CAT }))
+      .filter(e => e.val > 0);
+    const entries = [
+      ...all.filter(e => !e.savings).sort((a, b) => b.val - a.val),
+      ...all.filter(e => e.savings),
+    ];
 
-    // Paleta basada en variables existentes + tonos
-    const palette = ['#f5c842', '#4ade80', '#60a5fa', '#a78bfa', '#ef4444', '#f0abfc', '#34d399'];
+    // Paleta de gastos (sin verdes); Ahorro usa el verde de acento
+    const palette = ['#f5c842', '#60a5fa', '#a78bfa', '#ef4444', '#f0abfc', '#fb923c', '#94a3b8'];
+    const SAVINGS_COLOR = '#4ade80';
+    const colorOf = (e, idx) => e.savings ? SAVINGS_COLOR : palette[idx % palette.length];
 
     // SVG donut: más gruesa, mejor proporcionada
     const SIZE = 180;
@@ -1447,35 +1227,37 @@ const Finance = (() => {
     let offset = 0;
     const slices = entries.map((e, idx) => {
       const dash = C * e.pct;
-      const gap = C - dash;
-      const color = palette[idx % palette.length];
-      // Pequeño separador visual entre slices (gap de 1.5)
-      const visualDash = Math.max(0, dash - 1.5);
-      const visualGap = gap + 1.5;
-      const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="butt"
-        stroke-dasharray="${visualDash} ${visualGap}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" />`;
+      // Separador entre slices: 1.5 normal; más ancho a ambos lados del Ahorro
+      const sep = (e.savings && entries.length > 1) ? 6 : 1.5;
+      const visualDash = Math.max(0, dash - sep);
+      const visualGap = C - visualDash;
+      const shift = e.savings && entries.length > 1 ? sep / 2 : 0;
+      const width = e.savings ? sw + 6 : sw;
+      const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colorOf(e, idx)}" stroke-width="${width}" stroke-linecap="butt"
+        stroke-dasharray="${visualDash} ${visualGap}" stroke-dashoffset="${-(offset + shift)}" transform="rotate(-90 ${cx} ${cy})" />`;
       offset += dash;
       return el;
     }).join('');
 
     const legend = entries.map((e, idx) => {
-      const color = palette[idx % palette.length];
       const pctTxt = Math.round(e.pct * 100);
-      // Contraste contra el promedio de los otros meses con datos
+      // Contraste contra el promedio de los otros meses con datos.
+      // En Ahorro, estar sobre el promedio es bueno (colores invertidos).
       let delta = '';
       if (avgData && avgData.avg[e.cat.id] > 0) {
         const a = avgData.avg[e.cat.id];
         const diff = Math.round(((e.val - a) / a) * 100);
         if (Math.abs(diff) >= 5) {
           const over = diff > 0;
-          delta = `<div class="donut-delta ${over ? 'over' : 'under'}">${over ? '▲' : '▼'} ${Math.abs(diff)}% ${over ? 'sobre' : 'bajo'} tu promedio</div>`;
+          const cls = (over !== e.savings) ? 'over' : 'under';
+          delta = `<div class="donut-delta ${cls}">${over ? '▲' : '▼'} ${Math.abs(diff)}% ${over ? 'sobre' : 'bajo'} tu promedio</div>`;
         } else {
           delta = '<div class="donut-delta even">= en tu promedio</div>';
         }
       }
       return `
-        <div class="donut-legend-row">
-          <span class="donut-dot" style="background:${color}"></span>
+        <div class="donut-legend-row ${e.savings ? 'is-savings' : ''}">
+          <span class="donut-dot" style="background:${colorOf(e, idx)}"></span>
           <div class="donut-legend-body">
             <div class="donut-legend-top">
               <span class="donut-cat-name">${e.cat.icon} ${e.cat.name}</span>
@@ -1495,7 +1277,7 @@ const Finance = (() => {
             ${slices}
           </svg>
           <div class="donut-center">
-            <div class="donut-total-label">Total gastos</div>
+            <div class="donut-total-label">Total del mes</div>
             <div class="donut-total">${formatCLP(total)}</div>
           </div>
         </div>
@@ -1504,53 +1286,22 @@ const Finance = (() => {
     `;
   }
 
-  function renderIncomeTable(incomes) {
-    if (incomes.length === 0) {
-      return '<div class="empty" style="margin:6px 0">Sin ingresos este mes</div>';
-    }
-    const byCat = {};
-    incomes.forEach(i => {
-      const id = i.category || 'otros';
-      if (!byCat[id]) byCat[id] = 0;
-      byCat[id] += (i.amount || 0);
-    });
-    const total = Object.values(byCat).reduce((s, v) => s + v, 0);
-    const entries = Object.entries(byCat)
-      .map(([id, val]) => ({ cat: getIncomeCategory(id), val }))
-      .sort((a, b) => b.val - a.val);
-
-    return `
-      <div class="income-table">
-        ${entries.map(e => `
-          <div class="income-row">
-            <span class="income-cat">${e.cat.icon} ${e.cat.name}</span>
-            <span class="income-val">${formatCLP(e.val)}</span>
-          </div>
-        `).join('')}
-        <div class="income-row total">
-          <span class="income-cat">Total</span>
-          <span class="income-val">${formatCLP(total)}</span>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderCompareBars(endMk) {
+  // Barras apiladas por mes: gastado (abajo) + ahorrado (arriba)
+  function renderSpendSaveBars(endMk) {
     const months = getLast6Months(endMk);
-    const allMovs = Storage.get().movements || [];
     const data = months.map(mk => {
       const { start, end } = getMonthRange(mk);
-      const inMovs = allMovs.filter(m => m.date && m.date >= start && m.date <= end && !m.isAdjustment);
+      const ex = monthExpenses(start, end);
       return {
         mk,
-        income: inMovs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0),
-        expense: inMovs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0),
+        spent: sumAmount(ex.filter(m => !isSavings(m))),
+        saved: sumAmount(ex.filter(isSavings)),
       };
     });
-    if (data.every(d => d.income === 0 && d.expense === 0)) {
+    if (data.every(d => d.spent === 0 && d.saved === 0)) {
       return '<div class="empty" style="margin:6px 0">Sin datos suficientes</div>';
     }
-    const max = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
+    const max = Math.max(...data.map(d => d.spent + d.saved), 1);
     const curMk = endMk || getCurrentMonthKey();
 
     // Dimensiones generosas
@@ -1560,7 +1311,7 @@ const Finance = (() => {
     const chartH = h - padT - padB;
     const baseY = h - padB;
 
-    // Líneas guía (3 niveles: 25%, 50%, 75%, 100%)
+    // Líneas guía (25%, 50%, 75%, 100%)
     const guides = [0.25, 0.5, 0.75, 1].map(pct => {
       const y = baseY - chartH * pct;
       return `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="var(--border-soft)" stroke-width="0.5" stroke-dasharray="2 3" opacity="0.5"/>`;
@@ -1570,7 +1321,7 @@ const Finance = (() => {
     const maxLabel = `<text x="${padL + 2}" y="${padT + 8}" font-family="ui-monospace" font-size="9" fill="var(--text-faint)" text-anchor="start">máx ${formatCLP(max)}</text>`;
 
     const slotW = chartW / data.length;
-    const barW = (slotW - 8) / 2;
+    const barW = Math.min(28, slotW - 14);
 
     // Helper: monto formateado en versión muy corta para etiquetas
     const shortAmount = (n) => {
@@ -1581,43 +1332,35 @@ const Finance = (() => {
     };
 
     const bars = data.map((d, i) => {
-      const slotX = padL + i * slotW + 4;
-      const inH = max > 0 ? (d.income / max) * chartH : 0;
-      const exH = max > 0 ? (d.expense / max) * chartH : 0;
-      const inY = baseY - inH;
-      const exY = baseY - exH;
+      const slotX = padL + i * slotW;
+      const x = slotX + (slotW - barW) / 2;
+      const spentH = (d.spent / max) * chartH;
+      const savedH = (d.saved / max) * chartH;
+      const totalH = spentH + savedH;
       const isCurrent = d.mk === curMk;
-      const monthLbl = monthShort(d.mk);
-      const monthCls = isCurrent ? 'chart-month-current' : 'chart-month-label';
-      const net = d.income - d.expense;
-      const netClass = net >= 0 ? 'positive' : 'negative';
-      const netSign = net > 0 ? '+' : (net < 0 ? '−' : '');
-      // Highlight para mes actual: fondo sutil de la columna
+      const op = isCurrent ? '1' : '0.78';
+      // Highlight para el mes analizado: fondo sutil de la columna
       const highlight = isCurrent
-        ? `<rect x="${slotX - 3}" y="${padT}" width="${barW * 2 + 8}" height="${chartH + 4}" rx="4" fill="var(--accent-yellow)" opacity="0.06"/>`
+        ? `<rect x="${x - 5}" y="${padT}" width="${barW + 10}" height="${chartH + 4}" rx="4" fill="var(--accent-yellow)" opacity="0.06"/>`
         : '';
-      // Etiquetas de monto encima de cada barra (solo si hay espacio)
-      const inLabel = d.income > 0 && inH > 14
-        ? `<text x="${slotX + barW / 2}" y="${inY - 3}" text-anchor="middle" font-family="ui-monospace" font-size="8" fill="var(--accent-green)" font-weight="700">${shortAmount(d.income)}</text>`
+      const totalLabel = (d.spent + d.saved) > 0 && totalH > 10
+        ? `<text x="${x + barW / 2}" y="${baseY - totalH - 3}" text-anchor="middle" font-family="ui-monospace" font-size="8" fill="var(--text-dim)" font-weight="700">${shortAmount(d.spent + d.saved)}</text>`
         : '';
-      const exLabel = d.expense > 0 && exH > 14
-        ? `<text x="${slotX + barW + 2 + barW / 2}" y="${exY - 3}" text-anchor="middle" font-family="ui-monospace" font-size="8" fill="var(--accent-red)" font-weight="700">${shortAmount(d.expense)}</text>`
+      const savedPct = (d.spent + d.saved) > 0 ? Math.round((d.saved / (d.spent + d.saved)) * 100) : 0;
+      const savedLabel = d.saved > 0
+        ? `<text x="${x + barW / 2}" y="${baseY + 28}" text-anchor="middle" font-family="ui-monospace" font-size="8" fill="var(--accent-green)" font-weight="700">${savedPct}%</text>`
         : '';
-      // Balance neto debajo del mes
-      const netY = baseY + 28;
-      const netColor = net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-      const netLabel = (d.income > 0 || d.expense > 0)
-        ? `<text x="${slotX + barW + 1}" y="${netY}" text-anchor="middle" font-family="ui-monospace" font-size="8" fill="${netColor}" font-weight="700">${netSign}${shortAmount(Math.abs(net))}</text>`
-        : '';
+      // Un <g class="chart-bar"> por mes: la pila completa crece desde la base (js/animate.js)
       return `
         ${highlight}
-        <rect class="bar-hit" data-jump="${d.mk}" x="${padL + i * slotW}" y="${padT}" width="${slotW}" height="${chartH + padB - 6}" fill="transparent" style="cursor:pointer" />
-        <rect class="chart-bar" x="${slotX}" y="${inY}" width="${barW}" height="${inH}" rx="2" fill="var(--accent-green)" opacity="${isCurrent ? '1' : '0.78'}" />
-        <rect class="chart-bar" x="${slotX + barW + 2}" y="${exY}" width="${barW}" height="${exH}" rx="2" fill="var(--accent-red)" opacity="${isCurrent ? '1' : '0.78'}" />
-        ${inLabel}
-        ${exLabel}
-        <text x="${slotX + barW + 1}" y="${baseY + 14}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${isCurrent ? 'var(--accent-yellow)' : 'var(--text-dim)'}" font-weight="${isCurrent ? '700' : '400'}">${monthLbl}</text>
-        ${netLabel}
+        <rect class="bar-hit" data-jump="${d.mk}" x="${slotX}" y="${padT}" width="${slotW}" height="${chartH + padB - 6}" fill="transparent" style="cursor:pointer" />
+        <g class="chart-bar">
+          <rect x="${x}" y="${baseY - spentH}" width="${barW}" height="${spentH}" rx="2" fill="var(--accent-red)" opacity="${op}" />
+          <rect x="${x}" y="${baseY - totalH}" width="${barW}" height="${savedH}" rx="2" fill="var(--accent-green)" opacity="${op}" />
+        </g>
+        ${totalLabel}
+        <text x="${x + barW / 2}" y="${baseY + 14}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${isCurrent ? 'var(--accent-yellow)' : 'var(--text-dim)'}" font-weight="${isCurrent ? '700' : '400'}">${monthShort(d.mk)}</text>
+        ${savedLabel}
       `;
     }).join('');
 
@@ -1633,8 +1376,8 @@ const Finance = (() => {
           ${baseLine}
         </svg>
         <div class="chart-legend-row">
-          <span><span class="dot-green"></span> Ingresos</span>
-          <span><span class="dot-red"></span> Gastos</span>
+          <span><span class="dot-red"></span> Gastado</span>
+          <span><span class="dot-green"></span> Ahorrado (%)</span>
           <span class="chart-legend-hint">Toca un mes para verlo</span>
         </div>
       </div>
@@ -1666,9 +1409,9 @@ const Finance = (() => {
       .replace(' de ', ' ').toUpperCase();
   }
 
-  // Mes más antiguo con movimientos (límite para navegar hacia atrás)
+  // Mes más antiguo con gastos registrados (límite para navegar hacia atrás)
   function firstMonthWithData() {
-    const dates = (Storage.get().movements || []).map(m => m.date).filter(Boolean).sort();
+    const dates = (Storage.get().movements || []).filter(isTrackedExpense).map(m => m.date).filter(Boolean).sort();
     return dates.length ? dates[0].slice(0, 7) : getCurrentMonthKey();
   }
 
@@ -1678,7 +1421,7 @@ const Finance = (() => {
   function categoryAverages(excludeMk) {
     const byMonth = {};
     (Storage.get().movements || []).forEach(m => {
-      if (m.isAdjustment || m.type !== 'expense' || !m.date) return;
+      if (!isTrackedExpense(m) || !m.date) return;
       const mk = m.date.slice(0, 7);
       if (mk === excludeMk) return;
       byMonth[mk] = byMonth[mk] || {};
@@ -1708,10 +1451,11 @@ const Finance = (() => {
     const allMovs = Storage.get().movements || [];
     const curMk = getCurrentMonthKey();
 
-    // Agrupar movements por mes (excluyendo mes en curso)
+    // Agrupar gastos registrados por mes (excluyendo mes en curso).
+    // Ingresos y ajustes legados no aparecen en el archivo.
     const groups = {};
     allMovs.forEach(m => {
-      if (!m.date) return;
+      if (!m.date || !isTrackedExpense(m)) return;
       const mk = m.date.slice(0, 7);
       if (mk === curMk) return; // el mes en curso no va al archivo
       if (!groups[mk]) groups[mk] = [];
@@ -1724,18 +1468,7 @@ const Finance = (() => {
     }
 
     const monthCardHTML = (mk) => {
-      const movs = groups[mk].slice().sort((a, b) => {
-        const dateCmp = (b.date || '').localeCompare(a.date || '');
-        if (dateCmp !== 0) return dateCmp;
-        const ca = a.createdAt || 0;
-        const cb = b.createdAt || 0;
-        return cb - ca;
-      });
-      const income = movs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
-      const expense = movs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
-      const net = income - expense;
-      const netClass = net > 0 ? 'positive' : (net < 0 ? 'negative' : 'zero');
-      const netSign = net > 0 ? '+' : (net < 0 ? '−' : '');
+      const movs = sortByRecent(groups[mk]);
       const monthLabel = new Date(mk + '-15T12:00:00').toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
       const open = (archiveOpen[mk] === true);
 
@@ -1744,11 +1477,7 @@ const Finance = (() => {
           <button class="archive-month-head" data-archive-toggle="${mk}" aria-expanded="${open}">
             <span class="archive-month-arrow">${open ? '▼' : '▶'}</span>
             <span class="archive-month-title">${monthLabel}</span>
-            <span class="archive-month-meta">
-              <span class="archive-amt income">+${formatCLP(income)}</span>
-              <span class="archive-amt expense">−${formatCLP(expense)}</span>
-              <span class="archive-amt net ${netClass}">${netSign}${formatCLP(Math.abs(net))}</span>
-            </span>
+            <span class="archive-month-meta">${archiveAmounts(movs)}</span>
           </button>
           <div class="archive-month-body" ${open ? '' : 'hidden'}>
             ${movs.map(m => renderMovementItem(m)).join('')}
@@ -1764,19 +1493,14 @@ const Finance = (() => {
 
     c.innerHTML = yearKeys.map(yk => {
       const monthsOfYear = monthKeys.filter(mk => mk.slice(0, 4) === yk);
-      // Resumen del año: ingresos, gastos y neto
+      // Resumen del año: gastado y ahorrado
       const yMovs = monthsOfYear.flatMap(mk => groups[mk]);
-      const yInc = yMovs.filter(m => m.type === 'income').reduce((s, m) => s + (m.amount || 0), 0);
-      const yExp = yMovs.filter(m => m.type === 'expense').reduce((s, m) => s + (m.amount || 0), 0);
-      const yNet = yInc - yExp;
-      const yNetClass = yNet > 0 ? 'positive' : (yNet < 0 ? 'negative' : 'zero');
-      const yNetSign = yNet > 0 ? '+' : (yNet < 0 ? '−' : '');
       const yOpen = isYearOpen(yk);
       return `
         <div class="hist-year ${yOpen ? 'open' : ''}">
           <button class="hist-year-label" data-archive-year-toggle="${yk}" type="button">
             <span class="hist-year-name">${yk}</span>
-            <span class="archive-amt net ${yNetClass}" style="margin-left:auto">${yNetSign}${formatCLP(Math.abs(yNet))}</span>
+            <span class="archive-month-meta" style="margin-left:auto">${archiveAmounts(yMovs)}</span>
             <span class="hist-year-chevron">▾</span>
           </button>
           <div class="hist-year-body">${monthsOfYear.map(monthCardHTML).join('')}</div>
@@ -1816,25 +1540,29 @@ const Finance = (() => {
     });
   }
 
+  // Montos de un grupo del archivo: gastado y, si hay, ahorrado
+  function archiveAmounts(movs) {
+    const spent = sumAmount(movs.filter(m => !isSavings(m)));
+    const saved = sumAmount(movs.filter(isSavings));
+    return `<span class="archive-amt expense">−${formatCLP(spent)}</span>` +
+      (saved ? `<span class="archive-amt savings">🏦 ${formatCLP(saved)}</span>` : '');
+  }
+
   let archiveOpen = {};
   let archiveYearOpen = {};
 
   return {
     render,
-    renderDashboard,
     renderTodayPending,
     renderAnalysis,
     openAnalysis,
     renderArchive,
     openMovementModal,
     openNewExpense,
-    openNewIncome,
-    openAdjustBalanceModal,
+    isTrackedExpense,
     EXPENSE_CATEGORIES,
-    INCOME_CATEGORIES,
     RECURRENCES,
     getExpenseCategory,
-    getIncomeCategory,
     getRecurrence,
     formatCLP,
   };

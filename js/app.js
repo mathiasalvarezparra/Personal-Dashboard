@@ -43,7 +43,6 @@ const App = (() => {
     Tasks.renderToday(); Tasks.renderFull();
     Goals.renderAll(); Goals.renderWeeklyMini();
     Finance.render();
-    Finance.renderDashboard();
     refreshKPIs();
     renderCloseDay();
     renderWeekClose();
@@ -71,7 +70,6 @@ const App = (() => {
     Tasks.renderToday(); Tasks.renderFull();
     Goals.renderAll(); Goals.renderWeeklyMini();
     Finance.render();
-    Finance.renderDashboard();
     refreshKPIs();
     renderCloseDay();
     renderWeekClose();
@@ -243,7 +241,7 @@ const App = (() => {
 
     // Pagos REALES de ese día: gastos registrados en movements con esa fecha
     const dayPayments = (state.movements || []).filter(m =>
-      m.type === 'expense' && m.date === dateKey
+      Finance.isTrackedExpense(m) && m.date === dateKey
     );
 
     // Render
@@ -1132,10 +1130,6 @@ const App = (() => {
     if (tskAdd) tskAdd.addEventListener('click', () => Tasks.openCreateModal());
     const goalAdd = document.getElementById('goals-manage-add');
     if (goalAdd) goalAdd.addEventListener('click', () => Goals.openCreateModal());
-    const adjBtn = document.getElementById('balance-adjust-btn');
-    if (adjBtn) adjBtn.addEventListener('click', () => Finance.openAdjustBalanceModal());
-    const finAdd = document.getElementById('finance-add-btn');
-    if (finAdd) finAdd.addEventListener('click', () => Finance.openMovementModal());
     const finSetAdd = document.getElementById('finance-settings-add');
     if (finSetAdd) finSetAdd.addEventListener('click', () => Finance.openMovementModal());
 
