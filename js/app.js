@@ -1122,6 +1122,8 @@ const App = (() => {
     if (habAdd) habAdd.addEventListener('click', () => Habits.openCreateModal());
     const tskAdd = document.getElementById('tasks-manage-add');
     if (tskAdd) tskAdd.addEventListener('click', () => Tasks.openCreateModal());
+    const todayTaskAdd = document.getElementById('today-task-add');
+    if (todayTaskAdd) todayTaskAdd.addEventListener('click', () => Tasks.openCreateModal());
     const goalAdd = document.getElementById('goals-manage-add');
     if (goalAdd) goalAdd.addEventListener('click', () => Goals.openCreateModal());
     const finSetAdd = document.getElementById('finance-settings-add');

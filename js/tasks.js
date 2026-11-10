@@ -20,6 +20,20 @@ const Tasks = (() => {
   }
 
   function isToday(t) { return t.date === UI.todayKey(); }
+  // "Algún día": tarea pendiente sin fecha (date = null). No aparece en Hoy, Mañana,
+  // atrasadas ni KPIs; solo en el filtro "Algún día" hasta que se le asigna fecha.
+  const isSomeday = t => !t.done && !t.date;
+  function tomorrowKey() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return UI.localDateKey(d);
+  }
+  // Checklist inline abierto (por id de tarea) en Hoy y en la gestión
+  const openSubtasks = new Set();
+  const subtaskStats = t => {
+    const list = Array.isArray(t.subtasks) ? t.subtasks : [];
+    return { total: list.length, done: list.filter(x => x.done).length };
+  };
   function isThisWeek(t) {
     if (!t.date) return false;
     return UI.weekKey(new Date(t.date + 'T12:00:00')) === UI.weekKey();
@@ -88,7 +102,7 @@ const Tasks = (() => {
       }
 
       // Generar siguiente ocurrencia si es recurrente
-      if (rec) {
+      if (rec && t.date) {
         const nextDate = getNextRecurrenceDate(t.date, rec);
         if (nextDate) {
           const seriesId = t.seriesId || t.id;
@@ -109,6 +123,10 @@ const Tasks = (() => {
               recurrence: rec,
               done: false,
               createdAt: Date.now(),
+              // La nueva ocurrencia trae el mismo checklist, sin marcar
+              ...(t.subtasks && t.subtasks.length
+                ? { subtasks: t.subtasks.map(x => ({ id: Storage.uid(), name: x.name, done: false })) }
+                : {}),
             });
             UI.toast(`✓ Próxima: ${formatTaskDate(nextDate)}`);
           }
@@ -167,8 +185,15 @@ const Tasks = (() => {
     const overdue = all.filter(t => t.date && t.date < todayKey);
     const todays = all.filter(t => t.date === todayKey);
 
+    // Revisión semanal: solo los domingos, si hay tareas en "Algún día"
+    const somedayCount = all.filter(isSomeday).length;
+    const reviewHTML = (new Date().getDay() === 0 && somedayCount > 0)
+      ? `<button type="button" class="someday-review" id="someday-review">📥 ${somedayCount} en Algún día · Revisar</button>`
+      : '';
+
     if (overdue.length === 0 && todays.length === 0) {
-      c.innerHTML = '<div class="empty empty-tasks">🌤️ No tienes tareas pendientes</div>';
+      c.innerHTML = '<div class="empty empty-tasks">🌤️ No tienes tareas pendientes</div>' + reviewHTML;
+      bindSomedayReview(c);
       return;
     }
 
@@ -202,8 +227,18 @@ const Tasks = (() => {
     if (todays.length > 0) {
       html += todays.map(t => renderItem(t, { noActions: true })).join('');
     }
-    c.innerHTML = html;
+    c.innerHTML = html + reviewHTML;
     bindClicks(c);
+    bindSomedayReview(c);
+  }
+
+  function bindSomedayReview(c) {
+    const btn = c.querySelector('#someday-review');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      setFilter('someday');
+      UI.go('tasks-manage');
+    });
   }
 
   // Tareas de mañana en "Hoy": aparecen SOLO después de registrar el cierre
@@ -252,6 +287,11 @@ const Tasks = (() => {
     const c = document.getElementById('tasks-full-list');
     if (!isLive(c)) return;
 
+    // Contador del filtro "Algún día"
+    const somedayCount = Storage.get().tasks.filter(isSomeday).length;
+    const countEl = document.getElementById('someday-count');
+    if (countEl) countEl.textContent = somedayCount ? String(somedayCount) : '';
+
     // Archivo: tareas hechas, con agrupación por mes (vista especial)
     if (filter === 'archive') {
       renderDoneGrouped(c);
@@ -261,10 +301,13 @@ const Tasks = (() => {
     let list = Storage.get().tasks.slice();
     if (filter === 'scheduled') {
       // Programadas = tareas recurrentes activas (se repiten)
-      list = list.filter(t => !t.done && t.recurrence && t.recurrence !== 'none');
+      list = list.filter(t => !t.done && t.date && t.recurrence && t.recurrence !== 'none');
     } else if (filter === 'once') {
-      // Puntuales = tareas sin recurrencia, activas
-      list = list.filter(t => !t.done && (!t.recurrence || t.recurrence === 'none'));
+      // Puntuales = tareas sin recurrencia, activas y con fecha
+      list = list.filter(t => !t.done && t.date && (!t.recurrence || t.recurrence === 'none'));
+    } else if (filter === 'someday') {
+      // Algún día = pendientes sin fecha (orden: importantes, luego por creación)
+      list = list.filter(isSomeday).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     }
     list.sort((a, b) => {
       if ((a.important?1:0) !== (b.important?1:0)) return (b.important?1:0) - (a.important?1:0);
@@ -273,11 +316,13 @@ const Tasks = (() => {
     if (list.length === 0) {
       const msg = filter === 'scheduled'
         ? 'Sin tareas recurrentes · crea una y elige que se repita'
-        : 'Sin tareas puntuales pendientes';
+        : (filter === 'someday'
+          ? 'Bandeja vacía · guarda aquí lo que quieras hacer sin fecha'
+          : 'Sin tareas puntuales pendientes');
       c.innerHTML = `<div class="empty">${msg}</div>`;
       return;
     }
-    c.innerHTML = list.map(t => renderItem(t)).join('');
+    c.innerHTML = list.map(t => renderItem(t, { someday: filter === 'someday' })).join('');
     bindClicks(c);
   }
 
@@ -451,7 +496,7 @@ const Tasks = (() => {
 
   function renderItem(t, opts = {}) {
     const area = Storage.get().areas.find(a => a.id === t.area);
-    const dl = formatTaskDate(t.date);
+    const dl = t.date ? formatTaskDate(t.date) : (t.done ? '' : '📥 ALGÚN DÍA');
     const recLabel = {
       daily: 'DIARIA',
       weekly: 'SEMANAL',
@@ -483,11 +528,46 @@ const Tasks = (() => {
       ? `<div class="task-note">${escapeHtml(t.note)}</div>`
       : '';
 
+    // Subtareas. Las atrasadas de Hoy se muestran exactamente como antes (sin checklist).
+    const sub = subtaskStats(t);
+    const showSubtasks = sub.total > 0 && !overdue;
+    let subtasksHTML = '';
+    if (showSubtasks && t.done) {
+      subtasksHTML = `<div class="subtask-summary">✓ ${sub.done}/${sub.total} subtareas</div>`;
+    } else if (showSubtasks && opts.preview) {
+      subtasksHTML = `<div class="subtask-summary">${sub.done}/${sub.total} subtareas</div>`;
+    } else if (showSubtasks) {
+      const open = openSubtasks.has(t.id);
+      const pct = Math.round((sub.done / sub.total) * 100);
+      subtasksHTML = `
+          <button type="button" class="subtask-toggle ${open ? 'open' : ''}" data-action="subtasks" aria-expanded="${open}">
+            <span class="subtask-count">${sub.done}/${sub.total}</span>
+            <span class="subtask-bar"><span class="subtask-fill" style="width:${pct}%"></span></span>
+            <span class="subtask-chevron">▾</span>
+          </button>
+          ${open ? `<div class="subtask-list">${t.subtasks.map(x => `
+            <button type="button" class="subtask-row ${x.done ? 'done' : ''}" data-action="subtask" data-sub="${escapeAttr(x.id)}">
+              <span class="subtask-check">${x.done ? '✓' : ''}</span>
+              <span class="subtask-name">${escapeHtml(x.name)}</span>
+            </button>`).join('')}</div>` : ''}`;
+    }
+    // Todas las subtareas hechas: el checkbox se destaca (lista para cerrarse), sin completarla sola
+    const ready = showSubtasks && !t.done && sub.done === sub.total;
+
+    // Bandeja "Algún día": botones rápidos para asignar fecha (solo en ese filtro)
+    const somedayHTML = (opts.someday && !t.done && !t.date) ? `
+          <div class="someday-actions">
+            <button type="button" class="someday-btn" data-action="date-today">Hoy</button>
+            <button type="button" class="someday-btn" data-action="date-tomorrow">Mañana</button>
+            <button type="button" class="someday-btn" data-action="date-pick">Fecha</button>
+            <input type="date" class="someday-date" data-action="date-input" hidden />
+          </div>` : '';
+
     return `
       <div class="item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${opts.preview ? 'preview' : ''}" data-id="${t.id}">
         ${opts.preview
           ? '<span class="checkbox preview" aria-hidden="true"></span>'
-          : `<button class="checkbox ${t.done ? 'checked' : ''}" data-action="toggle">
+          : `<button class="checkbox ${t.done ? 'checked' : ''} ${ready ? 'ready' : ''}" data-action="toggle" ${ready ? 'aria-label="Subtareas listas: completar tarea"' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
         </button>`}
         ${t.important ? '<span class="item-icon">⭐</span>' : ''}
@@ -499,6 +579,8 @@ const Tasks = (() => {
             ${recLabel ? `<span class="recurrence-badge">🔁 ${recLabel}</span>` : ''}
           </div>
           ${noteBlock}
+          ${subtasksHTML}
+          ${somedayHTML}
         </div>
         ${opts.noActions ? '' : `
         <div class="item-actions">
@@ -522,28 +604,91 @@ const Tasks = (() => {
 
   function bindClicks(c) {
     c.querySelectorAll('[data-action]').forEach(b => {
+      if (b.dataset.action === 'date-input') {
+        b.addEventListener('click', e => e.stopPropagation());
+        b.addEventListener('change', () => { if (b.value) setTaskDate(b.closest('.item').dataset.id, b.value); });
+        return;
+      }
       b.addEventListener('click', e => {
         e.stopPropagation();
         const id = b.closest('.item').dataset.id;
-        if (b.dataset.action === 'toggle') toggle(id);
-        if (b.dataset.action === 'delete') remove(id);
-        if (b.dataset.action === 'edit') openCreateModal(id);
+        const a = b.dataset.action;
+        if (a === 'toggle') toggle(id);
+        if (a === 'delete') remove(id);
+        if (a === 'edit') openCreateModal(id);
+        if (a === 'subtasks') {
+          if (openSubtasks.has(id)) openSubtasks.delete(id); else openSubtasks.add(id);
+          rerender();
+        }
+        if (a === 'subtask') toggleSubtask(id, b.dataset.sub);
+        if (a === 'date-today') setTaskDate(id, UI.todayKey());
+        if (a === 'date-tomorrow') setTaskDate(id, tomorrowKey());
+        if (a === 'date-pick') {
+          const inp = b.parentElement.querySelector('.someday-date');
+          inp.hidden = false;
+          inp.focus();
+          try { if (inp.showPicker) inp.showPicker(); } catch (err) { /* el input visible basta */ }
+        }
       });
     });
   }
 
+  function rerender() { renderToday(); renderFull(); App.refreshKPIs(); }
+
+  // Marcar/desmarcar una subtarea sin abrir el modal (no completa la tarea sola)
+  function toggleSubtask(taskId, subId) {
+    const t = Storage.get().tasks.find(x => x.id === taskId);
+    const st = t && (t.subtasks || []).find(x => x.id === subId);
+    if (!st) return;
+    st.done = !st.done;
+    UI.buzz(8);
+    Storage.save();
+    rerender();
+  }
+
+  // Asignar fecha a una tarea de "Algún día" (botones rápidos de la bandeja)
+  function setTaskDate(taskId, dateKey) {
+    const t = Storage.get().tasks.find(x => x.id === taskId);
+    if (!t || !dateKey) return;
+    t.date = dateKey;
+    Storage.save();
+    rerender();
+    UI.toast(`Movida a ${formatTaskDate(dateKey).toLowerCase()}`);
+  }
+
+  // Modal de tarea (crear desde Hoy o la gestión, y editar). Nombre primero, chips de
+  // fecha (Hoy · Mañana · Algún día · Fecha) y el resto bajo "Más opciones".
   function openCreateModal(editId = null) {
     const state = Storage.get();
     const editing = editId ? state.tasks.find(t => t.id === editId) : null;
     const areasOpts = state.areas.map(a => `<option value="${a.id}" ${editing && editing.area === a.id ? 'selected' : ''}>${a.icon} ${a.name}</option>`).join('');
     const goalsOpts = state.goals.filter(g => !g.done && !g.archived).map(g => `<option value="${g.id}" ${editing && editing.goalId === g.id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('');
     const today = UI.todayKey();
+    const tomorrow = tomorrowKey();
     const currentRec = (editing && editing.recurrence) || 'none';
-    const recOpts = [
+    const recChoices = [
       ['none', 'No se repite'],
       ['monthly', '🔁 Mensual'],
       ['yearly', '🔁 Anual'],
-    ].map(([v, l]) => `<option value="${v}" ${currentRec === v ? 'selected' : ''}>${l}</option>`).join('');
+    ];
+    // Recurrencias antiguas (diaria/semanal) que ya no se ofrecen: se conservan al editar
+    if (currentRec === 'daily') recChoices.push(['daily', '🔁 Diaria']);
+    if (currentRec === 'weekly') recChoices.push(['weekly', '🔁 Semanal']);
+    const recOpts = recChoices.map(([v, l]) => `<option value="${v}" ${currentRec === v ? 'selected' : ''}>${l}</option>`).join('');
+
+    // Estado del modal
+    const modalState = {
+      when: !editing ? 'today'
+        : (!editing.date ? 'someday'
+          : (editing.date === today ? 'today'
+            : (editing.date === tomorrow ? 'tomorrow' : 'pick'))),
+      subtasks: (editing && Array.isArray(editing.subtasks)) ? editing.subtasks.map(x => ({ ...x })) : [],
+    };
+    const pickInit = editing && editing.date ? editing.date : today;
+    const pickLabel = dk => `📅 ${new Date(dk + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}`;
+
+    // "Más opciones" abierto al editar algo con importante, repetición, meta o subtareas
+    const moreOpen = !!(editing && (editing.important || currentRec !== 'none' || editing.goalId || modalState.subtasks.length));
 
     // Campos extra solo cuando editamos una tarea HECHA (bitácora)
     const isEditingDone = editing && editing.done;
@@ -555,38 +700,74 @@ const Tasks = (() => {
       </div>
     ` : '';
 
+    const whenChip = (id, label) => `<button type="button" class="qe-chip ${modalState.when === id ? 'active' : ''}" data-when="${id}">${label}</button>`;
+
     UI.openModal({
       title: editing ? 'Editar tarea' : 'Nueva tarea',
-      okText: editing ? 'Guardar cambios' : 'Crear',
+      okText: editing ? 'Guardar cambios' : 'Guardar',
       bodyHTML: `
-        <label>Nombre de la tarea</label>
-        <input type="text" id="t-name" placeholder="Ej: Pagar la luz" value="${editing ? escapeAttr(editing.name) : ''}" />
+        <label for="t-name">Tarea</label>
+        <input type="text" id="t-name" placeholder="Ej: Pagar la luz" autocomplete="off" value="${editing ? escapeAttr(editing.name) : ''}" />
+        <p class="qe-error" id="t-name-error" hidden></p>
+
         <label>Fecha</label>
-        <input type="date" id="t-date" value="${editing ? editing.date : today}" />
-        <label>🔁 Recurrencia</label>
-        <select id="t-recurrence">${recOpts}</select>
-        <p style="color:var(--text-dim);font-size:11px;margin-top:6px;line-height:1.4">Si es recurrente, al completarla se generará automáticamente la próxima ocurrencia.</p>
-        <label>Área</label>
-        <select id="t-area">${areasOpts}</select>
-        ${goalsOpts ? `
-          <label>Vincular a meta (opcional)</label>
-          <select id="t-goal">
-            <option value="">— Ninguna —</option>
-            ${goalsOpts}
-          </select>` : ''}
-        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;text-transform:none;">
-          <input type="checkbox" id="t-imp" style="width:auto;margin:0" ${editing && editing.important ? 'checked' : ''} /> ⭐ Marcar como importante
-        </label>
+        <div class="qe-chips" id="t-when-chips">
+          ${whenChip('today', 'Hoy')}
+          ${whenChip('tomorrow', 'Mañana')}
+          ${whenChip('someday', '📥 Algún día')}
+          ${whenChip('pick', modalState.when === 'pick' ? pickLabel(pickInit) : '📅 Fecha')}
+        </div>
+        <input type="date" id="t-date" value="${pickInit}" ${modalState.when === 'pick' ? '' : 'hidden'} />
+
+        <button type="button" class="qe-more-toggle" id="t-more-toggle" aria-expanded="${moreOpen}">
+          Más opciones <span class="qe-more-arrow">${moreOpen ? '▴' : '▾'}</span>
+        </button>
+        <div class="qe-more" id="t-more" ${moreOpen ? '' : 'hidden'}>
+          <label for="t-area">Área</label>
+          <select id="t-area">${areasOpts}</select>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:14px;text-transform:none;">
+            <input type="checkbox" id="t-imp" style="width:auto;margin:0" ${editing && editing.important ? 'checked' : ''} /> ⭐ Marcar como importante
+          </label>
+          <label for="t-recurrence">🔁 Repetición</label>
+          <select id="t-recurrence">${recOpts}</select>
+          <p class="qe-help" id="t-rec-help">Si es recurrente, al completarla se generará automáticamente la próxima ocurrencia.</p>
+          ${goalsOpts ? `
+            <label for="t-goal">Vincular a meta (opcional)</label>
+            <select id="t-goal">
+              <option value="">— Ninguna —</option>
+              ${goalsOpts}
+            </select>` : ''}
+          <label for="t-sub-input">Subtareas</label>
+          <div class="t-sub-list" id="t-sub-list"></div>
+          <input type="text" id="t-sub-input" placeholder="Agregar subtarea y presiona Enter" autocomplete="off" />
+        </div>
         ${doneFieldsHTML}
       `,
       onSave: () => {
-        const name = document.getElementById('t-name').value.trim();
-        if (!name) { UI.toast('Falta el nombre'); return false; }
-        const date = document.getElementById('t-date').value;
+        const nameEl = document.getElementById('t-name');
+        const name = nameEl.value.trim();
+        const errEl = document.getElementById('t-name-error');
+        if (!name) {
+          errEl.textContent = 'Escribe el nombre de la tarea';
+          errEl.hidden = false;
+          nameEl.focus();
+          return false;
+        }
+        // Subtarea escrita pero sin Enter: también se guarda
+        addPendingSubtask();
+
+        let date;
+        if (modalState.when === 'today') date = today;
+        else if (modalState.when === 'tomorrow') date = tomorrow;
+        else if (modalState.when === 'someday') date = null;
+        else date = document.getElementById('t-date').value || today;
         const area = document.getElementById('t-area').value;
         const goalId = document.getElementById('t-goal')?.value || null;
         const important = document.getElementById('t-imp').checked;
-        const recurrence = document.getElementById('t-recurrence').value;
+        // "Algún día" no puede repetirse
+        const recurrence = date ? document.getElementById('t-recurrence').value : 'none';
+        const subtasks = modalState.subtasks.filter(x => x.name.trim());
+
         if (editing) {
           editing.name = name;
           editing.date = date;
@@ -594,6 +775,8 @@ const Tasks = (() => {
           editing.goalId = goalId;
           editing.important = important;
           editing.recurrence = recurrence;
+          if (subtasks.length) editing.subtasks = subtasks;
+          else delete editing.subtasks;
           // Campos de bitácora (solo si edita una hecha)
           if (isEditingDone) {
             const noteInp = document.getElementById('t-note');
@@ -610,13 +793,95 @@ const Tasks = (() => {
             recurrence,
             seriesId: null, // se llena solo en las generadas automáticamente
             done: false, createdAt: Date.now(),
+            ...(subtasks.length ? { subtasks } : {}),
           });
-          UI.toast(recurrence !== 'none' ? `Tarea recurrente creada (${recurrence})` : 'Tarea creada');
+          UI.toast(!date ? 'Guardada en Algún día' : (recurrence !== 'none' ? `Tarea recurrente creada (${recurrence})` : 'Tarea creada'));
         }
         Storage.save();
-        renderToday(); renderFull(); App.refreshKPIs();
+        rerender();
       }
     });
+
+    // --- Interacción (UI.openModal pinta el HTML de forma síncrona) ---
+    const recSel = document.getElementById('t-recurrence');
+    const recHelp = document.getElementById('t-rec-help');
+    const dateInp = document.getElementById('t-date');
+    const refreshWhen = () => {
+      document.querySelectorAll('#t-when-chips .qe-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.when === modalState.when);
+        if (btn.dataset.when === 'pick') btn.textContent = modalState.when === 'pick' && dateInp.value ? pickLabel(dateInp.value) : '📅 Fecha';
+      });
+      dateInp.hidden = modalState.when !== 'pick';
+      const someday = modalState.when === 'someday';
+      recSel.disabled = someday;
+      if (someday) recSel.value = 'none';
+      recHelp.textContent = someday
+        ? 'Asigna una fecha para repetir'
+        : 'Si es recurrente, al completarla se generará automáticamente la próxima ocurrencia.';
+    };
+    document.querySelectorAll('#t-when-chips .qe-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modalState.when = btn.dataset.when;
+        refreshWhen();
+        if (modalState.when === 'pick') {
+          dateInp.focus();
+          try { if (dateInp.showPicker) dateInp.showPicker(); } catch (err) { /* el input visible basta */ }
+        }
+      });
+    });
+    dateInp.addEventListener('change', refreshWhen);
+
+    const moreToggle = document.getElementById('t-more-toggle');
+    moreToggle.addEventListener('click', () => {
+      const more = document.getElementById('t-more');
+      more.hidden = !more.hidden;
+      moreToggle.setAttribute('aria-expanded', String(!more.hidden));
+      moreToggle.querySelector('.qe-more-arrow').textContent = more.hidden ? '▾' : '▴';
+    });
+
+    // Subtareas en el modal: Enter agrega y deja el foco listo; × elimina
+    const subList = document.getElementById('t-sub-list');
+    const subInput = document.getElementById('t-sub-input');
+    const renderSubList = () => {
+      subList.innerHTML = modalState.subtasks.map(x => `
+        <div class="t-sub-row ${x.done ? 'done' : ''}">
+          <span class="t-sub-name">${x.done ? '✓ ' : ''}${escapeHtml(x.name)}</span>
+          <button type="button" class="t-sub-del" data-sub-del="${escapeAttr(x.id)}" aria-label="Eliminar subtarea">×</button>
+        </div>`).join('');
+      subList.querySelectorAll('[data-sub-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          modalState.subtasks = modalState.subtasks.filter(x => x.id !== btn.dataset.subDel);
+          renderSubList();
+        });
+      });
+    };
+    function addPendingSubtask() {
+      const v = subInput.value.trim();
+      if (!v) return false;
+      modalState.subtasks.push({ id: Storage.uid(), name: v, done: false });
+      subInput.value = '';
+      renderSubList();
+      return true;
+    }
+    subInput.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      addPendingSubtask();
+      subInput.focus();
+    });
+    renderSubList();
+
+    // Enter en el nombre guarda (con validación inline)
+    const nameInp = document.getElementById('t-name');
+    nameInp.addEventListener('input', () => { document.getElementById('t-name-error').hidden = true; });
+    nameInp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      document.getElementById('modal-ok').click();
+    });
+
+    refreshWhen();
+    setTimeout(() => nameInp.focus(), 50);
   }
 
   return { renderToday, renderTomorrow, renderFull, openCreateModal, setFilter };
