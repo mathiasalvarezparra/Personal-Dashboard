@@ -42,11 +42,11 @@
 
   <!-- ===== PANEL: HOY ===== -->
   <div class="focus-panel active" id="focus-panel-hoy">
-    <!-- Tareas de hoy -->
+    <!-- Tareas: Atrasadas + pestañas por plazo -->
     <div class="section-card">
       <div class="section-head">
         <div>
-          <div class="section-title">✅ Tareas de hoy</div>
+          <div class="section-title">✅ Tareas</div>
           <div class="section-subtitle">Pendientes</div>
         </div>
         <div class="section-head-actions">
@@ -83,9 +83,6 @@
       </div>
       <div id="today-goals"></div>
     </div>
-
-    <!-- Mañana (aparece solo tras cerrar el día) -->
-    <div id="tomorrow-tasks"></div>
 
     <!-- Cierres -->
     <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
@@ -229,7 +226,7 @@
   <div class="task-filter">
     <button class="chip active" data-filter="scheduled">Programadas</button>
     <button class="chip" data-filter="once">Puntuales</button>
-    <button class="chip" data-filter="someday">Algún día <span class="chip-count" id="someday-count"></span></button>
+    <button class="chip" data-filter="someday">Próximamente <span class="chip-count" id="someday-count"></span></button>
     <button class="chip" data-filter="archive">Archivo</button>
   </div>
   <div class="section-card">

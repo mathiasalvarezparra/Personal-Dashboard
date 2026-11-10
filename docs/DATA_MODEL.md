@@ -123,14 +123,14 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `date` | string\|null | `YYYY-MM-DD`, o `null` = **"Algún día"** (bandeja sin fecha) |
-| `goalId` | string\|null | → `goals[].id` (ver Relaciones) |
+| `date` | string\|null | `YYYY-MM-DD`, o `null` = **"Próximamente"** (sin fecha) |
+| `goalId` | string\|null | → `goals[].id` (ver Relaciones). El modal solo ofrece metas semanales activas; vínculos antiguos a metas mensuales/anuales se conservan |
 | `recurrence` | string | `'none'` \| `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'` (ver `getNextRecurrenceDate`) |
 | `seriesId` | string\|null | agrupa ocurrencias generadas por la misma tarea recurrente; `null` hasta que se genera la 2ª ocurrencia |
 | `note` | string | opcional, solo en tareas ya completadas (bitácora) |
-| `subtasks` | `{ id, name, done }[]`\|undefined | checklist opcional. Ausente o vacío = sin subtareas |
+| `subtasks` | `{ id, name, done, date }[]`\|undefined | checklist opcional. Ausente o vacío = sin subtareas. `date`: `YYYY-MM-DD` o `null`/ausente (sin fecha) |
 
-**"Algún día" y subtareas** — ejemplo:
+**"Próximamente" y subtareas con fecha** — ejemplo:
 
 ```json
 {
@@ -138,17 +138,18 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
   "area": "hogar", "goalId": null, "important": false,
   "recurrence": "none", "seriesId": null, "done": false, "createdAt": 1732000000000,
   "subtasks": [
-    { "id": "s1", "name": "Sacar cajas", "done": true },
-    { "id": "s2", "name": "Botar lo roto", "done": false }
+    { "id": "s1", "name": "Sacar cajas", "done": true, "date": null },
+    { "id": "s2", "name": "Botar lo roto", "done": false, "date": "2026-11-14" }
   ]
 }
 ```
 
-- `date: null` (Algún día): no aparece en Hoy, Mañana, atrasadas ni KPIs; solo en el filtro "Algún día" de la gestión mientras está pendiente. Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
-- `subtasks`: completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos y `done: false`.
-- Ambos campos son opcionales: no hubo migración ni cambio de `version`.
+- **Fecha efectiva** (`Tasks.effectiveDate(t)`, no se guarda): la más próxima entre `date` y las `date` de las subtareas **pendientes**. Decide si la tarea va a "⚠ Atrasadas" (< hoy) o a qué pestaña de la tarjeta Tareas (Hoy, Semana, Mes, Más adelante). Sin fecha efectiva → pestaña Próximamente.
+- `date: null` (Próximamente): sin subtareas fechadas pendientes va a la pestaña Próximamente de Enfoque; con alguna, se ubica según esa fecha. En la gestión vive en el filtro "Próximamente". Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
+- `subtasks[].date`: si la tarea tiene fecha, ninguna subtarea puede ser posterior (validación en el modal); si está en Próximamente, cualquier fecha vale. Completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos, `done: false` y las fechas desplazadas los mismos días que la tarea (las sin fecha siguen sin fecha).
+- Todos estos campos son opcionales (subtareas antiguas sin `date` = sin fecha): no hubo migración ni cambio de `version`.
 
-Leído/escrito por: `Tasks` (dueño). Leído por `App` (tareas de hoy/mañana, KPIs; las de `date: null` quedan fuera de todos los filtros por fecha), `Stats`.
+Leído/escrito por: `Tasks` (dueño). Leído por `App` (KPIs y contadores del día vía `Tasks.countsForToday`: fecha = hoy, o pendiente con fecha efectiva hoy), `Stats`.
 
 ### `goals` (array)
 
@@ -254,7 +255,7 @@ Cierre de semana. Dueño: `App`. Leído por `Stats`.
 ## Relaciones entre entidades
 
 - `habit.linkedGoalId → goal.id`: al registrar avance en el hábito, `Habits.addToHabitProgress` suma a `goal.current` vía `Goals.updateCurrent` (y registra el aporte en `habit.contributions`).
-- `task.goalId → goal.id`: vínculo informativo (la tarea se asocia a una meta), no mueve `current` automáticamente.
+- `task.goalId → goal.id`: al completar la tarea suma 1 al `current` de la meta (si tiene `target`) vía `Goals.updateCurrent`, y al desmarcarla resta 1; el avance sube a metas mensuales/anuales por la cadena `parentGoalId`. Las tareas nuevas solo se vinculan a metas **semanales** activas.
 - `goal.parentGoalId → goal.id` (de un horizonte mayor): `Goals.updateCurrent` propaga el delta del hijo al padre recursivamente (semana → mes → año). Una meta archivada guarda en `propagatedCurrent` lo ya propagado para no duplicar si se edita después.
 - `movement.recurringExpenseId → recurringExpense.id`: el movimiento es el pago registrado de ese gasto programado.
 - `habit.area`, `goal.area → area.id`: solo para mostrar ícono/color/nombre, sin lógica adicional.
