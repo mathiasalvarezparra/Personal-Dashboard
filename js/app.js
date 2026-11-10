@@ -117,7 +117,7 @@ const App = (() => {
       const state = Storage.get();
       const onVacation = Vacation.isActive();
       const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
-      const tasksToday = state.tasks.filter(t => t.date === UI.todayKey());
+      const tasksToday = state.tasks.filter(Tasks.countsForToday);
       const habitsPctSum = habitsToday.reduce((acc, h) => acc + Habits.getHabitDayPct(h), 0);
       const tasksPctSum = tasksToday.reduce((acc, t) => acc + (t.done ? 100 : 0), 0);
       const total = habitsToday.length + tasksToday.length;
@@ -515,7 +515,7 @@ const App = (() => {
     const state = Storage.get();
     const onVacation = Vacation.isActive();
     const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
-    const tasksToday = state.tasks.filter(t => t.date === UI.todayKey());
+    const tasksToday = state.tasks.filter(Tasks.countsForToday);
 
     // Suma de % por hábito (0..100 cada uno). Para binarios: 0 o 100. Para cuantitativos: proporcional.
     const habitsPctSum = habitsToday.reduce((acc, h) => acc + Habits.getHabitDayPct(h), 0);
@@ -541,7 +541,6 @@ const App = (() => {
     Habits.renderTodayHabits();
     Goals.renderTodayGoals();
     Finance.renderTodayPending();
-    Tasks.renderTomorrow();
   }
 
   // ---------- Saludo y estado del día ----------
@@ -911,7 +910,7 @@ const App = (() => {
       const onVacation = Vacation.isActive();
       const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
       const habitsDone = habitsToday.filter(Habits.isCompletedToday).length;
-      const tasksToday = state.tasks.filter(t => t.date === today);
+      const tasksToday = state.tasks.filter(Tasks.countsForToday);
       const tasksDone = tasksToday.filter(t => t.done).length;
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
       const closedToday = state.goals.filter(g => g.done && g.doneAt && g.doneAt >= startOfDay.getTime());
