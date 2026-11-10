@@ -14,6 +14,10 @@ const Storage = (() => {
       lastWeekKey: null,
       vacation: null, // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } o null
       pendingWeekClose: null, // weekKey de una semana terminada sin cerrar
+      // Plan de Finanzas (Movimientos › Plan)
+      monthlyBudget: null,      // tope de gasto mensual en CLP (sin Ahorro) o null
+      categoryBudgets: {},      // { categoryId: CLP } límite mensual por categoría
+      monthlySavingsGoal: null, // meta de ahorro mensual en CLP o null
     },
     areas: [
       { id: 'salud',       name: 'Salud',       icon: '💪', color: '#4ade80' },

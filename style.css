@@ -16,6 +16,7 @@
   --accent-blue: #60a5fa;
   --accent-purple: #a78bfa;
   --accent-orange: #fb923c;
+  --accent-amber: #f59e0b;
 
   --primary: var(--accent-yellow);
 
@@ -838,7 +839,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   white-space: nowrap;
 }
 .ms-val.savings { color: var(--accent-green); }
-.ms-val.expense { color: var(--accent-red); }
+.ms-val.expense { color: var(--text); }
 .ms-val.zero { color: var(--text); }
 .ms-lbl {
   font-family: var(--font-mono);
@@ -2212,6 +2213,14 @@ label {
   display: flex;
   gap: 8px;
   margin-top: 18px;
+  /* Si el contenido del modal es largo, los botones quedan siempre a la vista.
+     Se extiende sobre el padding inferior del modal para tapar lo que scrollea debajo. */
+  position: sticky;
+  bottom: 0;
+  padding-top: 8px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  margin-bottom: calc(-20px - env(safe-area-inset-bottom));
+  background: var(--bg-elev);
 }
 .modal-actions button {
   flex: 1;
@@ -3666,9 +3675,9 @@ label {
   border-radius: 6px;
 }
 .recurring-expense-item .re-amount.expense {
-  color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
   padding: 1px 7px;
   border-radius: 6px;
 }
@@ -3880,7 +3889,7 @@ label {
   margin-top: 2px;
 }
 .chart-legend-row .dot-green,
-.chart-legend-row .dot-red {
+.chart-legend-row .dot-neutral {
   display: inline-block;
   width: 10px;
   height: 10px;
@@ -3889,7 +3898,7 @@ label {
   vertical-align: middle;
 }
 .chart-legend-row .dot-green { background: var(--accent-green); }
-.chart-legend-row .dot-red   { background: var(--accent-red); }
+.chart-legend-row .dot-neutral { background: var(--text-dim); }
 
 /* Archivo histórico (Mi Sistema → Finanzas) */
 .archive-month {
@@ -3942,8 +3951,8 @@ label {
   background: rgba(74, 222, 128, 0.1);
 }
 .archive-amt.expense {
-  color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--text);
+  background: var(--bg-card-hover);
 }
 .archive-month-body {
   padding: 4px 10px 10px;
@@ -4151,3 +4160,192 @@ label {
   background: rgba(74, 222, 128, 0.06);
 }
 .donut-legend-row.is-savings .donut-cat-val { color: var(--accent-green); }
+
+/* ============== FINANZAS: PRESUPUESTO Y META DE AHORRO ============== */
+/* Rojo solo para alertas: el gasto es neutro, ámbar al acercarse al tope y rojo al pasarlo */
+.fin-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.fin-prog + .fin-prog { margin-top: 10px; }
+.fin-plan .fin-prog + .fin-prog { margin-top: 0; }
+.fin-prog-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.fin-prog-label { font-size: 12.5px; color: var(--text); }
+.fin-prog-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.fin-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.fin-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: var(--text-dim);
+  transition: width var(--anim-dur) var(--anim-ease);
+}
+.fin-prog.warn .fin-bar-fill { background: var(--accent-amber); }
+.fin-prog.warn .fin-prog-pct { color: var(--accent-amber); }
+.fin-prog.over .fin-bar-fill { background: var(--accent-red); }
+.fin-prog.over .fin-prog-pct { color: var(--accent-red); }
+.fin-prog.savings .fin-bar-fill { background: var(--accent-green); }
+.fin-prog.savings .fin-prog-pct { color: var(--accent-green); }
+.fin-prog-alert {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-red);
+}
+.plan-cat-bars {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.plan-empty {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+.link-btn {
+  color: var(--accent-yellow);
+  font-weight: 600;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+
+/* Movimientos › Plan */
+.plan-form { display: flex; flex-direction: column; }
+.plan-field { margin-bottom: 14px; }
+.plan-help {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.plan-section-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 6px;
+}
+.plan-money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 10px;
+}
+.plan-money input {
+  border: none !important;
+  background: transparent !important;
+  padding: 10px 0 !important;
+  margin: 0 !important;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.plan-currency { font-family: var(--font-mono); color: var(--text-faint); }
+.plan-cats { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.plan-cat {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  align-items: center;
+  gap: 10px;
+  margin: 0 !important;
+  font-size: 13px;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  color: var(--text) !important;
+}
+.plan-cat .plan-money input { padding: 7px 0 !important; font-size: 13px; }
+.plan-cat { font-family: var(--font-sans); font-weight: 500; }
+.plan-money:focus-within, .qe-amount-field:focus-within { border-color: var(--accent-yellow); }
+
+/* Registro rápido de gastos (modal) */
+.qe-amount-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 14px;
+}
+.qe-currency { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--text-faint); }
+.qe-amount {
+  border: none !important;
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 12px 0 !important;
+  width: 100%;
+  font-family: var(--font-mono) !important;
+  font-size: 28px !important;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.qe-error {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-red);
+}
+.qe-help { color: var(--text-faint); font-size: 11px; margin-top: 4px; }
+.qe-help:empty { display: none; }
+.qe-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qe-chips[hidden], .qe-error[hidden] { display: none; }
+#mv-cat-extra { margin-top: 6px; }
+.qe-chip {
+  padding: 7px 11px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.12s;
+}
+.qe-chip:active { transform: scale(0.95); }
+.qe-chip.active {
+  background: rgba(245, 200, 66, 0.14);
+  border-color: var(--accent-yellow);
+  color: var(--text);
+}
+.qe-chip-more { border-style: dashed; color: var(--text-faint); }
+.qe-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+.qe-opt { text-transform: none; letter-spacing: normal; color: var(--text-faint); font-weight: 400; }
+.qe-date input { width: 148px; padding-left: 8px; padding-right: 8px; font-size: 13px; }
+.qe-more-toggle {
+  margin-top: 14px;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.qe-more { margin-top: 4px; }
