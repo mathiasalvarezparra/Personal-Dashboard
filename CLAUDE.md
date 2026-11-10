@@ -20,7 +20,7 @@ HTML, CSS y JS **vanilla**. Scripts clásicos (`<script src="...">`, sin `type="
 6. `tasks.js` — `Tasks`: tareas puntuales y recurrentes.
 7. `goals.js` — `Goals`: metas por horizonte (semana/mes/año), jerarquía padre-hijo.
 8. `goal-archive.js` — `GoalArchive`: vista de solo lectura de metas archivadas.
-9. `finance.js` — `Finance`: **solo seguimiento de gastos y ahorro** (sin ingresos ni balance): pagos programados, gastos registrados, tarjeta "💰 Gastos" de Hoy, Estadísticas › Finanzas y vista de gestión. `Finance.isTrackedExpense(m)` decide qué movimiento cuenta.
+9. `finance.js` — `Finance`: **solo seguimiento de gastos y ahorro** (sin ingresos ni balance): pagos programados, gastos registrados, presupuesto y meta de ahorro, tarjeta "💰 Finanzas" de Hoy, Estadísticas › Finanzas, vista "🧾 Movimientos" y el modal de registro rápido. `Finance.isTrackedExpense(m)` decide qué movimiento cuenta.
 10. `templates.js` — `Templates`: sets predefinidos de hábitos+metas para onboarding.
 11. `goal-rollover.js` — `GoalRollover`: archiva metas vencidas y auto-crea las recurrentes.
 12. `vacation.js` — `Vacation`: modo vacaciones (pausa hábitos en un rango de fechas).
@@ -44,6 +44,7 @@ Estructura completa de cada entidad, relaciones y qué módulo lee/escribe qué:
 - Todos los textos de la UI van en **español**.
 - Patrón de render de cada módulo: función `renderX()` que busca su contenedor por `id`, hace `if (!isLive(c)) return;` (evita repintar vistas ocultas), lee `Storage.get()`, arma un string HTML y lo asigna a `.innerHTML`.
 - Todo gráfico o barra nuevo debe usar el módulo de animación central (`js/animate.js`): renderizar el valor final en `style` (`width`/`height` en %) o `stroke-dashoffset`, y agregar su selector a las listas de `Animate`. Duraciones y easing salen de las variables `--anim-*` de `style.css`.
+- Colores en Finanzas: los montos de gasto van en color de texto neutro (`var(--text)`) y sin signo "−"; el Ahorro en verde (`.savings`). El **rojo se reserva para alertas**: pagos atrasados, "Vence hoy", presupuesto excedido y tendencias negativas. Barras de presupuesto: neutro < 80%, ámbar (`--accent-amber`) 80–100%, rojo > 100%.
 - **Uso obligatorio** de `escapeHtml()` al insertar cualquier texto ingresado por el usuario dentro de HTML, y `escapeAttr()` al insertarlo dentro de un atributo (ej. `value="${escapeAttr(x)}"`).
 
 ## Sistema de diseño y navegación: pendiente de rediseño
@@ -54,8 +55,9 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 - Volver atrás: `data-back` dispara `UI.goBack()` (pila de historial interna).
 - Cada vista es una sección `<section id="view-nombre-de-vista" class="view">` en `index.html`.
 - Bottom-nav: solo **Enfoque** (`today`) y **Estadísticas** (`stats`). Finanzas no tiene pestaña propia.
-- Finanzas en Hoy: la tarjeta **"💰 Gastos"** (`Finance.renderTodayPending`, contenedor `#today-pending`) se muestra siempre. Con pagos programados por vencer lista cada uno con "Pagar"; si no hay, muestra "Gastado este mes" (sin Ahorro) y "No hay gastos pendientes". Su botón "+" abre el modal de nuevo gasto y la billetera lleva a la gestión (`finance-settings`: Pagos programados, Gastos, Archivo), cuyo "volver" regresa a Hoy.
-- El análisis mensual de gastos y ahorro vive en Estadísticas › Finanzas (incluye "Registros del mes" con editar/eliminar).
+- Finanzas en Hoy: la tarjeta **"💰 Finanzas"** (`Finance.renderTodayPending`, contenedor `#today-pending`) se muestra siempre. Si hay presupuesto o meta de ahorro, muestra sus barras ("Gastado $X de $Y", "Ahorro $A de $B"). Con pagos programados por vencer lista cada uno con "Pagar"; si no hay, muestra "Gastado este mes" (sin Ahorro) y "No hay gastos pendientes". Su "+" abre el modal de registro rápido y la billetera ("Ver movimientos") lleva a **"🧾 Movimientos"** (vista `finance-settings`), cuyo "volver" regresa a donde se entró.
+- Subpestañas de Movimientos: **Pagos programados, Puntuales, Archivo, Plan**. En **Plan** se definen presupuesto mensual, meta de ahorro mensual y presupuesto por categoría (`Finance.openPlan()` abre directo esa pestaña).
+- El análisis mensual vive en Estadísticas › Finanzas: resumen Gastado/Ahorrado/%, bloques Presupuesto y Meta de ahorro (o estado vacío con link a Plan), dona, "Gastos y ahorro · 6 meses" (con línea punteada del presupuesto) y "Registros del mes" con editar/eliminar.
 
 Esta sección se completará después del rediseño.
 

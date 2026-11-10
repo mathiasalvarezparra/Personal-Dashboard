@@ -31,8 +31,23 @@ Fuente de verdad: `js/storage.js` (`Storage.defaultState` y `Storage.load()`). T
 | `areasEspiritualidadAdded` | boolean | flag de migración (ver arriba) |
 | `quarterRemoved` | boolean | flag de migración (ver arriba) |
 | `lastPeriodKeys` | object | `{ week?, month?, year?: string }`, último período procesado por `GoalRollover` |
+| `monthlyBudget` | number\|null | presupuesto de gasto mensual en CLP, **sin contar Ahorro**. `null` = sin presupuesto |
+| `categoryBudgets` | object | `{ [categoryId]: number }` límite mensual en CLP por categoría de gasto (nunca `inversion`). Vacío `{}` = sin límites; una categoría ausente = sin límite |
+| `monthlySavingsGoal` | number\|null | meta de ahorro mensual en CLP (categoría `inversion` / Ahorro). `null` = sin meta |
 
-Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones y `pendingWeekClose`; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`.
+Ejemplo de los campos del plan de Finanzas:
+
+```json
+{
+  "monthlyBudget": 600000,
+  "categoryBudgets": { "alimentacion": 200000, "ocio": 50000 },
+  "monthlySavingsGoal": 150000
+}
+```
+
+Los tres campos están en `defaultState.settings`; el merge de un nivel de `Storage.load()` se los agrega a los datos existentes (no hizo falta subir `version`). Se editan en Movimientos › Plan y se guardan al salir de cada campo. "Gastado" del mes = gastos registrados (`Finance.isTrackedExpense`) excepto Ahorro; "Ahorrado" = gastos en Ahorro.
+
+Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones y `pendingWeekClose`; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`; `Finance` lee y escribe `monthlyBudget`, `categoryBudgets` y `monthlySavingsGoal`.
 
 ### `areas` (array, catálogo fijo editable)
 

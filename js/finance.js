@@ -44,8 +44,9 @@ const Finance = (() => {
   // Sub-tabs (orden visible)
   const SUB_TABS = [
     { id: 'scheduled', label: 'Pagos programados' },
-    { id: 'once',      label: 'Gastos' },
+    { id: 'once',      label: 'Puntuales' },
     { id: 'archive',   label: 'Archivo' },
+    { id: 'plan',      label: 'Plan' },
   ];
 
   let activeSubTab = 'scheduled'; // por defecto: pagos programados (recurrentes)
@@ -60,6 +61,61 @@ const Finance = (() => {
   function formatCLP(n) {
     if (n == null || isNaN(n)) return '';
     return '$' + Math.round(Number(n)).toLocaleString('es-CL');
+  }
+
+  // ── Montos en inputs de texto con teclado numérico y miles con punto (CLP) ──
+  function parseMoney(str) {
+    const digits = String(str == null ? '' : str).replace(/\D/g, '');
+    return digits ? Number(digits) : null;
+  }
+  function moneyText(n) {
+    if (n == null || isNaN(n)) return '';
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function bindMoneyInput(el, onInput) {
+    el.addEventListener('input', () => {
+      const n = parseMoney(el.value);
+      el.value = moneyText(n);
+      if (onInput) onInput(n);
+    });
+  }
+
+  // ── Plan: presupuesto mensual, presupuesto por categoría y meta de ahorro ──
+  function getPlan() {
+    const st = Storage.get().settings || {};
+    return {
+      budget: st.monthlyBudget > 0 ? st.monthlyBudget : null,
+      goal: st.monthlySavingsGoal > 0 ? st.monthlySavingsGoal : null,
+      catBudgets: st.categoryBudgets || {},
+    };
+  }
+
+  // Nivel del presupuesto: neutro < 80% · ámbar 80–100% · rojo > 100%
+  function budgetLevel(pct) { return pct > 100 ? 'over' : (pct >= 80 ? 'warn' : 'ok'); }
+
+  // Barra de progreso (animada por js/animate.js vía .fin-bar-fill)
+  function progressRow(label, value, total, opts = {}) {
+    const ratio = total > 0 ? (value / total) * 100 : 0;
+    const pct = Math.round(ratio);
+    const level = opts.savings ? 'savings' : budgetLevel(ratio);
+    const alert = level === 'over' ? `<div class="fin-prog-alert">Excedido por ${formatCLP(value - total)}</div>` : '';
+    return `
+      <div class="fin-prog ${level}">
+        <div class="fin-prog-top">
+          <span class="fin-prog-label">${label}</span>
+          <span class="fin-prog-pct">${pct}%</span>
+        </div>
+        <div class="fin-bar"><div class="fin-bar-fill" style="width:${Math.min(100, Math.round(ratio * 10) / 10)}%"></div></div>
+        ${alert}
+      </div>`;
+  }
+  const budgetRow = (spent, budget) => progressRow(`Gastado ${formatCLP(spent)} de ${formatCLP(budget)}`, spent, budget);
+  const savingsRow = (saved, goal) => progressRow(`Ahorro ${formatCLP(saved)} de ${formatCLP(goal)}`, saved, goal, { savings: true });
+
+  // Abre Movimientos › Plan
+  function openPlan() {
+    activeSubTab = 'plan';
+    UI.go('finance-settings');
   }
 
   // Distancia en días desde hoy hasta el próximo día de pago (1-31). Para ordenar por proximidad.
@@ -111,6 +167,8 @@ const Finance = (() => {
       // que renderArchive() busca por id.
       c.innerHTML = '<div id="finance-archive-list"></div>';
       renderArchive();
+    } else if (activeSubTab === 'plan') {
+      renderPlan(c);
     } else {
       renderScheduledList(c);
     }
@@ -121,7 +179,7 @@ const Finance = (() => {
   function renderScheduledList(c) {
     const list = (Storage.get().recurringExpenses || []).slice();
     if (list.length === 0) {
-      c.innerHTML = '<div class="empty">Sin pagos programados · toca "+ Nuevo movimiento" para crear</div>';
+      c.innerHTML = '<div class="empty">Sin pagos programados · toca "+" y usa "Más opciones" para crear uno</div>';
       return;
     }
     list.sort((a, b) => {
@@ -164,6 +222,63 @@ const Finance = (() => {
   }
 
   const sumAmount = list => list.reduce((s, m) => s + (m.amount || 0), 0);
+
+  // --- Plan: presupuesto mensual, meta de ahorro y presupuesto por categoría.
+  // Cada campo se guarda al salir de él (evento change).
+  function renderPlan(c) {
+    const st = Storage.get().settings;
+    const catBudgets = st.categoryBudgets || {};
+    const moneyField = (attrs, value, placeholder) =>
+      `<span class="plan-money"><span class="plan-currency">$</span><input type="text" inputmode="numeric" autocomplete="off" ${attrs} placeholder="${placeholder}" value="${moneyText(value)}" /></span>`;
+    const cats = EXPENSE_CATEGORIES.filter(cat => cat.id !== SAVINGS_CAT);
+    c.innerHTML = `
+      <div class="plan-form">
+        <div class="plan-field">
+          <label for="plan-budget">Presupuesto mensual</label>
+          ${moneyField('id="plan-budget" data-plan="monthlyBudget"', st.monthlyBudget, 'Sin presupuesto')}
+          <p class="plan-help">Tope de gasto del mes, sin contar Ahorro.</p>
+        </div>
+        <div class="plan-field">
+          <label for="plan-goal">Meta de ahorro mensual</label>
+          ${moneyField('id="plan-goal" data-plan="monthlySavingsGoal"', st.monthlySavingsGoal, 'Sin meta')}
+          <p class="plan-help">Lo que quieres apartar cada mes en la categoría 🏦 Ahorro.</p>
+        </div>
+        <div class="plan-section-title">Presupuesto por categoría (opcional)</div>
+        <p class="plan-help">Vacío = sin límite.</p>
+        <div class="plan-cats">
+          ${cats.map(cat => `
+            <label class="plan-cat">
+              <span class="plan-cat-name">${cat.icon} ${cat.name}</span>
+              ${moneyField(`data-plan-cat="${cat.id}"`, catBudgets[cat.id], 'Sin límite')}
+            </label>`).join('')}
+        </div>
+      </div>`;
+    c.querySelectorAll('input').forEach(inp => {
+      bindMoneyInput(inp);
+      inp.addEventListener('change', () => savePlanField(inp));
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+    });
+  }
+
+  function savePlanField(inp) {
+    const s = Storage.get();
+    const n = parseMoney(inp.value);
+    const val = n > 0 ? n : null;
+    if (inp.dataset.plan) {
+      s.settings[inp.dataset.plan] = val;
+      const what = inp.dataset.plan === 'monthlyBudget' ? 'Presupuesto mensual' : 'Meta de ahorro';
+      UI.toast(val ? `${what} guardado · ${formatCLP(val)}` : `${what} eliminado`);
+    } else {
+      const cat = getExpenseCategory(inp.dataset.planCat);
+      s.settings.categoryBudgets = s.settings.categoryBudgets || {};
+      if (val) s.settings.categoryBudgets[inp.dataset.planCat] = val;
+      else delete s.settings.categoryBudgets[inp.dataset.planCat];
+      UI.toast(val ? `${cat.name} · límite ${formatCLP(val)}` : `${cat.name} · sin límite`);
+    }
+    inp.value = moneyText(val);
+    Storage.save();
+    renderTodayPending();
+  }
 
   // --- Gastos recurrentes (recurringExpenses por tipo, ordenados por proximidad a fecha de pago)
 
@@ -218,7 +333,6 @@ const Finance = (() => {
       ? new Date(m.date + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()
       : '—';
     const amountClass = isSavings(m) ? 're-amount savings' : 're-amount expense';
-    const sign = isSavings(m) ? '' : '− ';
     const noteBlock = m.note ? `<div class="task-note">${escapeHtml(m.note)}</div>` : '';
     const actionsBlock = opts.readonly ? '' : `
         <div class="re-actions">
@@ -232,7 +346,7 @@ const Finance = (() => {
           <div class="re-meta">
             <span class="re-due">${dateLabel}</span>
             <span class="re-cat">${cat.name}</span>
-            <span class="${amountClass}">${sign}${formatCLP(m.amount)}</span>
+            <span class="${amountClass}">${formatCLP(m.amount)}</span>
           </div>
           ${noteBlock}
         </div>
@@ -273,8 +387,20 @@ const Finance = (() => {
     });
   }
 
-  // ====== MODAL UNIFICADO: NUEVO GASTO ======
-  // Solo gastos (type 'expense'). Opciones:
+  // Categorías de gasto ordenadas por uso (frecuencia en movements); a igualdad,
+  // mantiene el orden de EXPENSE_CATEGORIES (sort estable).
+  function categoriesByUse() {
+    const count = {};
+    (Storage.get().movements || []).forEach(m => {
+      if (isTrackedExpense(m)) count[m.category] = (count[m.category] || 0) + 1;
+    });
+    return EXPENSE_CATEGORIES.slice().sort((a, b) => (count[b.id] || 0) - (count[a.id] || 0));
+  }
+
+  // ====== MODAL DE GASTO (registro rápido) ======
+  // Solo gastos (type 'expense'). Monto primero, categoría en chips, nombre
+  // opcional (si queda vacío se usa el de la categoría) y lo menos usado
+  // (repetición, cuotas, nota) bajo "Más opciones". Opciones:
   //  - editRecurringId: editar un recurringExpense existente
   //  - editMovementId: editar un movement existente
   function openMovementModal(opts = {}) {
@@ -288,88 +414,112 @@ const Finance = (() => {
     if (opts.editRecurringId) {
       editingRecurring = (state.recurringExpenses || []).find(x => x.id === opts.editRecurringId) || null;
     }
-
-    // Recurrencia inicial
-    let initialRec = 'once';
-    if (editingRecurring) initialRec = editingRecurring.recurrence;
-    else if (editing) initialRec = 'once'; // movement = siempre puntual
+    const src = editing || editingRecurring;
 
     // Estado del modal (mutable mientras está abierto)
-    const modalState = { recurrence: initialRec };
+    const modalState = {
+      recurrence: editingRecurring ? editingRecurring.recurrence : 'once',
+      category: src ? src.category : null,
+    };
 
-    const isEditingSomething = editing || editingRecurring;
+    const isEditingSomething = !!src;
     const title = isEditingSomething ? 'Editar gasto' : 'Nuevo gasto';
-    const okText = isEditingSomething ? 'Guardar cambios' : 'Registrar';
+    const okText = isEditingSomething ? 'Guardar cambios' : 'Guardar';
+
+    // Chips: las 6 categorías más usadas a la vista; el resto tras "Más"
+    const ordered = categoriesByUse();
+    const top = ordered.slice(0, 6);
+    const rest = ordered.slice(6);
+    const chip = c => `<button type="button" class="qe-chip ${modalState.category === c.id ? 'active' : ''}" data-cat="${c.id}">${c.icon} ${c.name}</button>`;
+    const showRest = !!modalState.category && rest.some(c => c.id === modalState.category);
+
+    const amountInit = editing ? editing.amount : (editingRecurring ? editingRecurring.defaultAmount : null);
+    const noteInit = src && src.note ? src.note : '';
+    // "Más opciones" abierto al editar algo con nota o repetición
+    const moreOpen = !!noteInit || !!editingRecurring;
 
     UI.openModal({
       title,
       okText,
       bodyHTML: `
-        <label>Nombre</label>
-        <input type="text" id="mv-name" placeholder="Ej: Luz, Supermercado, Bencina"
-          value="${(editing && escapeAttr(editing.name)) || (editingRecurring && escapeAttr(editingRecurring.name)) || ''}" />
+        <div class="qe-amount-wrap">
+          <label id="mv-amount-label" for="mv-amount">Monto (CLP)</label>
+          <div class="qe-amount-field">
+            <span class="qe-currency">$</span>
+            <input type="text" id="mv-amount" class="qe-amount" inputmode="numeric" autocomplete="off" placeholder="0"
+              value="${moneyText(amountInit)}" />
+          </div>
+          <p class="qe-error" id="mv-amount-error" hidden></p>
+          <p class="qe-help" id="mv-amount-help"></p>
+        </div>
 
         <label>Categoría</label>
-        <select id="mv-category"></select>
-
-        <div id="mv-recurrence-wrap">
-          <label>Recurrencia</label>
-          <select id="mv-recurrence">
-            ${RECURRENCES.map(r => `<option value="${r.id}" ${modalState.recurrence === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-          </select>
+        <div class="qe-chips" id="mv-cat-chips">
+          ${top.map(chip).join('')}
+          ${rest.length ? `<button type="button" class="qe-chip qe-chip-more" id="mv-cat-more" aria-expanded="${showRest}">${showRest ? 'Menos ▴' : 'Más ▾'}</button>` : ''}
         </div>
+        <div class="qe-chips" id="mv-cat-extra" ${showRest ? '' : 'hidden'}>${rest.map(chip).join('')}</div>
+        <p class="qe-error" id="mv-cat-error" hidden></p>
 
-        <div id="mv-amount-wrap">
-          <label id="mv-amount-label">Monto (CLP)</label>
-          <input type="number" id="mv-amount" inputmode="numeric" min="0" step="1" placeholder="Ej: 45000"
-            value="${(editing && editing.amount != null) ? editing.amount : (editingRecurring && editingRecurring.defaultAmount != null ? editingRecurring.defaultAmount : '')}"
-            style="font-family:var(--font-mono)" />
-          <p id="mv-amount-help" style="color:var(--text-faint);font-size:11px;margin-top:4px"></p>
-        </div>
-
-        <div id="mv-date-wrap">
-          <label id="mv-date-label">Fecha</label>
-          <input type="date" id="mv-date" value="${(editing && editing.date) || UI.todayKey()}" />
-        </div>
-
-        <div id="mv-due-wrap" hidden>
-          <label id="mv-due-label">Fecha de referencia del pago</label>
-          <input type="date" id="mv-due-date"
-            value="${editingRecurring && editingRecurring.dueDate ? editingRecurring.dueDate : (editingRecurring && editingRecurring.dueDay ? deriveDueDateFromLegacy(editingRecurring) : UI.todayKey())}" />
-          <p id="mv-due-help" style="color:var(--text-faint);font-size:11px;margin-top:4px"></p>
-        </div>
-
-        <div id="mv-inst-toggle-wrap" hidden>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px">
-            <input type="checkbox" id="mv-inst-toggle" style="width:18px;height:18px;accent-color:var(--primary)" />
-            <span style="font-weight:600">Compra en cuotas</span>
-          </label>
-        </div>
-
-        <div id="mv-installments-wrap" hidden>
-          <div style="display:flex;gap:8px">
-            <div style="flex:1">
-              <label>Cuota actual</label>
-              <input type="number" id="mv-inst-current" inputmode="numeric" min="1" step="1" placeholder="Ej: 5"
-                value="${editingRecurring && editingRecurring.installmentsCurrent != null ? editingRecurring.installmentsCurrent : ''}"
-                style="font-family:var(--font-mono)" />
-            </div>
-            <div style="flex:1">
-              <label>Total de cuotas</label>
-              <input type="number" id="mv-inst-total" inputmode="numeric" min="1" step="1" placeholder="Ej: 24"
-                value="${editingRecurring && editingRecurring.installmentsTotal != null ? editingRecurring.installmentsTotal : ''}"
-                style="font-family:var(--font-mono)" />
-            </div>
+        <div class="qe-row">
+          <div class="qe-name">
+            <label for="mv-name">Nombre <span class="qe-opt">(opcional)</span></label>
+            <input type="text" id="mv-name" placeholder="Se usa la categoría"
+              value="${src ? escapeAttr(src.name) : ''}" />
           </div>
-          <p id="mv-inst-computed" style="color:var(--primary);font-size:12px;font-weight:600;margin-top:6px">Cuota mensual: —</p>
-          <p style="color:var(--text-faint);font-size:11px;margin-top:2px">La cuota se calcula como monto total ÷ total de cuotas. Al pagar la última, deja de repetirse.</p>
+          <div class="qe-date" id="mv-date-wrap">
+            <label id="mv-date-label" for="mv-date">Fecha</label>
+            <input type="date" id="mv-date" value="${(editing && editing.date) || UI.todayKey()}" />
+          </div>
         </div>
 
-        <label>Nota (opcional)</label>
-        <textarea id="mv-note" placeholder="Detalles, observaciones">${
-          (editing && editing.note) ? escapeHtml(editing.note) :
-          (editingRecurring && editingRecurring.note) ? escapeHtml(editingRecurring.note) : ''
-        }</textarea>
+        <button type="button" class="qe-more-toggle" id="mv-more-toggle" aria-expanded="${moreOpen}">
+          Más opciones <span class="qe-more-arrow">${moreOpen ? '▴' : '▾'}</span>
+        </button>
+        <div class="qe-more" id="mv-more" ${moreOpen ? '' : 'hidden'}>
+          <div id="mv-recurrence-wrap" ${editing ? 'hidden' : ''}>
+            <label for="mv-recurrence">Repetición</label>
+            <select id="mv-recurrence">
+              ${RECURRENCES.map(r => `<option value="${r.id}" ${modalState.recurrence === r.id ? 'selected' : ''} ${editingRecurring && r.id === 'once' ? 'disabled' : ''}>${r.id === 'once' ? 'No se repite' : r.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div id="mv-due-wrap" hidden>
+            <label id="mv-due-label">Fecha de referencia del pago</label>
+            <input type="date" id="mv-due-date"
+              value="${editingRecurring && editingRecurring.dueDate ? editingRecurring.dueDate : (editingRecurring && editingRecurring.dueDay ? deriveDueDateFromLegacy(editingRecurring) : UI.todayKey())}" />
+            <p id="mv-due-help" class="qe-help"></p>
+          </div>
+
+          <div id="mv-inst-toggle-wrap" hidden>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:4px">
+              <input type="checkbox" id="mv-inst-toggle" style="width:18px;height:18px;accent-color:var(--primary)" />
+              <span style="font-weight:600">Compra en cuotas</span>
+            </label>
+          </div>
+
+          <div id="mv-installments-wrap" hidden>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1">
+                <label>Cuota actual</label>
+                <input type="number" id="mv-inst-current" inputmode="numeric" min="1" step="1" placeholder="Ej: 5"
+                  value="${editingRecurring && editingRecurring.installmentsCurrent != null ? editingRecurring.installmentsCurrent : ''}"
+                  style="font-family:var(--font-mono)" />
+              </div>
+              <div style="flex:1">
+                <label>Total de cuotas</label>
+                <input type="number" id="mv-inst-total" inputmode="numeric" min="1" step="1" placeholder="Ej: 24"
+                  value="${editingRecurring && editingRecurring.installmentsTotal != null ? editingRecurring.installmentsTotal : ''}"
+                  style="font-family:var(--font-mono)" />
+              </div>
+            </div>
+            <p id="mv-inst-computed" style="color:var(--primary);font-size:12px;font-weight:600;margin-top:6px">Cuota mensual: —</p>
+            <p class="qe-help">La cuota se calcula como monto total ÷ total de cuotas. Al pagar la última, deja de repetirse.</p>
+          </div>
+
+          <label for="mv-note">Nota (opcional)</label>
+          <textarea id="mv-note" placeholder="Detalles, observaciones">${escapeHtml(noteInit)}</textarea>
+        </div>
       `,
       onSave: () => saveMovement(modalState, editing, editingRecurring)
     });
@@ -383,7 +533,7 @@ const Finance = (() => {
       const amountEl = document.getElementById('mv-amount');
       if (!toggle || !toggle.checked) return;
       const total = totalEl ? parseInt(totalEl.value, 10) : NaN;
-      const monto = amountEl ? Number(amountEl.value) : NaN;
+      const monto = amountEl ? parseMoney(amountEl.value) : null;
       if (total > 0 && monto > 0) {
         line.textContent = `Cuota mensual: ${formatCLP(Math.round(monto / total))}`;
       } else {
@@ -391,23 +541,9 @@ const Finance = (() => {
       }
     };
 
-    // Setup inicial: completar categorías y aplicar visibilidad según recurrencia
+    // Visibilidad y textos según repetición/cuotas
     const refreshUI = () => {
       const isRecurring = modalState.recurrence !== 'once';
-
-      const catSel = document.getElementById('mv-category');
-      const cats = EXPENSE_CATEGORIES;
-      // Preservar lo que el usuario tenga elegido (si sigue siendo válido);
-      // si no, caer en la categoría del ítem editado o la primera.
-      const prevCat = catSel.value;
-      const currentCat = (prevCat && cats.some(c => c.id === prevCat))
-        ? prevCat
-        : ((editing && editing.category) || (editingRecurring && editingRecurring.category) || null);
-      catSel.innerHTML = cats.map(c =>
-        `<option value="${c.id}" ${currentCat === c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`
-      ).join('');
-
-      const recurrenceWrap = document.getElementById('mv-recurrence-wrap');
       const dueWrap = document.getElementById('mv-due-wrap');
       const dueLabel = document.getElementById('mv-due-label');
       const dueHelp = document.getElementById('mv-due-help');
@@ -416,7 +552,6 @@ const Finance = (() => {
       const amountHelp = document.getElementById('mv-amount-help');
 
       // Cuotas: interruptor disponible para cualquier gasto MENSUAL (no solo deudas).
-      // El interruptor aparece en mensuales; los campos se muestran al encenderlo.
       const instToggleWrap = document.getElementById('mv-inst-toggle-wrap');
       const instToggle = document.getElementById('mv-inst-toggle');
       const instWrap = document.getElementById('mv-installments-wrap');
@@ -427,14 +562,12 @@ const Finance = (() => {
       updateInstComputed();
       const instOn = showToggle && instToggle && instToggle.checked;
 
-      recurrenceWrap.hidden = false;
       if (isRecurring) {
-        // Gasto recurrente: ocultar fecha puntual, mostrar fecha de referencia
+        // Pago programado: sin fecha puntual, con fecha de referencia
         dateWrap.hidden = true;
         dueWrap.hidden = false;
         amountLabel.textContent = 'Monto estimado (CLP, opcional)';
-        amountHelp.textContent = 'Sirve como referencia. El monto real se registra al pagar (desde la tarjeta Gastos en Hoy).';
-        // Texto contextual según recurrencia
+        amountHelp.textContent = 'Sirve como referencia. El monto real se registra al pagar (desde la tarjeta Finanzas en Hoy).';
         if (modalState.recurrence === 'monthly') {
           dueLabel.textContent = 'Fecha de referencia';
           dueHelp.textContent = 'Selecciona una fecha. Se repetirá el mismo día cada mes (ej: día 15 cada mes).';
@@ -446,15 +579,13 @@ const Finance = (() => {
           dueHelp.textContent = 'Selecciona la fecha del año. Se repetirá cada año en ese mismo día y mes.';
         }
       } else {
-        // Gasto puntual: mostrar fecha, ocultar fecha de referencia
         dateWrap.hidden = false;
         dueWrap.hidden = true;
         amountLabel.textContent = 'Monto (CLP)';
         amountHelp.textContent = '';
       }
 
-      // Si el interruptor de cuotas está encendido, el monto pasa a ser el TOTAL
-      // de la compra y la fecha de referencia se rotula como "Fecha de pago".
+      // Con cuotas, el monto pasa a ser el TOTAL de la compra
       if (instOn) {
         amountLabel.textContent = 'Monto total de la compra (CLP)';
         amountHelp.textContent = 'Se divide en las cuotas indicadas. La cuota mensual se calcula abajo.';
@@ -463,54 +594,69 @@ const Finance = (() => {
       }
     };
 
-    setTimeout(() => {
-      // Bind cambio de recurrencia
-      const recSel = document.getElementById('mv-recurrence');
-      if (recSel) {
-        recSel.addEventListener('change', () => {
-          modalState.recurrence = recSel.value;
-          refreshUI();
-        });
-      }
-      // Interruptor de cuotas: al encender/apagar, muestra u oculta los campos.
-      const instToggleBind = document.getElementById('mv-inst-toggle');
-      if (instToggleBind) {
-        instToggleBind.addEventListener('change', () => refreshUI());
-      }
-      // Recalcular la cuota mensual en vivo al cambiar monto total o total de cuotas.
-      ['mv-amount', 'mv-inst-total'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', updateInstComputed);
+    // Los elementos ya existen: UI.openModal pinta el HTML de forma síncrona
+    const amountEl = document.getElementById('mv-amount');
+    bindMoneyInput(amountEl, () => {
+      document.getElementById('mv-amount-error').hidden = true;
+      updateInstComputed();
+    });
+
+    // Chips de categoría
+    document.querySelectorAll('#modal-body .qe-chip[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modalState.category = btn.dataset.cat;
+        document.querySelectorAll('#modal-body .qe-chip[data-cat]').forEach(b => b.classList.toggle('active', b === btn));
+        document.getElementById('mv-cat-error').hidden = true;
       });
-      // Si estamos editando un recurringExpense, fijar la recurrencia (no cambiar entre tipos)
-      // Pero permitir cambiar entre mensual/trimestral/anual y bloquear "once" para no confundir
-      if (editingRecurring) {
-        const recSelEl = document.getElementById('mv-recurrence');
-        if (recSelEl) {
-          Array.from(recSelEl.options).forEach(opt => {
-            if (opt.value === 'once') opt.disabled = true;
-          });
-        }
-      }
+    });
+    const moreCats = document.getElementById('mv-cat-more');
+    if (moreCats) {
+      moreCats.addEventListener('click', () => {
+        const extra = document.getElementById('mv-cat-extra');
+        extra.hidden = !extra.hidden;
+        moreCats.textContent = extra.hidden ? 'Más ▾' : 'Menos ▴';
+        moreCats.setAttribute('aria-expanded', String(!extra.hidden));
+      });
+    }
 
-      // Al editar un recurrente que ya tiene cuotas, encender el interruptor y
-      // mostrar el MONTO TOTAL en el campo de monto (no la cuota individual).
-      if (editingRecurring && editingRecurring.installmentsTotal) {
-        const instToggle = document.getElementById('mv-inst-toggle');
-        if (instToggle) instToggle.checked = true;
-        const amountEl = document.getElementById('mv-amount');
-        if (amountEl) {
-          const total = editingRecurring.installmentTotalAmount != null
-            ? editingRecurring.installmentTotalAmount
-            : (editingRecurring.defaultAmount != null ? editingRecurring.defaultAmount * editingRecurring.installmentsTotal : '');
-          amountEl.value = total;
-        }
-      }
+    // "Más opciones"
+    const moreToggle = document.getElementById('mv-more-toggle');
+    moreToggle.addEventListener('click', () => {
+      const more = document.getElementById('mv-more');
+      more.hidden = !more.hidden;
+      moreToggle.setAttribute('aria-expanded', String(!more.hidden));
+      moreToggle.querySelector('.qe-more-arrow').textContent = more.hidden ? '▾' : '▴';
+    });
 
+    const recSel = document.getElementById('mv-recurrence');
+    recSel.addEventListener('change', () => {
+      modalState.recurrence = recSel.value;
       refreshUI();
-      const i = document.getElementById('mv-name');
-      if (i) i.focus();
-    }, 50);
+    });
+    const instToggle = document.getElementById('mv-inst-toggle');
+    instToggle.addEventListener('change', () => refreshUI());
+    document.getElementById('mv-inst-total').addEventListener('input', updateInstComputed);
+
+    // Al editar un recurrente con cuotas: interruptor encendido y monto TOTAL de la compra
+    if (editingRecurring && editingRecurring.installmentsTotal) {
+      instToggle.checked = true;
+      const total = editingRecurring.installmentTotalAmount != null
+        ? editingRecurring.installmentTotalAmount
+        : (editingRecurring.defaultAmount != null ? editingRecurring.defaultAmount * editingRecurring.installmentsTotal : null);
+      amountEl.value = moneyText(total);
+    }
+
+    // Enter guarda (el guardado valida monto y categoría; si falla, el modal sigue abierto)
+    document.querySelectorAll('#modal-body input').forEach(inp => {
+      inp.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        document.getElementById('modal-ok').click();
+      });
+    });
+
+    refreshUI();
+    setTimeout(() => { amountEl.focus(); }, 50);
   }
 
   // Lee los campos de cuotas del modal. Aplica cuando el interruptor está encendido
@@ -525,32 +671,38 @@ const Finance = (() => {
     const a = document.getElementById('mv-amount');
     const total = (t && t.value.trim() !== '') ? Math.max(1, parseInt(t.value, 10)) : null;
     let current = (c && c.value.trim() !== '') ? Math.max(1, parseInt(c.value, 10)) : null;
-    const totalAmount = (a && a.value.trim() !== '') ? Math.max(0, Number(a.value)) : null;
+    const totalAmount = a ? parseMoney(a.value) : null;
     if (total && !current) current = 1;                 // hay total pero no cuota → empieza en 1
     if (total && current > total) current = total;      // no exceder el total
     const perCuota = (total && totalAmount != null) ? Math.round(totalAmount / total) : null;
     return { total: total || null, current: total ? current : null, totalAmount: total ? totalAmount : null, perCuota };
   }
 
+  function showFieldError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.hidden = !msg;
+  }
+
   function saveMovement(modalState, editing, editingRecurring) {
-    const name = document.getElementById('mv-name').value.trim();
-    if (!name) { UI.toast('Falta el nombre'); return false; }
-    const category = document.getElementById('mv-category').value;
-    const amountRaw = document.getElementById('mv-amount').value.trim();
-    const note = document.getElementById('mv-note').value.trim() || null;
-
     const isRecurring = modalState.recurrence !== 'once';
+    const amountEl = document.getElementById('mv-amount');
+    const amount = parseMoney(amountEl.value);
+    const category = modalState.category;
 
-    let amount = null;
-    if (amountRaw !== '') {
-      const n = Number(amountRaw);
-      if (!isNaN(n) && n >= 0) amount = n;
-    }
-    // Para gastos puntuales, monto es obligatorio
-    if (!isRecurring && (amount == null || amount === 0)) {
-      UI.toast('Falta el monto');
+    // Validación inline: monto > 0 (opcional en pagos programados) y categoría
+    const amountBad = !isRecurring && !(amount > 0);
+    showFieldError('mv-amount-error', amountBad ? 'Ingresa un monto mayor a $0' : '');
+    showFieldError('mv-cat-error', category ? '' : 'Elige una categoría');
+    if (amountBad || !category) {
+      if (amountBad) amountEl.focus();
       return false;
     }
+
+    // Nombre opcional: si queda vacío, el de la categoría
+    const name = document.getElementById('mv-name').value.trim() || getExpenseCategory(category).name;
+    const note = document.getElementById('mv-note').value.trim() || null;
 
     const s = Storage.get();
     s.movements = s.movements || [];
@@ -563,7 +715,7 @@ const Finance = (() => {
       editing.amount = amount;
       editing.note = note;
       const dateEl = document.getElementById('mv-date');
-      if (dateEl && !dateEl.closest('[hidden]')) editing.date = dateEl.value;
+      if (dateEl && dateEl.value) editing.date = dateEl.value;
       UI.toast('Gasto actualizado');
     } else if (editingRecurring) {
       // Editar recurring existente
@@ -597,11 +749,10 @@ const Finance = (() => {
         editingRecurring.installmentsDone = false;
         editingRecurring.installmentTotalAmount = null;
       }
-      // Si cambió la recurrencia, saltar a la sub-tab correspondiente para que el usuario vea el resultado
       activeSubTab = 'scheduled';
       UI.toast('Gasto actualizado');
     } else if (isRecurring) {
-      // Nuevo gasto recurrente
+      // Nuevo pago programado
       const dueDateRaw = document.getElementById('mv-due-date').value;
       let dueDate = null, dueDay = null;
       if (dueDateRaw) {
@@ -625,7 +776,7 @@ const Finance = (() => {
         createdAt: Date.now(),
       });
       activeSubTab = 'scheduled';
-      UI.toast('Gasto recurrente creado');
+      UI.toast('Pago programado creado');
     } else {
       // Nuevo gasto puntual
       const date = document.getElementById('mv-date').value || UI.todayKey();
@@ -882,9 +1033,10 @@ const Finance = (() => {
     return result;
   }
 
-  // Tarjeta "💰 Gastos" en Hoy. Siempre visible. Con pagos programados
-  // vencidos, que vencen hoy o en los próximos 3 días, los lista (con "Pagar")
-  // ordenados por urgencia; si no hay, muestra lo gastado en el mes.
+  // Tarjeta "💰 Finanzas" en Hoy. Siempre visible. Si hay presupuesto o meta
+  // de ahorro, muestra sus barras. Con pagos programados vencidos, que vencen
+  // hoy o en los próximos 3 días, los lista (con "Pagar") por urgencia; si no
+  // hay, muestra lo gastado en el mes.
   function renderTodayPending() {
     const c = document.getElementById('today-pending');
     if (!isLive(c)) return;
@@ -928,10 +1080,17 @@ const Finance = (() => {
     // Orden por urgencia: más atrasado primero
     collapsed.sort((a, b) => a.daysLeft - b.daysLeft);
 
+    const { start, end } = getMonthRange(curMk);
+    const monthEx = monthExpenses(start, end);
+    const spent = sumAmount(monthEx.filter(m => !isSavings(m)));
+    const saved = sumAmount(monthEx.filter(isSavings));
+    const plan = getPlan();
+    const planHTML = (plan.budget || plan.goal)
+      ? `<div class="fin-plan">${plan.budget ? budgetRow(spent, plan.budget) : ''}${plan.goal ? savingsRow(saved, plan.goal) : ''}</div>`
+      : '';
+
     let subtitle, body;
     if (collapsed.length === 0) {
-      const { start, end } = getMonthRange(curMk);
-      const spent = sumAmount(monthExpenses(start, end).filter(m => !isSavings(m)));
       subtitle = `Gastado este mes · ${formatCLP(spent)}`;
       body = '<div class="empty">No hay gastos pendientes</div>';
     } else {
@@ -944,14 +1103,15 @@ const Finance = (() => {
       <div class="section-card">
         <div class="section-head">
           <div>
-            <div class="section-title">💰 Gastos</div>
+            <div class="section-title">💰 Finanzas</div>
             <div class="section-subtitle">${subtitle}</div>
           </div>
           <div class="section-head-actions">
             <button class="section-icon-btn" id="today-expense-add" aria-label="Nuevo gasto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-            <button class="section-icon-btn" data-go="finance-settings" aria-label="Gestionar gastos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
+            <button class="section-icon-btn" data-go="finance-settings" aria-label="Ver movimientos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
           </div>
         </div>
+        ${planHTML}
         ${body}
       </div>`;
 
@@ -1156,6 +1316,7 @@ const Finance = (() => {
     c.innerHTML = `
       ${nav}
       ${summary}
+      ${renderPlanBlocks(expenses, spent, saved)}
       <div class="analysis-block">
         <div class="analysis-block-title">Gastos por categoría</div>
         ${renderExpenseDonut(expenses, mk)}
@@ -1170,8 +1331,42 @@ const Finance = (() => {
     bindMovementActions(c);
   }
 
+  // Presupuesto (general + por categoría) y meta de ahorro del mes analizado
+  function renderPlanBlocks(expenses, spent, saved) {
+    const plan = getPlan();
+    const emptyPlan = (msg, link) =>
+      `<div class="plan-empty">${msg} <button type="button" class="link-btn" data-open-plan>${link}</button></div>`;
+
+    const byCat = {};
+    expenses.forEach(m => { byCat[m.category] = (byCat[m.category] || 0) + (m.amount || 0); });
+    const catRows = Object.entries(plan.catBudgets)
+      .filter(([id, limit]) => limit > 0 && id !== SAVINGS_CAT)
+      .map(([id, limit]) => ({ cat: getExpenseCategory(id), used: byCat[id] || 0, limit }))
+      .sort((a, b) => (b.used / b.limit) - (a.used / a.limit))
+      .map(r => progressRow(`${r.cat.icon} ${r.cat.name} · ${formatCLP(r.used)} de ${formatCLP(r.limit)}`, r.used, r.limit))
+      .join('');
+
+    const budgetBody = (plan.budget || catRows)
+      ? `${plan.budget ? budgetRow(spent, plan.budget) : ''}${catRows ? `<div class="plan-cat-bars">${catRows}</div>` : ''}`
+      : emptyPlan('Sin presupuesto mensual.', 'Define tu presupuesto');
+    const goalBody = plan.goal
+      ? savingsRow(saved, plan.goal)
+      : emptyPlan('Sin meta de ahorro.', 'Define tu meta de ahorro');
+
+    return `
+      <div class="analysis-block">
+        <div class="analysis-block-title">Presupuesto</div>
+        ${budgetBody}
+      </div>
+      <div class="analysis-block">
+        <div class="analysis-block-title">Meta de ahorro</div>
+        ${goalBody}
+      </div>`;
+  }
+
   function bindAnalysis(c) {
     const cur = analysisMk || getCurrentMonthKey();
+    c.querySelectorAll('[data-open-plan]').forEach(b => b.addEventListener('click', openPlan));
     c.querySelectorAll('[data-mnav]').forEach(b => {
       b.addEventListener('click', () => {
         if (b.disabled) return;
@@ -1214,7 +1409,8 @@ const Finance = (() => {
     ];
 
     // Paleta de gastos (sin verdes); Ahorro usa el verde de acento
-    const palette = ['#f5c842', '#60a5fa', '#a78bfa', '#ef4444', '#f0abfc', '#fb923c', '#94a3b8'];
+    // (sin rojo: el rojo queda reservado para alertas)
+    const palette = ['#f5c842', '#60a5fa', '#a78bfa', '#2dd4bf', '#f0abfc', '#fb923c', '#94a3b8'];
     const SAVINGS_COLOR = '#4ade80';
     const colorOf = (e, idx) => e.savings ? SAVINGS_COLOR : palette[idx % palette.length];
 
@@ -1301,7 +1497,8 @@ const Finance = (() => {
     if (data.every(d => d.spent === 0 && d.saved === 0)) {
       return '<div class="empty" style="margin:6px 0">Sin datos suficientes</div>';
     }
-    const max = Math.max(...data.map(d => d.spent + d.saved), 1);
+    const budget = getPlan().budget;
+    const max = Math.max(...data.map(d => d.spent + d.saved), budget || 0, 1);
     const curMk = endMk || getCurrentMonthKey();
 
     // Dimensiones generosas
@@ -1355,7 +1552,7 @@ const Finance = (() => {
         ${highlight}
         <rect class="bar-hit" data-jump="${d.mk}" x="${slotX}" y="${padT}" width="${slotW}" height="${chartH + padB - 6}" fill="transparent" style="cursor:pointer" />
         <g class="chart-bar">
-          <rect x="${x}" y="${baseY - spentH}" width="${barW}" height="${spentH}" rx="2" fill="var(--accent-red)" opacity="${op}" />
+          <rect x="${x}" y="${baseY - spentH}" width="${barW}" height="${spentH}" rx="2" fill="var(--text-dim)" opacity="${op}" />
           <rect x="${x}" y="${baseY - totalH}" width="${barW}" height="${savedH}" rx="2" fill="var(--accent-green)" opacity="${op}" />
         </g>
         ${totalLabel}
@@ -1367,6 +1564,15 @@ const Finance = (() => {
     // Eje base (línea horizontal en 0)
     const baseLine = `<line x1="${padL}" y1="${baseY}" x2="${w - padR}" y2="${baseY}" stroke="var(--border)" stroke-width="1"/>`;
 
+    // Presupuesto mensual: línea horizontal punteada sutil (comparable con lo gastado)
+    let budgetLine = '';
+    if (budget) {
+      const y = baseY - (budget / max) * chartH;
+      budgetLine = `
+        <line class="budget-line" x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="var(--text-faint)" stroke-width="1" stroke-dasharray="4 4" opacity="0.8"/>
+        <text x="${w - padR - 2}" y="${y - 3}" text-anchor="end" font-family="ui-monospace" font-size="8" fill="var(--text-faint)">presupuesto ${shortAmount(budget)}</text>`;
+    }
+
     return `
       <div class="chart-bars-wrap">
         <svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
@@ -1374,9 +1580,10 @@ const Finance = (() => {
           ${maxLabel}
           ${bars}
           ${baseLine}
+          ${budgetLine}
         </svg>
         <div class="chart-legend-row">
-          <span><span class="dot-red"></span> Gastado</span>
+          <span><span class="dot-neutral"></span> Gastado</span>
           <span><span class="dot-green"></span> Ahorrado (%)</span>
           <span class="chart-legend-hint">Toca un mes para verlo</span>
         </div>
@@ -1544,7 +1751,7 @@ const Finance = (() => {
   function archiveAmounts(movs) {
     const spent = sumAmount(movs.filter(m => !isSavings(m)));
     const saved = sumAmount(movs.filter(isSavings));
-    return `<span class="archive-amt expense">−${formatCLP(spent)}</span>` +
+    return `<span class="archive-amt expense">${formatCLP(spent)}</span>` +
       (saved ? `<span class="archive-amt savings">🏦 ${formatCLP(saved)}</span>` : '');
   }
 
@@ -1559,6 +1766,7 @@ const Finance = (() => {
     renderArchive,
     openMovementModal,
     openNewExpense,
+    openPlan,
     isTrackedExpense,
     EXPENSE_CATEGORIES,
     RECURRENCES,
