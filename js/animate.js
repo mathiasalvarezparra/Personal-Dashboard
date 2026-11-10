@@ -16,7 +16,7 @@ const Animate = (() => {
   const BAR_W = '.hab-ov-bar-fill, .goal-bar-fill, .qty-bar-fill, .wc-goal-fill, .sg-fill, .wb-fill, .archive-goal-bar-fill, .dc-fill';
   const BAR_H = '.trend-bar, .sh-win-fill';
   const RING = '.week-day-ring .ring-bar';
-  const NUM = '.trend-summary-val, .trend-val, .sg-val, .sh-win-val, .sh-streak-val, .wb-val, .cd-stat-val, .wc-stat-val, .wc-goal-pct, .ms-val, .fb-amount, .donut-total, .stat-value';
+  const NUM = '.trend-summary-val, .trend-val, .sg-val, .sh-win-val, .sh-streak-val, .wb-val, .cd-stat-val, .wc-stat-val, .wc-goal-pct, .ms-val, .donut-total, .stat-value';
   const LIST = '.item, .hab-ov-item, .goal-card, .goal-mini-item, .recurring-expense-item, .hist-item, .sh-item, .archive-goal, .donut-legend-row, .sg-row, .wb-row, .day-summary-item';
   const CELL = '.heatmap-cell';
   const SVG_BAR = '.chart-bar';
@@ -249,7 +249,7 @@ const Animate = (() => {
     const cells = staggered(enterOnly(CELL), el => el.parentElement, CELL_STAGGER, CELL_MAX_DELAY);
     const svgBars = enterOnly(SVG_BAR).map(el => {
       const i = Array.from(el.ownerSVGElement.querySelectorAll(SVG_BAR)).indexOf(el);
-      return [el, Math.min(Math.floor(i / 2), MAX_STAGGER_STEPS) * STAGGER];
+      return [el, Math.min(i, MAX_STAGGER_STEPS) * STAGGER];
     });
     const donuts = enterOnly(DONUT);
 

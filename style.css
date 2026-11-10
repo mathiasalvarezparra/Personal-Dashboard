@@ -725,43 +725,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   margin-bottom: 12px;
 }
 
-/* ============== AJUSTE DE SALDO ============== */
-.balance-adjust-btn { margin-bottom: 20px; }
-.adj-current {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-}
-.adj-current-lbl {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.adj-current-val {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.4px;
-}
-.adj-diff {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-weight: 700;
-  margin-top: 8px;
-  min-height: 17px;
-}
-.adj-diff.positive { color: var(--accent-green); }
-.adj-diff.negative { color: var(--accent-red); }
-.adj-diff.zero { color: var(--text-faint); font-weight: 600; }
-
 /* Selector 1-5 y rangos en el cierre del día */
 .cd-scale {
   display: grid;
@@ -874,10 +837,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   letter-spacing: -0.4px;
   white-space: nowrap;
 }
-.ms-val.income { color: var(--accent-green); }
+.ms-val.savings { color: var(--accent-green); }
 .ms-val.expense { color: var(--accent-red); }
-.ms-val.positive { color: var(--accent-green); }
-.ms-val.negative { color: var(--accent-red); }
 .ms-val.zero { color: var(--text); }
 .ms-lbl {
   font-family: var(--font-mono);
@@ -1384,6 +1345,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 }
 .section-icon-btn svg { width: 17px; height: 17px; }
 .section-icon-btn:active { transform: scale(0.92); color: var(--text); }
+/* Varios botones de ícono en la cabecera de una tarjeta (ej. "+" y billetera en Gastos) */
+.section-head-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 /* Lista de hábitos (pestaña Hábitos) */
 .hab-ov-item {
@@ -3656,35 +3619,6 @@ label {
   white-space: nowrap;
 }
 
-/* Toggle Gasto / Ingreso dentro del modal */
-.finance-type-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.finance-type-btn {
-  padding: 10px 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text-dim);
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.15s;
-}
-.finance-type-btn:active { transform: scale(0.97); }
-.finance-type-btn.active[data-type="expense"] {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: var(--accent-red);
-}
-.finance-type-btn.active[data-type="income"] {
-  background: rgba(74, 222, 128, 0.12);
-  border-color: rgba(74, 222, 128, 0.4);
-  color: var(--accent-green);
-}
-
 /* Items (gastos recurrentes + movimientos comparten estilo base) */
 .recurring-expense-item {
   display: grid;
@@ -3724,7 +3658,7 @@ label {
 .recurring-expense-item .re-amount {
   font-weight: 700;
 }
-.recurring-expense-item .re-amount.income {
+.recurring-expense-item .re-amount.savings {
   color: var(--accent-green);
   background: rgba(74, 222, 128, 0.1);
   border: 1px solid rgba(74, 222, 128, 0.25);
@@ -3738,7 +3672,7 @@ label {
   padding: 1px 7px;
   border-radius: 6px;
 }
-.recurring-expense-item .re-amount:not(.income):not(.expense) {
+.recurring-expense-item .re-amount:not(.savings):not(.expense) {
   color: var(--accent-green);
 }
 .recurring-expense-item .re-amount-empty {
@@ -3806,180 +3740,7 @@ label {
   color: var(--accent-red);
 }
 
-/* ============== MIS FINANZAS (pestaña) ============== */
-.finance-balance {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 14px;
-  margin-bottom: 14px;
-}
-.finance-balance-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-  padding: 6px 0;
-}
-.finance-balance-row .fb-label {
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.finance-balance-row .fb-amount {
-  font-family: var(--font-mono);
-  font-weight: 700;
-}
-.finance-balance-row.income .fb-amount  { color: var(--accent-green); }
-.finance-balance-row.expense .fb-amount { color: var(--accent-red); }
-.finance-balance-row.carry .fb-amount   { color: var(--text-dim); }
-.finance-balance-divider {
-  height: 1px;
-  background: var(--border-soft);
-  margin: 6px 0;
-}
-.finance-balance-row.net {
-  padding-top: 8px;
-}
-.finance-balance-row.net .fb-label {
-  font-size: 12px;
-  color: var(--text);
-}
-.finance-balance-row.net .fb-amount {
-  font-size: 18px;
-  font-weight: 800;
-}
-.finance-balance-row.net.positive .fb-amount { color: var(--accent-green); }
-.finance-balance-row.net.negative .fb-amount { color: var(--accent-red); }
-.finance-balance-row.net.zero .fb-amount     { color: var(--text-dim); }
-
-.finance-section {
-  margin-bottom: 14px;
-}
-.finance-section-title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  margin-bottom: 8px;
-  padding-left: 4px;
-}
-.pending-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding: 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  margin-bottom: 8px;
-}
-.pending-item.due-soon {
-  border-color: rgba(245, 200, 66, 0.35);
-  background: rgba(245, 200, 66, 0.03);
-}
-.pending-item.due-today {
-  border-color: rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.04);
-}
-.pending-item.overdue {
-  border-color: rgba(239, 68, 68, 0.5);
-  background: rgba(239, 68, 68, 0.06);
-}
-.pending-item .pe-main { min-width: 0; }
-.pending-item .pe-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.pending-item .pe-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  align-items: center;
-}
-.pending-item .pe-due-tag {
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-  padding: 1px 7px;
-  border-radius: 6px;
-}
-.pending-item .pe-due-tag.soon {
-  background: rgba(245, 200, 66, 0.1);
-  border-color: rgba(245, 200, 66, 0.3);
-  color: var(--accent-yellow);
-}
-.pending-item .pe-due-tag.today {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: var(--accent-red);
-}
-.pending-item .pe-due-tag.overdue {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.5);
-  color: var(--accent-red);
-  font-weight: 700;
-}
-.pending-item .pe-est {
-  color: var(--accent-yellow);
-  background: rgba(245, 200, 66, 0.08);
-  border: 1px solid rgba(245, 200, 66, 0.25);
-  padding: 1px 7px;
-  border-radius: 6px;
-}
-.pending-item .pe-est-empty {
-  color: var(--text-faint);
-  font-style: italic;
-}
-.pending-item .pe-action {
-  flex-shrink: 0;
-  padding: 8px 12px;
-  background: var(--accent-yellow);
-  color: #0a0e14;
-  font-weight: 700;
-  font-size: 12px;
-  border-radius: 8px;
-  transition: transform 0.15s;
-}
-.pending-item .pe-action:active {
-  transform: scale(0.95);
-}
-
-/* Banner del mes en curso (sin selector) */
-.finance-month-banner {
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 8px 12px;
-  margin-bottom: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
 /* Análisis (gráficos) */
-.finance-analysis-wrap {
-  margin-top: 14px;
-}
 .analysis-block {
   margin-bottom: 18px;
 }
@@ -4079,37 +3840,6 @@ label {
   text-align: right;
 }
 
-/* Mini-tabla de ingresos */
-.income-table {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.income-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 10px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  font-size: 13px;
-}
-.income-row.total {
-  background: rgba(74, 222, 128, 0.06);
-  border-color: rgba(74, 222, 128, 0.25);
-  font-weight: 700;
-  margin-top: 4px;
-}
-.income-row .income-cat {
-  color: var(--text);
-}
-.income-row .income-val {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--accent-green);
-}
-
 /* Bar charts */
 .chart-bars-wrap {
   position: relative;
@@ -4207,7 +3937,7 @@ label {
   border-radius: 5px;
   letter-spacing: 0.3px;
 }
-.archive-amt.income {
+.archive-amt.savings {
   color: var(--accent-green);
   background: rgba(74, 222, 128, 0.1);
 }
@@ -4215,13 +3945,6 @@ label {
   color: var(--accent-red);
   background: rgba(239, 68, 68, 0.1);
 }
-.archive-amt.net {
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-}
-.archive-amt.net.positive { color: var(--accent-green); }
-.archive-amt.net.negative { color: var(--accent-red); }
-.archive-amt.net.zero     { color: var(--text-dim); }
 .archive-month-body {
   padding: 4px 10px 10px;
   border-top: 1px solid var(--border-soft);
@@ -4420,3 +4143,11 @@ label {
   :root { --anim-dur: 0ms; --anim-stagger: 0ms; }
   .anim-rise, .anim-pop, .anim-grow-y { animation: none; }
 }
+
+/* ============== FINANZAS: AHORRO DESTACADO ============== */
+.donut-legend-row.is-savings {
+  margin-top: 6px;
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.06);
+}
+.donut-legend-row.is-savings .donut-cat-val { color: var(--accent-green); }

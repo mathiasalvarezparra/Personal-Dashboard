@@ -20,7 +20,7 @@ HTML, CSS y JS **vanilla**. Scripts clásicos (`<script src="...">`, sin `type="
 6. `tasks.js` — `Tasks`: tareas puntuales y recurrentes.
 7. `goals.js` — `Goals`: metas por horizonte (semana/mes/año), jerarquía padre-hijo.
 8. `goal-archive.js` — `GoalArchive`: vista de solo lectura de metas archivadas.
-9. `finance.js` — `Finance`: gastos recurrentes, movimientos (gastos/ingresos), balance mensual.
+9. `finance.js` — `Finance`: **solo seguimiento de gastos y ahorro** (sin ingresos ni balance): pagos programados, gastos registrados, tarjeta "💰 Gastos" de Hoy, Estadísticas › Finanzas y vista de gestión. `Finance.isTrackedExpense(m)` decide qué movimiento cuenta.
 10. `templates.js` — `Templates`: sets predefinidos de hábitos+metas para onboarding.
 11. `goal-rollover.js` — `GoalRollover`: archiva metas vencidas y auto-crea las recurrentes.
 12. `vacation.js` — `Vacation`: modo vacaciones (pausa hábitos en un rango de fechas).
@@ -53,6 +53,9 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 - Cambiar de vista: cualquier elemento con `data-go="nombre-de-vista"` dispara `UI.go('nombre-de-vista')` (listener delegado en `ui.js`). También se puede llamar `UI.go(...)` directo desde código.
 - Volver atrás: `data-back` dispara `UI.goBack()` (pila de historial interna).
 - Cada vista es una sección `<section id="view-nombre-de-vista" class="view">` en `index.html`.
+- Bottom-nav: solo **Enfoque** (`today`) y **Estadísticas** (`stats`). Finanzas no tiene pestaña propia.
+- Finanzas en Hoy: la tarjeta **"💰 Gastos"** (`Finance.renderTodayPending`, contenedor `#today-pending`) se muestra siempre. Con pagos programados por vencer lista cada uno con "Pagar"; si no hay, muestra "Gastado este mes" (sin Ahorro) y "No hay gastos pendientes". Su botón "+" abre el modal de nuevo gasto y la billetera lleva a la gestión (`finance-settings`: Pagos programados, Gastos, Archivo), cuyo "volver" regresa a Hoy.
+- El análisis mensual de gastos y ahorro vive en Estadísticas › Finanzas (incluye "Registros del mes" con editar/eliminar).
 
 Esta sección se completará después del rediseño.
 
