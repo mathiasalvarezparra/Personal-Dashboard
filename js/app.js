@@ -229,15 +229,8 @@ const App = (() => {
       .filter(t => t.date === dateKey)
       .sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
 
-    // Hábitos que aplican en ese día (según frequency)
-    const habits = (state.habits || []).filter(h => {
-      if (h.frequency?.type === 'daily') return true;
-      if (h.frequency?.type === 'days') {
-        const dow = date.getDay();
-        return (h.frequency.days || []).includes(dow);
-      }
-      return false;
-    });
+    // Hábitos que cuentan ese día (según frequency; sin archivados)
+    const habits = (state.habits || []).filter(h => Habits.countsForDate(h, date));
 
     // Pagos REALES de ese día: gastos registrados en movements con esa fecha
     const dayPayments = (state.movements || []).filter(m =>
@@ -703,11 +696,12 @@ const App = (() => {
     // Hábitos: promedio de cumplimiento sobre días programados
     let hSum = 0, hCount = 0;
     state.habits.forEach(h => {
+      if (h.archived) return;
       const born = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
       past.forEach(dk => {
         if (born && dk < born) return;
         if (Vacation.isDateInVacation(dk)) return;
-        if (!Habits.isHabitForDate(h, new Date(dk + 'T12:00:00'))) return;
+        if (!Habits.countsForDate(h, new Date(dk + 'T12:00:00'))) return;
         hSum += Habits.getHabitDayPct(h, dk);
         hCount++;
       });

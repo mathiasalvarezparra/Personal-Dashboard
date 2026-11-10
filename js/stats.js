@@ -141,16 +141,18 @@ const Stats = (() => {
     const c = document.getElementById('stats-habits');
     if (!c) return;
     const state = Storage.get();
-    if (!state.habits.length) {
-      c.innerHTML = '<div class="empty">No tienes hábitos creados</div>';
+    const habits = state.habits.filter(h => !h.archived);
+    if (!habits.length) {
+      c.innerHTML = '<div class="empty">No tienes hábitos activos</div>';
       return;
     }
-    c.innerHTML = state.habits.map(h => {
+    c.innerHTML = habits.map(h => {
       const w7 = Habits.complianceWindow(h, 7).pct;
       const w30 = Habits.complianceWindow(h, 30).pct;
       const w90 = Habits.complianceWindow(h, 90).pct;
       const streak = Habits.calcStreak(h);
       const best = Habits.calcBestStreak(h);
+      const weekly = Habits.isWeekly(h);
       const color = h.color || '#f5c842';
       const trend = w7 - w30;
       const trendCls = trend > 4 ? 'positive' : (trend < -4 ? 'negative' : 'zero');
@@ -169,8 +171,8 @@ const Stats = (() => {
                 <div class="sh-win-lbl">${lbl}</div>
               </div>`).join('')}
             <div class="sh-streaks">
-              <div class="sh-streak"><span class="sh-streak-val">${streak}</span><span class="sh-streak-lbl">racha</span></div>
-              <div class="sh-streak"><span class="sh-streak-val">${best}</span><span class="sh-streak-lbl">récord</span></div>
+              <div class="sh-streak"><span class="sh-streak-val">${streak}</span><span class="sh-streak-lbl">${weekly ? 'sem. racha' : 'racha'}</span></div>
+              <div class="sh-streak"><span class="sh-streak-val">${best}</span><span class="sh-streak-lbl">${weekly ? 'sem. récord' : 'récord'}</span></div>
             </div>
           </div>
         </div>`;

@@ -76,7 +76,11 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `frequency` | object | `{ type: 'daily' }` o `{ type: 'days', days: [0-6] }` (0=domingo) |
+| `frequency` | object | `{ type: 'daily' }`, `{ type: 'days', days: [0-6] }` (0=domingo) o `{ type: 'weekly', timesPerWeek: 1-7, suggestedDays: [0-6] }` (ver abajo) |
+| `timeOfDay` | string\|null\|undefined | `'mañana'` \| `'tarde'` \| `'noche'`; vacío = "Cualquier momento". Agrupa la lista de Hoy |
+| `archived` | boolean\|undefined | `true` si está archivado (opcional; ausente = activo) |
+| `archivedAt` | number\|undefined | timestamp del archivado actual (solo mientras `archived: true`) |
+| `archivedRanges` | `{ from, to }[]`\|undefined | períodos pasados en que estuvo archivado (`YYYY-MM-DD`, inclusive). Se agrega uno al reactivar; esos días cuentan como "no aplica" |
 | `linkedGoalId` | string\|null | → `goals[].id` (ver Relaciones) |
 | `defaultIncrement` | number | paso del botón "+" |
 | `dailyTarget` / `unit` | number / string | meta diaria cuantitativa (todos los hábitos son cuantitativos; binario = `dailyTarget: 1`) |
@@ -86,7 +90,25 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 | `notes` | object | `{ fecha: texto }` nota opcional al registrar |
 | `_completedAt` | object | `{ fecha: timestamp }`, pese al prefijo `_` **sí se persiste** (se usa para ordenar la lista de hoy) |
 
-Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar avance a una meta vinculada. Leído por `Stats`, `App` (KPIs del día), `Vacation` (pausa cómputo de streaks).
+**Frecuencia semanal (`weekly`, "X veces por semana")** — ejemplo:
+
+```json
+{
+  "id": "sp1", "name": "Deporte", "frequency": { "type": "weekly", "timesPerWeek": 3, "suggestedDays": [1, 3, 5] },
+  "timeOfDay": "tarde", "dailyTarget": 1, "unit": "sesión",
+  "history": ["2026-11-09", "2026-11-10"]
+}
+```
+
+- La semana va de **lunes a domingo**. Un día cuenta como sesión cuando alcanza su `dailyTarget` (queda en `history` como siempre); sesiones de la semana = días de `history` dentro de esa semana. `suggestedDays` es opcional (puede ir vacío) y, si tiene días, no son menos que `timesPerWeek`.
+- Se puede registrar cualquier día. Sobrecumplir se registra (ej. 4/3) pero no se acumula para la semana siguiente.
+- Racha en **semanas** consecutivas cumplidas. La semana en curso no rompe mientras siga alcanzable o esté cumplida; una semana con algún día de vacaciones o archivado no rompe ni suma.
+- Cumplimiento (ventanas 7/30/90, heatmap, Estadísticas) = sesiones realizadas ÷ sesiones esperadas (`timesPerWeek` × días del período ÷ 7), con tope de 100%.
+- KPI del día: cuenta solo si ese día es sugerido y la semana no estaba ya cumplida, o si ese día se registró algo (`Habits.countsForDate`).
+
+**Archivado:** `archived`, `archivedAt` y `archivedRanges` son opcionales; los hábitos existentes no necesitan migración (no se subió `version`). Un hábito archivado no aparece en Hoy, no cuenta en KPIs, porcentajes, rachas globales ni en el heatmap general, y no se puede registrar (por eso deja de aportar a su meta vinculada, aunque conserva `linkedGoalId`). Al reactivar se conserva todo el historial.
+
+Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar avance a una meta vinculada. Leído por `Stats`, `App` (KPIs del día, resumen del día y de la semana vía `Habits.countsForDate` / `isHabitForToday`), `Vacation` (pausa cómputo de streaks).
 
 ### `tasks` (array)
 
