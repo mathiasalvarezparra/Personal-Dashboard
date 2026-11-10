@@ -15,18 +15,19 @@ HTML, CSS y JS **vanilla**. Scripts clásicos (`<script src="...">`, sin `type="
 1. `storage.js` — `Storage`: estado global, persistencia en `localStorage`, export/import JSON, migraciones.
 2. `ui.js` — `UI`: navegación entre vistas (`go`/`goBack`), modal genérico, toast, helpers de fecha.
 3. `helpers.js` — `escapeHtml`, `escapeAttr`, `isLive` (funciones sueltas, no un módulo).
-4. `habits.js` — `Habits`: hábitos cuantitativos, streaks, heatmap, progreso diario.
-5. `tasks.js` — `Tasks`: tareas puntuales y recurrentes.
-6. `goals.js` — `Goals`: metas por horizonte (semana/mes/año), jerarquía padre-hijo.
-7. `goal-archive.js` — `GoalArchive`: vista de solo lectura de metas archivadas.
-8. `finance.js` — `Finance`: gastos recurrentes, movimientos (gastos/ingresos), balance mensual.
-9. `templates.js` — `Templates`: sets predefinidos de hábitos+metas para onboarding.
-10. `goal-rollover.js` — `GoalRollover`: archiva metas vencidas y auto-crea las recurrentes.
-11. `vacation.js` — `Vacation`: modo vacaciones (pausa hábitos en un rango de fechas).
-12. `stats.js` — `Stats`: vista de estadísticas (tendencias, cumplimiento, bienestar, finanzas).
-13. `onboarding.js` — `Onboarding`: flujo de bienvenida para usuarios nuevos.
-14. `app.js` — `App`: controlador principal, orquesta el resto, migraciones one-shot, cierres de día/semana.
-15. `main.js` — una línea: `document.addEventListener('DOMContentLoaded', App.init)`.
+4. `animate.js` — `Animate`: animaciones de entrada (barras, anillos, gráficos SVG, mapa de calor, números y listas). Solo visual; se engancha automáticamente vía `MutationObserver` + `UI.go`.
+5. `habits.js` — `Habits`: hábitos cuantitativos, streaks, heatmap, progreso diario.
+6. `tasks.js` — `Tasks`: tareas puntuales y recurrentes.
+7. `goals.js` — `Goals`: metas por horizonte (semana/mes/año), jerarquía padre-hijo.
+8. `goal-archive.js` — `GoalArchive`: vista de solo lectura de metas archivadas.
+9. `finance.js` — `Finance`: gastos recurrentes, movimientos (gastos/ingresos), balance mensual.
+10. `templates.js` — `Templates`: sets predefinidos de hábitos+metas para onboarding.
+11. `goal-rollover.js` — `GoalRollover`: archiva metas vencidas y auto-crea las recurrentes.
+12. `vacation.js` — `Vacation`: modo vacaciones (pausa hábitos en un rango de fechas).
+13. `stats.js` — `Stats`: vista de estadísticas (tendencias, cumplimiento, bienestar, finanzas).
+14. `onboarding.js` — `Onboarding`: flujo de bienvenida para usuarios nuevos.
+15. `app.js` — `App`: controlador principal, orquesta el resto, migraciones one-shot, cierres de día/semana.
+16. `main.js` — una línea: `document.addEventListener('DOMContentLoaded', App.init)`.
 
 Cada módulo es un IIFE (`const Nombre = (() => {...})()`) que queda en el scope global del documento (no en `window`, pero accesible como identificador en cualquier script posterior). El orden de carga importa: un módulo puede referenciar a otro definido más abajo, pero solo dentro de funciones que se ejecutan después de que todos los scripts cargaron — nunca en el cuerpo del IIFE al momento de definirse.
 
@@ -42,6 +43,7 @@ Estructura completa de cada entidad, relaciones y qué módulo lee/escribe qué:
 
 - Todos los textos de la UI van en **español**.
 - Patrón de render de cada módulo: función `renderX()` que busca su contenedor por `id`, hace `if (!isLive(c)) return;` (evita repintar vistas ocultas), lee `Storage.get()`, arma un string HTML y lo asigna a `.innerHTML`.
+- Todo gráfico o barra nuevo debe usar el módulo de animación central (`js/animate.js`): renderizar el valor final en `style` (`width`/`height` en %) o `stroke-dashoffset`, y agregar su selector a las listas de `Animate`. Duraciones y easing salen de las variables `--anim-*` de `style.css`.
 - **Uso obligatorio** de `escapeHtml()` al insertar cualquier texto ingresado por el usuario dentro de HTML, y `escapeAttr()` al insertarlo dentro de un atributo (ej. `value="${escapeAttr(x)}"`).
 
 ## Sistema de diseño y navegación: pendiente de rediseño

@@ -49,6 +49,7 @@ const UI = (() => {
     if (view === 'today' && typeof App !== 'undefined' && App.renderFocusTab) {
       App.renderFocusTab();
     }
+    if (typeof Animate !== 'undefined') Animate.enter(t);
   }
 
   // Vuelve a la vista anterior. Si no hay historial, va a 'today'.

@@ -1612,8 +1612,8 @@ const Finance = (() => {
       return `
         ${highlight}
         <rect class="bar-hit" data-jump="${d.mk}" x="${padL + i * slotW}" y="${padT}" width="${slotW}" height="${chartH + padB - 6}" fill="transparent" style="cursor:pointer" />
-        <rect x="${slotX}" y="${inY}" width="${barW}" height="${inH}" rx="2" fill="var(--accent-green)" opacity="${isCurrent ? '1' : '0.78'}" />
-        <rect x="${slotX + barW + 2}" y="${exY}" width="${barW}" height="${exH}" rx="2" fill="var(--accent-red)" opacity="${isCurrent ? '1' : '0.78'}" />
+        <rect class="chart-bar" x="${slotX}" y="${inY}" width="${barW}" height="${inH}" rx="2" fill="var(--accent-green)" opacity="${isCurrent ? '1' : '0.78'}" />
+        <rect class="chart-bar" x="${slotX + barW + 2}" y="${exY}" width="${barW}" height="${exH}" rx="2" fill="var(--accent-red)" opacity="${isCurrent ? '1' : '0.78'}" />
         ${inLabel}
         ${exLabel}
         <text x="${slotX + barW + 1}" y="${baseY + 14}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${isCurrent ? 'var(--accent-yellow)' : 'var(--text-dim)'}" font-weight="${isCurrent ? '700' : '400'}">${monthLbl}</text>

@@ -24,6 +24,11 @@
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, monospace;
+
+  /* Animaciones de entrada (ver js/animate.js) */
+  --anim-dur: 800ms;
+  --anim-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --anim-stagger: 50ms;
 }
 
 [data-theme="light"] {
@@ -320,7 +325,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 }
 .week-day-ring .ring-bar {
   stroke: url(#weekDayRingGrad);
-  transition: stroke-dashoffset 0.4s ease;
+  transition: stroke-dashoffset var(--anim-dur) var(--anim-ease);
 }
 /* En el día actual (pill azul) el track debe verse sobre el pill */
 .week-day.is-today .week-day-ring .ring-track {
@@ -606,7 +611,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   height: 100%;
   border-radius: 100px;
   background: var(--dc-color, var(--accent-yellow));
-  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--anim-dur) var(--anim-ease);
 }
 .day-counter.complete .dc-fill { background: var(--accent-green); }
 
@@ -1014,7 +1019,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   width: 100%;
   background: linear-gradient(180deg, var(--accent-yellow), var(--accent-orange));
   border-radius: 4px;
-  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height var(--anim-dur) var(--anim-ease);
 }
 .trend-col.is-current .trend-bar { background: var(--accent-green); }
 .trend-col.is-current .trend-val { color: var(--accent-green); font-weight: 700; }
@@ -1431,7 +1436,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 .hab-ov-bar-fill {
   height: 100%;
   border-radius: 100px;
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--anim-dur) var(--anim-ease);
 }
 .hab-ov-actions {
   display: flex;
@@ -1945,7 +1950,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   height: 100%;
   background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange));
   border-radius: 2px;
-  transition: width 0.4s ease;
+  transition: width var(--anim-dur) var(--anim-ease);
 }
 
 /* Meta cumplida en vista Enfoque: tachada, check y barra verde */
@@ -2930,7 +2935,7 @@ label {
 .qty-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange));
-  transition: width 0.4s;
+  transition: width var(--anim-dur) var(--anim-ease);
 }
 .qty-input-big {
   font-family: var(--font-mono) !important;
@@ -3131,7 +3136,7 @@ label {
   display: block;
 }
 .ring-fg {
-  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: stroke-dashoffset var(--anim-dur) var(--anim-ease);
 }
 .ring-hero-label {
   position: absolute;
@@ -4381,4 +4386,37 @@ label {
   color: var(--text-dim);
   margin: 8px 0;
   line-height: 1.4;
+}
+
+/* ============== ANIMACIONES DE ENTRADA ============== */
+/* Todo gráfico o barra nuevo debe usar estas variables y js/animate.js */
+.wc-goal-fill, .sg-fill, .wb-fill, .archive-goal-bar-fill {
+  transition: width var(--anim-dur) var(--anim-ease);
+}
+.sh-win-fill {
+  transition: height var(--anim-dur) var(--anim-ease);
+}
+.chart-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.anim-sweep {
+  transition: stroke-dashoffset var(--anim-dur) var(--anim-ease);
+}
+@keyframes anim-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes anim-pop {
+  from { opacity: 0; transform: scale(0.6); }
+}
+@keyframes anim-grow-y {
+  from { transform: scaleY(0); }
+}
+.anim-rise { animation: anim-rise var(--anim-dur) var(--anim-ease) backwards; }
+.anim-pop { animation: anim-pop var(--anim-dur) var(--anim-ease) backwards; }
+.anim-grow-y { animation: anim-grow-y var(--anim-dur) var(--anim-ease) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --anim-dur: 0ms; --anim-stagger: 0ms; }
+  .anim-rise, .anim-pop, .anim-grow-y { animation: none; }
 }
