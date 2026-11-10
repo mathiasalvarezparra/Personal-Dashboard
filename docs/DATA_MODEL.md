@@ -123,13 +123,32 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `date` | string | `YYYY-MM-DD` |
+| `date` | string\|null | `YYYY-MM-DD`, o `null` = **"Algún día"** (bandeja sin fecha) |
 | `goalId` | string\|null | → `goals[].id` (ver Relaciones) |
 | `recurrence` | string | `'none'` \| `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'` (ver `getNextRecurrenceDate`) |
 | `seriesId` | string\|null | agrupa ocurrencias generadas por la misma tarea recurrente; `null` hasta que se genera la 2ª ocurrencia |
 | `note` | string | opcional, solo en tareas ya completadas (bitácora) |
+| `subtasks` | `{ id, name, done }[]`\|undefined | checklist opcional. Ausente o vacío = sin subtareas |
 
-Leído/escrito por: `Tasks` (dueño). Leído por `App` (tareas de hoy/mañana, KPIs), `Stats`.
+**"Algún día" y subtareas** — ejemplo:
+
+```json
+{
+  "id": "k9l8", "name": "Ordenar la bodega", "date": null,
+  "area": "hogar", "goalId": null, "important": false,
+  "recurrence": "none", "seriesId": null, "done": false, "createdAt": 1732000000000,
+  "subtasks": [
+    { "id": "s1", "name": "Sacar cajas", "done": true },
+    { "id": "s2", "name": "Botar lo roto", "done": false }
+  ]
+}
+```
+
+- `date: null` (Algún día): no aparece en Hoy, Mañana, atrasadas ni KPIs; solo en el filtro "Algún día" de la gestión mientras está pendiente. Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
+- `subtasks`: completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos y `done: false`.
+- Ambos campos son opcionales: no hubo migración ni cambio de `version`.
+
+Leído/escrito por: `Tasks` (dueño). Leído por `App` (tareas de hoy/mañana, KPIs; las de `date: null` quedan fuera de todos los filtros por fecha), `Stats`.
 
 ### `goals` (array)
 
