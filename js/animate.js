@@ -22,7 +22,7 @@ const Animate = (() => {
   const SVG_BAR = '.chart-bar';
   const DONUT = '.donut-svg';
   // Controles que cambian de pestaña/sub-vista: lo que rendericen entra "desde 0"
-  const TAB_TRIGGERS = '[data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
+  const TAB_TRIGGERS = '[data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-fin-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
 
   const memory = new Map();       // clave estable → último valor final
   const handled = new WeakSet();  // elementos ya preparados (evita doble proceso)

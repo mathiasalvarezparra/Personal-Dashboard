@@ -196,7 +196,7 @@ Leído/escrito por: `Goals` (dueño, activas), `GoalArchive` (solo lectura de ar
 | Campo | Tipo | Notas |
 |---|---|---|
 | `category` | string | id de `Finance.EXPENSE_CATEGORIES` (ver `movements` para Ahorro) |
-| `recurrence` | string | `'monthly'` \| `'quarterly'` \| `'yearly'` (`'once'` es para movimientos puntuales, no vive acá) |
+| `recurrence` | string | `'monthly'` \| `'quarterly'` \| `'yearly'` \| `'once'` (pago programado puntual: vence en `dueDate`; se crea con "No se repite" y fecha futura, y se elimina de la lista al pagarlo, conservando su movimiento) |
 | `defaultAmount` | number | monto estimado por ciclo (o monto de la cuota, si tiene cuotas) |
 | `dueDay` | number\|null | día del mes en que vence (para ordenar "próximos a vencer") |
 | `installmentsTotal/Current/TotalAmount/Done` | number\|null / number\|null / number\|null / boolean | soporte de compras en cuotas |

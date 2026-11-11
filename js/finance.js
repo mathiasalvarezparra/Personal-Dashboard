@@ -289,9 +289,11 @@ const Finance = (() => {
     const amountLabel = re.defaultAmount
       ? `<span class="re-amount">${formatCLP(re.defaultAmount)}</span>`
       : '<span class="re-amount-empty">Variable</span>';
-    const dayLabel = re.dueDay
-      ? (re.recurrence === 'monthly' ? `Día ${re.dueDay}` : `Día ${re.dueDay} del mes de pago`)
-      : 'Sin fecha definida';
+    const dayLabel = (re.recurrence === 'once' && re.dueDate)
+      ? `Vence ${new Date(re.dueDate + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '')}`
+      : (re.dueDay
+        ? (re.recurrence === 'monthly' ? `Día ${re.dueDay}` : `Día ${re.dueDay} del mes de pago`)
+        : 'Sin fecha definida');
     // Proximidad como hint sutil
     let proximityLabel = '';
     if (re.dueDay && re.recurrence === 'monthly' && !re.installmentsDone) {
@@ -469,9 +471,10 @@ const Finance = (() => {
           </div>
           <div class="qe-date" id="mv-date-wrap">
             <label id="mv-date-label" for="mv-date">Fecha</label>
-            <input type="date" id="mv-date" value="${(editing && editing.date) || UI.todayKey()}" />
+            <input type="date" id="mv-date" value="${(editing && editing.date) || (editingRecurring && editingRecurring.recurrence === 'once' && editingRecurring.dueDate) || UI.todayKey()}" />
           </div>
         </div>
+        <p class="qe-help" id="mv-date-help" hidden>Fecha futura: quedará como pago programado pendiente (aparece en Finanzas de Enfoque con "Pagar").</p>
 
         <button type="button" class="qe-more-toggle" id="mv-more-toggle" aria-expanded="${moreOpen}">
           Más opciones <span class="qe-more-arrow">${moreOpen ? '▴' : '▾'}</span>
@@ -480,7 +483,7 @@ const Finance = (() => {
           <div id="mv-recurrence-wrap" ${editing ? 'hidden' : ''}>
             <label for="mv-recurrence">Repetición</label>
             <select id="mv-recurrence">
-              ${RECURRENCES.map(r => `<option value="${r.id}" ${modalState.recurrence === r.id ? 'selected' : ''} ${editingRecurring && r.id === 'once' ? 'disabled' : ''}>${r.id === 'once' ? 'No se repite' : r.name}</option>`).join('')}
+              ${RECURRENCES.map(r => `<option value="${r.id}" ${modalState.recurrence === r.id ? 'selected' : ''} ${editingRecurring && editingRecurring.recurrence !== 'once' && r.id === 'once' ? 'disabled' : ''}>${r.id === 'once' ? 'No se repite' : r.name}</option>`).join('')}
             </select>
           </div>
 
@@ -584,6 +587,9 @@ const Finance = (() => {
         amountLabel.textContent = 'Monto (CLP)';
         amountHelp.textContent = '';
       }
+      // Puntual con fecha futura → pago programado puntual (no al editar un gasto ya registrado)
+      const dateVal = document.getElementById('mv-date').value;
+      document.getElementById('mv-date-help').hidden = isRecurring || !!editing || !(dateVal > UI.todayKey());
 
       // Con cuotas, el monto pasa a ser el TOTAL de la compra
       if (instOn) {
@@ -628,6 +634,7 @@ const Finance = (() => {
       moreToggle.querySelector('.qe-more-arrow').textContent = more.hidden ? '▾' : '▴';
     });
 
+    document.getElementById('mv-date').addEventListener('change', () => refreshUI());
     const recSel = document.getElementById('mv-recurrence');
     recSel.addEventListener('change', () => {
       modalState.recurrence = recSel.value;
@@ -724,7 +731,10 @@ const Finance = (() => {
       editingRecurring.recurrence = modalState.recurrence;
       editingRecurring.defaultAmount = amount;
       editingRecurring.note = note;
-      const dueDateRaw = document.getElementById('mv-due-date').value;
+      // Puntual programado: su vencimiento es la Fecha del gasto
+      const dueDateRaw = modalState.recurrence === 'once'
+        ? (document.getElementById('mv-date').value || UI.todayKey())
+        : document.getElementById('mv-due-date').value;
       if (dueDateRaw) {
         editingRecurring.dueDate = dueDateRaw;
         // dueDay derivado para compatibilidad con código que lo lee
@@ -777,6 +787,24 @@ const Finance = (() => {
       });
       activeSubTab = 'scheduled';
       UI.toast('Pago programado creado');
+    } else if ((document.getElementById('mv-date').value || '') > UI.todayKey()) {
+      // Puntual con fecha futura: pago programado puntual (pendiente hasta pagarlo)
+      const dueDate = document.getElementById('mv-date').value;
+      s.recurringExpenses.push({
+        id: Storage.uid(),
+        name, category,
+        recurrence: 'once',
+        defaultAmount: amount,
+        dueDate, dueDay: parseInt(dueDate.slice(8, 10), 10),
+        note,
+        installmentsTotal: null,
+        installmentsCurrent: null,
+        installmentTotalAmount: null,
+        installmentsDone: false,
+        createdAt: Date.now(),
+      });
+      activeSubTab = 'scheduled';
+      UI.toast(`Pago programado para el ${new Date(dueDate + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }).replace('.', '')}`);
     } else {
       // Nuevo gasto puntual
       const date = document.getElementById('mv-date').value || UI.todayKey();
@@ -1033,52 +1061,92 @@ const Finance = (() => {
     return result;
   }
 
-  // Tarjeta "💰 Finanzas" en Hoy. Siempre visible. Si hay presupuesto o meta
-  // de ahorro, muestra sus barras. Con pagos programados vencidos, que vencen
-  // hoy o en los próximos 3 días, los lista (con "Pagar") por urgencia; si no
-  // hay, muestra lo gastado en el mes.
+  // ---- Vencimientos para la tarjeta de Enfoque ----
+  const keyAddDays = (k, n) => { const d = new Date(k + 'T12:00:00'); d.setDate(d.getDate() + n); return UI.localDateKey(d); };
+  const keyDiffDays = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+
+  // ¿Ya se pagó este pago programado puntual (recurrence 'once')?
+  const isOncePaid = re => (Storage.get().movements || []).some(m => m.type === 'expense' && m.recurringExpenseId === re.id);
+
+  // Todos los vencimientos no pagados que ve la tarjeta Finanzas:
+  //  · los de getAllPending (atrasados de meses anteriores y los del mes en curso),
+  //  · el ciclo del mes siguiente que cae antes de `untilKey` (la semana puede cruzar de mes),
+  //  · los pagos programados puntuales ('once') con su fecha.
+  // Cada uno: { re, mk, dueKey (null = sin fecha), cuota (n.º o null) }.
+  function getPaymentOccurrences(untilKey) {
+    const curMk = getCurrentMonthKey();
+    const nextMk = shiftMonth(curMk, 1);
+    const occ = getAllPending().map(p => ({
+      re: p.recurring, mk: p.periodMk, dueKey: getDueDateForRecurringInMonth(p.recurring, p.periodMk),
+    }));
+    (Storage.get().recurringExpenses || []).forEach(re => {
+      if (re.installmentsDone) return;
+      if (re.recurrence === 'once') {
+        if (re.dueDate && !isOncePaid(re)) occ.push({ re, mk: re.dueDate.slice(0, 7), dueKey: re.dueDate });
+        return;
+      }
+      // Mismas reglas de getAllPending, aplicadas al mes siguiente
+      const created = new Date(re.createdAt || Date.now());
+      const createdMk = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
+      const startMk = (re.recurrence === 'monthly' && re.dueDate) ? re.dueDate.slice(0, 7) : createdMk;
+      if (startMk > nextMk) return;
+      if (re.dueDate && re.recurrence !== 'monthly' && re.dueDate.slice(0, 7) > nextMk) return;
+      const dueKey = getDueDateForRecurringInMonth(re, nextMk);
+      if (!dueKey || dueKey > untilKey || isRecurringPaidInMonth(re, nextMk)) return;
+      occ.push({ re, mk: nextMk, dueKey });
+    });
+    // Cuotas: cada vencimiento pendiente de la misma deuda es la cuota siguiente
+    const byRe = new Map();
+    occ.sort((a, b) => (a.dueKey || a.mk).localeCompare(b.dueKey || b.mk));
+    return occ.filter(o => {
+      if (!o.re.installmentsTotal) { o.cuota = null; return true; }
+      const i = byRe.get(o.re.id) || 0;
+      byRe.set(o.re.id, i + 1);
+      o.cuota = (o.re.installmentsCurrent || 1) + i;
+      return o.cuota <= o.re.installmentsTotal;
+    });
+  }
+
+  // Pestañas de pagos en Enfoque (mismos rangos que Tareas)
+  const FIN_TABS = [['today', 'Hoy'], ['week', 'Semana'], ['month', 'Mes'], ['later', 'Más adelante']];
+  const FIN_TAB_STORE = 'mi_dashboard_fin_tab'; // sessionStorage: dura la sesión
+  let finTab = 'today';
+  try {
+    const saved = sessionStorage.getItem(FIN_TAB_STORE);
+    if (FIN_TABS.some(([id]) => id === saved)) finTab = saved;
+  } catch (e) { /* sin sessionStorage: Hoy */ }
+
+  // Tarjeta "💰 Finanzas" en Enfoque. Siempre visible. Arriba presupuesto y ahorro;
+  // luego "⚠ Atrasados" (uno por pago, el período más antiguo) y las pestañas
+  // Hoy · Semana · Mes · Más adelante (esta última solo con pagos puntuales).
   function renderTodayPending() {
     const c = document.getElementById('today-pending');
     if (!isLive(c)) return;
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayKey = UI.todayKey();
     const curMk = getCurrentMonthKey();
-    const pending = getAllPending();
+    const d = new Date(todayKey + 'T12:00:00');
+    const sunday = keyAddDays(todayKey, d.getDay() === 0 ? 0 : 7 - d.getDay());
+    const nextMonday = keyAddDays(sunday, 1);
+    const endMonth = getMonthRange(curMk).end;
 
-    const items = [];
-    pending.forEach(item => {
-      const re = item.recurring;
-      const mk = item.periodMk;
-      const dueDateKey = getDueDateForRecurringInMonth(re, mk);
-      let daysLeft; // <0 atrasado · 0 hoy · >0 faltan
-      if (mk < curMk) {
-        if (dueDateKey) {
-          const dDue = new Date(dueDateKey + 'T00:00:00');
-          daysLeft = -Math.max(1, Math.round((today - dDue) / 86400000));
-        } else {
-          daysLeft = -1; // arrastrado sin fecha: vencido
-        }
-      } else if (dueDateKey) {
-        const dDue = new Date(dueDateKey + 'T00:00:00');
-        daysLeft = Math.round((dDue - today) / 86400000);
-      } else {
-        return; // del mes actual sin fecha: no se puede ubicar, se omite en Hoy
+    const groups = { overdue: [], today: [], week: [], month: [], later: [] };
+    const overdueByRe = new Map();
+    getPaymentOccurrences(sunday).forEach(o => {
+      // Del mes en curso sin fecha: no se puede ubicar (como antes, se omite)
+      if (!o.dueKey && o.mk >= curMk) return;
+      if (!o.dueKey || o.dueKey < todayKey) {
+        o.daysLate = o.dueKey ? Math.max(1, keyDiffDays(o.dueKey, todayKey)) : 1;
+        const prev = overdueByRe.get(o.re.id);
+        if (!prev || o.daysLate > prev.daysLate) overdueByRe.set(o.re.id, o);
+        return;
       }
-      if (daysLeft > 3) return; // aún lejos: no se muestra en Hoy
-      items.push({ re, mk, daysLeft });
+      if (o.dueKey === todayKey) groups.today.push(o);
+      else if (o.dueKey <= sunday) groups.week.push(o);
+      else if (o.dueKey >= nextMonday && o.dueKey <= endMonth) groups.month.push(o);
+      else if (o.re.recurrence === 'once' && o.dueKey > endMonth) groups.later.push(o);
     });
-
-    // En Hoy basta una línea por gasto recurrente: la de su período más
-    // urgente (más atrasado). El desglose vive en la vista de gestión.
-    const byRe = new Map();
-    items.forEach(it => {
-      const prev = byRe.get(it.re.id);
-      if (!prev || it.daysLeft < prev.daysLeft) byRe.set(it.re.id, it);
-    });
-    const collapsed = [...byRe.values()];
-
-    // Orden por urgencia: más atrasado primero
-    collapsed.sort((a, b) => a.daysLeft - b.daysLeft);
+    groups.overdue = [...overdueByRe.values()].sort((a, b) => b.daysLate - a.daysLate);
 
     const { start, end } = getMonthRange(curMk);
     const monthEx = monthExpenses(start, end);
@@ -1089,14 +1157,33 @@ const Finance = (() => {
       ? `<div class="fin-plan">${plan.budget ? budgetRow(spent, plan.budget) : ''}${plan.goal ? savingsRow(saved, plan.goal) : ''}</div>`
       : '';
 
-    let subtitle, body;
-    if (collapsed.length === 0) {
-      subtitle = `Gastado este mes · ${formatCLP(spent)}`;
+    const total = list => list.reduce((s, o) => s + (o.re.defaultAmount || 0), 0);
+    const pendingThisMonth = [...groups.overdue, ...groups.today, ...groups.week, ...groups.month];
+    const anyItem = pendingThisMonth.length + groups.later.length > 0;
+    const subtitle = pendingThisMonth.length
+      ? `${pendingThisMonth.length} ${pendingThisMonth.length === 1 ? 'pendiente' : 'pendientes'} este mes · ${formatCLP(total(pendingThisMonth))}`
+      : `Gastado este mes · ${formatCLP(spent)}`;
+
+    let body;
+    if (!anyItem) {
       body = '<div class="empty">No hay gastos pendientes</div>';
     } else {
-      const total = collapsed.reduce((sum, it) => sum + (it.re.defaultAmount || 0), 0);
-      subtitle = `${collapsed.length} ${collapsed.length === 1 ? 'pendiente' : 'pendientes'}${total ? ` · ${formatCLP(total)}` : ''}`;
-      body = `<div class="tp-list">${renderPendingRows(collapsed)}</div>`;
+      const overdueHTML = groups.overdue.length ? `
+        <div class="overdue-section fin-overdue">
+          <div class="overdue-section-title">
+            <span>⚠ Atrasados</span>
+            <span class="overdue-count">${groups.overdue.length}</span>
+          </div>
+          <div class="tp-list">${renderPendingRows(groups.overdue, 'overdue')}</div>
+        </div>` : '';
+      const tabsHTML = `<div class="fin-tabs" role="tablist">${FIN_TABS.map(([id, label]) => {
+        const n = groups[id].length, t = total(groups[id]);
+        return `<button type="button" class="fin-tab ${id === finTab ? 'active' : ''}" data-fin-tab="${id}" role="tab" aria-selected="${id === finTab}">${label}<span class="fin-tab-meta"> · ${n}${t ? ` · ${formatCLP(t)}` : ''}</span></button>`;
+      }).join('')}</div>`;
+      const list = groups[finTab];
+      body = overdueHTML + tabsHTML + (list.length
+        ? `<div class="tp-list">${renderPendingRows(list, finTab)}</div>`
+        : '<div class="empty fin-tab-empty">No hay pagos</div>');
     }
 
     c.innerHTML = `
@@ -1115,9 +1202,24 @@ const Finance = (() => {
         ${body}
       </div>`;
 
+    // Pestañas desplazables: mantener visible la activa
+    const tabsEl = c.querySelector('.fin-tabs');
+    if (tabsEl) {
+      const act = tabsEl.querySelector('.fin-tab.active');
+      const rel = act.getBoundingClientRect().left - tabsEl.getBoundingClientRect().left;
+      if (rel + act.offsetWidth > tabsEl.clientWidth) tabsEl.scrollLeft = rel - 8;
+    }
+
     c.querySelector('#today-expense-add').addEventListener('click', (e) => {
       e.stopPropagation();
       openNewExpense();
+    });
+    c.querySelectorAll('[data-fin-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        finTab = btn.dataset.finTab;
+        try { sessionStorage.setItem(FIN_TAB_STORE, finTab); } catch (err) { /* solo en memoria */ }
+        renderTodayPending();
+      });
     });
     c.querySelectorAll('[data-tp-pay]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1127,28 +1229,30 @@ const Finance = (() => {
     });
   }
 
-  function renderPendingRows(collapsed) {
-    return collapsed.map(it => {
-      const cat = getExpenseCategory(it.re.category);
+  // Filas de pagos: nombre, monto, vencimiento corto (o atraso) y "Cuota N/M"
+  function renderPendingRows(list, kind) {
+    return list.map(o => {
+      const cat = getExpenseCategory(o.re.category);
       let tagClass, tagText;
-      if (it.daysLeft < 0) { tagClass = 'overdue'; tagText = `Atrasado ${Math.abs(it.daysLeft)}d`; }
-      else if (it.daysLeft === 0) { tagClass = 'today'; tagText = 'Vence hoy'; }
-      else { tagClass = 'soon'; tagText = it.daysLeft === 1 ? 'Vence mañana' : `Vence en ${it.daysLeft}d`; }
-      const amount = it.re.defaultAmount ? `~ ${formatCLP(it.re.defaultAmount)}` : 'Monto variable';
-      const instTag = (it.re.installmentsTotal)
-        ? `<span class="tp-inst">Cuota ${it.re.installmentsCurrent || 1}/${it.re.installmentsTotal}</span>`
-        : '';
+      if (kind === 'overdue') { tagClass = 'overdue'; tagText = `Atrasado ${o.daysLate}d`; }
+      else if (kind === 'today') { tagClass = 'today'; tagText = 'Vence hoy'; }
+      else {
+        tagClass = 'soon';
+        tagText = new Date(o.dueKey + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }).replace('.', '');
+      }
+      const amount = o.re.defaultAmount ? `~ ${formatCLP(o.re.defaultAmount)}` : 'Monto variable';
+      const instTag = o.cuota ? `<span class="tp-inst">Cuota ${o.cuota}/${o.re.installmentsTotal}</span>` : '';
       return `
         <div class="tp-item ${tagClass}">
           <div class="tp-main">
-            <div class="tp-name">${cat.icon} ${escapeHtml(it.re.name)}</div>
+            <div class="tp-name">${cat.icon} ${escapeHtml(o.re.name)}</div>
             <div class="tp-meta">
               <span class="tp-tag ${tagClass}">${tagText}</span>
               <span class="tp-amount">${amount}</span>
               ${instTag}
             </div>
           </div>
-          <button class="tp-pay" data-tp-pay="${it.re.id}" data-tp-period="${it.mk}">Pagar</button>
+          <button class="tp-pay" data-tp-pay="${o.re.id}" data-tp-period="${o.mk}">Pagar</button>
         </div>`;
     }).join('');
   }
@@ -1164,7 +1268,7 @@ const Finance = (() => {
     const defaultDate = UI.todayKey();
 
     const curMk = getCurrentMonthKey();
-    const periodHint = (periodMk && periodMk !== curMk)
+    const periodHint = (periodMk && periodMk < curMk)
       ? `<p style="color:var(--accent-red);font-size:12px;margin-bottom:8px">⚠ Pago atrasado · correspondía a ${new Date(periodMk + '-15T12:00:00').toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}</p>`
       : '';
 
@@ -1225,6 +1329,11 @@ const Finance = (() => {
           periodMk: periodMk || null,
           createdAt: Date.now(),
         });
+
+        // Pago programado puntual: queda pagado y sale de la lista (el pago se conserva)
+        if (re.recurrence === 'once') {
+          ss.recurringExpenses = (ss.recurringExpenses || []).filter(x => x.id !== re.id);
+        }
 
         // Avanzar cuota si el gasto está en cuotas (cualquier categoría)
         if (re.installmentsTotal) {
@@ -1761,6 +1870,7 @@ const Finance = (() => {
   return {
     render,
     renderTodayPending,
+    getPaymentOccurrences,
     renderAnalysis,
     openAnalysis,
     renderArchive,
