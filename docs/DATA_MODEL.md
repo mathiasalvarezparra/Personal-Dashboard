@@ -8,7 +8,8 @@ Fuente de verdad: `js/storage.js` (`Storage.defaultState` y `Storage.load()`). T
 
 ## Versión y migraciones
 
-- `state.version` existe (`1`) pero **nunca se usó para versionar un cambio real todavía** — ningún código revisa su valor. Si en el futuro se necesita una migración de esquema incompatible, es el mecanismo pensado para eso: subir el número y manejarla en `Storage.load()`.
+- `state.version` (hoy **`2`**) versiona los cambios de esquema incompatibles. `Storage.migrate()` aplica las migraciones pendientes según la versión, tanto al cargar (`Storage.load()`) como al importar un respaldo (`Storage.importJSON()`), ambos vía `Storage.hydrate()`:
+  - **v1 → v2** — hábitos `frequency.type: 'weekly'` ("X veces por semana") pasan a `{ type: 'days', days: suggestedDays (o los 7 días si estaba vacío), weeklyMin: timesPerWeek (sin superar la cantidad de días) }`. `history`, `notes`, `contributions`, `dailyProgress` y `linkedGoalId` no se tocan. El tipo `'weekly'` ya no existe en el resto del código.
 - Las migraciones reales que existen hoy son **one-shot basadas en flags dentro de `settings`**, ejecutadas al inicio (`App.init()`), no en `Storage.load()`:
   - `migrateAreas()` (`js/app.js`): agrega el área `espiritualidad` a usuarios existentes. Flag: `settings.areasEspiritualidadAdded`.
   - `migrateRemoveQuarter()` (`js/app.js`): elimina metas con `horizon: 'quarter'` (se descartó ese horizonte) y normaliza `recurrence: 'quarterly'` huérfana a `'none'`. Flag: `settings.quarterRemoved`.
@@ -76,7 +77,7 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `frequency` | object | `{ type: 'daily' }`, `{ type: 'days', days: [0-6] }` (0=domingo) o `{ type: 'weekly', timesPerWeek: 1-7, suggestedDays: [0-6] }` (ver abajo) |
+| `frequency` | object | `{ type: 'daily' }` o `{ type: 'days', days: [0-6] }` (0=domingo): días en que aparece. Ambos con `weeklyMin` opcional (ver abajo) |
 | `timeOfDay` | string\|null\|undefined | `'mañana'` \| `'tarde'` \| `'noche'`; vacío = "Cualquier momento". Agrupa la lista de Hoy |
 | `archived` | boolean\|undefined | `true` si está archivado (opcional; ausente = activo) |
 | `archivedAt` | number\|undefined | timestamp del archivado actual (solo mientras `archived: true`) |
@@ -90,21 +91,21 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 | `notes` | object | `{ fecha: texto }` nota opcional al registrar |
 | `_completedAt` | object | `{ fecha: timestamp }`, pese al prefijo `_` **sí se persiste** (se usa para ordenar la lista de hoy) |
 
-**Frecuencia semanal (`weekly`, "X veces por semana")** — ejemplo:
+**Mínimo semanal para la racha (`frequency.weeklyMin`)** — ejemplo:
 
 ```json
 {
-  "id": "sp1", "name": "Deporte", "frequency": { "type": "weekly", "timesPerWeek": 3, "suggestedDays": [1, 3, 5] },
+  "id": "sp1", "name": "Deporte", "frequency": { "type": "days", "days": [1, 2, 3, 4, 5], "weeklyMin": 3 },
   "timeOfDay": "tarde", "dailyTarget": 1, "unit": "sesión",
-  "history": ["2026-11-09", "2026-11-10"]
+  "history": ["2026-11-10", "2026-11-11"]
 }
 ```
 
-- La semana va de **lunes a domingo**. Un día cuenta como sesión cuando alcanza su `dailyTarget` (queda en `history` como siempre); sesiones de la semana = días de `history` dentro de esa semana. `suggestedDays` es opcional (puede ir vacío) y, si tiene días, no son menos que `timesPerWeek`.
-- Se puede registrar cualquier día. Sobrecumplir se registra (ej. 4/3) pero no se acumula para la semana siguiente.
-- Racha en **semanas** consecutivas cumplidas. La semana en curso no rompe mientras siga alcanzable o esté cumplida; una semana con algún día de vacaciones o archivado no rompe ni suma.
-- Cumplimiento (ventanas 7/30/90, heatmap, Estadísticas) = sesiones realizadas ÷ sesiones esperadas (`timesPerWeek` × días del período ÷ 7), con tope de 100%.
-- KPI del día: cuenta solo si ese día es sugerido y la semana no estaba ya cumplida, o si ese día se registró algo (`Habits.countsForDate`).
+- `weeklyMin` es opcional: entero entre 1 y la cantidad de días en que aparece (`'daily'` = 7). Ausente = racha diaria estricta, como siempre.
+- **Solo flexibiliza la racha, nunca el % del día:** el hábito aparece en Enfoque y cuenta en el % del día y los KPIs todos sus días (`Habits.countsForDate` = `isHabitForDate`), se cumpla o no el mínimo.
+- La semana va de **lunes a domingo**; días cumplidos de la semana = días de `history` dentro de ella. Racha en **semanas** consecutivas con al menos `weeklyMin` días cumplidos ("N semanas"). La semana en curso no rompe mientras el mínimo siga alcanzable o ya esté cumplido.
+- Semanas con días de vacaciones, archivados o previos a la creación: el mínimo se reduce en proporción a los días disponibles (`⌊weeklyMin × disponibles ÷ días en que aparece⌋`, mínimo 1); sin días disponibles la semana no rompe ni suma (`Habits.weekMinInfo`).
+- Cumplimiento (ventanas 7/30/90, heatmap, detalle, Estadísticas): sobre los días en que aparece, igual que `'days'`, independiente del mínimo.
 
 **Archivado:** `archived`, `archivedAt` y `archivedRanges` son opcionales; los hábitos existentes no necesitan migración (no se subió `version`). Un hábito archivado no aparece en Hoy, no cuenta en KPIs, porcentajes, rachas globales ni en el heatmap general, y no se puede registrar (por eso deja de aportar a su meta vinculada, aunque conserva `linkedGoalId`). Al reactivar se conserva todo el historial.
 

@@ -152,7 +152,7 @@ const Stats = (() => {
       const w90 = Habits.complianceWindow(h, 90).pct;
       const streak = Habits.calcStreak(h);
       const best = Habits.calcBestStreak(h);
-      const weekly = Habits.isWeekly(h);
+      const weekly = Habits.hasWeeklyMin(h);
       const color = h.color || '#f5c842';
       const trend = w7 - w30;
       const trendCls = trend > 4 ? 'positive' : (trend < -4 ? 'negative' : 'zero');
