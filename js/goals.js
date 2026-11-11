@@ -98,14 +98,20 @@ const Goals = (() => {
     return { state: 'ok', pct, expected, n: 0, text: 'Al día' };
   }
 
-  // Barra de progreso + marca vertical del esperado (ambas animadas por Animate)
-  function goalBarHTML(pct, pace, style = '') {
-    return `<div class="goal-bar ${pace ? 'has-pace' : ''}" ${style ? `style="${style}"` : ''}>` +
-      `<div class="goal-bar-fill" style="width:${pct}%"></div>` +
-      (pace ? `<div class="goal-pace-mark" style="width:${pace.pct}%"></div>` : '') +
-      `</div>`;
+  // Barra de progreso: solo el avance sobre el total (animada por Animate)
+  function goalBarHTML(pct, style = '') {
+    return `<div class="goal-bar" ${style ? `style="${style}"` : ''}><div class="goal-bar-fill" style="width:${pct}%"></div></div>`;
   }
-  const paceHTML = pace => pace ? `<div class="goal-pace ${pace.state}">${pace.text}</div>` : '';
+  // Gestión: avance en positivo frente a lo esperado a hoy. Verde con ✓ si va al
+  // día o adelante; si no, gris neutro (sin avisos de atraso).
+  function paceLineHTML(g) {
+    const pace = goalPace(g);
+    if (!pace) return '';
+    const expected = Math.ceil(pace.expected);
+    const cur = g.current || 0;
+    const ok = cur >= expected;
+    return `<div class="goal-pace ${ok ? 'ok' : ''}">Llevas ${fmtNum(cur)} de ${expected}${g.unit ? ' ' + escapeHtml(g.unit) : ''} a la fecha${ok ? ' ✓' : ''}</div>`;
+  }
 
   // Etiqueta corta del período de una meta (por su fecha de creación)
   function shortPeriodLabel(g) {
@@ -588,16 +594,14 @@ const Goals = (() => {
   function renderGoalMini(g) {
     const pct = g.done ? 100 : getProgress(g);
     const tt = g.done ? '✓' : (g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : `${pct}%`);
-    // Enfoque limpio: nombre, avance y ritmo (sin área, período ni recurrencia)
-    const pace = goalPace(g);
+    // Enfoque limpio: nombre y avance sobre el total (sin ritmo, área, período ni recurrencia)
     return `
       <div class="goal-mini-item ${g.done ? 'done' : ''}" data-goal-quick="${g.id}">
         <div class="goal-mini-row">
           <span class="goal-mini-name">${escapeHtml(g.name)}</span>
           <span class="goal-mini-progress">${tt}</span>
         </div>
-        ${goalBarHTML(pct, pace)}
-        ${paceHTML(pace)}
+        ${goalBarHTML(pct)}
       </div>`;
   }
 
@@ -964,7 +968,6 @@ const Goals = (() => {
 
     const canUp = canMoveGoal(g.id, -1);
     const canDown = canMoveGoal(g.id, 1);
-    const pace = goalPace(g);
 
     return `
       <div class="goal-card ${g.done ? 'done' : ''}" data-id="${g.id}">
@@ -987,8 +990,8 @@ const Goals = (() => {
           ${archivedChildrenBadge}
           ${recurrenceBadge}
         </div>
-        ${goalBarHTML(pct, pace, 'margin-top:8px')}
-        ${paceHTML(pace)}
+        ${goalBarHTML(pct, 'margin-top:8px')}
+        ${paceLineHTML(g)}
         ${isQuant ? `
           <div class="goal-card-progress">
             <input type="number" data-action="current" value="${g.current || 0}" min="0" step="0.5" />

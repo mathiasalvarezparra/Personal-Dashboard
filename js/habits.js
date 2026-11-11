@@ -928,15 +928,12 @@ const Habits = (() => {
             <span class="hab-dot-fill" style="height:${d.done ? 100 : 0}%"></span>
             <span class="hab-dot-letter">${DOT_LETTERS[d.dow]}</span>
           </span>`).join('');
-    let status = '';
-    if (info.state === 'risk') status = `<div class="hab-pace alert">Racha en riesgo: te faltan ${info.missing}</div>`;
-    else if (info.state === 'unreachable') status = '<div class="hab-pace">Esta semana no alcanza el mínimo</div>';
+    // Tono positivo: sin avisos de racha en riesgo (solo puntos y "N/M mín.")
     return `
           <div class="hab-week ${celebrateId === h.id ? 'celebrate' : ''}">
             <div class="hab-dots">${dots}</div>
             ${info.min > 0 ? `<span class="hab-week-txt ${info.state === 'met' ? 'met' : ''}">${Math.min(info.done, 99)}/${info.min} mín.</span>` : ''}
-          </div>
-          ${status}`;
+          </div>`;
   }
 
   // Si el registro de `dk` asegura el mínimo de la semana en curso: toast + animación

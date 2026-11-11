@@ -147,26 +147,6 @@ const WeekSummary = (() => {
     return out.slice(0, 5);
   }
 
-  function toImprove(isRecent, habitRows) {
-    const out = [];
-    const worst = habitRows
-      .filter(x => x.scheduled > 0 && x.done < x.scheduled)
-      .sort((a, b) => (a.done / a.scheduled) - (b.done / b.scheduled) || b.scheduled - a.scheduled)[0];
-    if (worst) out.push({ name: `${worst.h.icon || '⭐'} ${worst.h.name}`, pct: Math.round(worst.done / worst.scheduled * 100), value: `${worst.done}/${worst.scheduled} días` });
-    if (isRecent) {
-      const behind = Storage.get().goals
-        .filter(g => (g.horizon === 'month' || g.horizon === 'year') && !g.archived && !g.done && g.target > 0)
-        .map(g => ({ g, p: Goals.goalPace(g) }))
-        .filter(x => x.p && x.p.state === 'behind')
-        .sort((a, b) => (b.p.expected - (b.g.current || 0)) / b.g.target - (a.p.expected - (a.g.current || 0)) / a.g.target)[0];
-      if (behind) {
-        const g = behind.g;
-        out.push({ name: `📌 ${g.name}`, pct: Math.min(100, Math.round((g.current || 0) / g.target * 100)), value: `${g.current || 0}/${g.target}${g.unit ? ' ' + g.unit : ''}` });
-      }
-    }
-    return out.slice(0, 2);
-  }
-
   const block = (title, inner, cls = '') => `
       <div class="ws-block ${cls}">
         <div class="ws-block-title">${title}</div>
@@ -208,14 +188,6 @@ const WeekSummary = (() => {
     const ach = achievements(wk, r, isRecent, habitRows);
     const achHTML = ach.length ? block('Logros', `<div class="ws-ach-list">${ach.map(([ic, t]) => `<div class="ws-ach"><span class="ws-ach-icon">${ic}</span><span>${escapeHtml(t)}</span></div>`).join('')}</div>`, 'ws-achievements') : '';
 
-    // d) A mejorar
-    const imp = toImprove(isRecent, habitRows);
-    const impHTML = imp.length ? block('A mejorar', imp.map(x => `
-        <div class="ws-row">
-          <div class="ws-row-top"><span class="ws-row-name">${escapeHtml(x.name)}</span><span class="ws-row-val">${escapeHtml(x.value)}</span></div>
-          <div class="ws-bar"><div class="ws-bar-fill" style="width:${x.pct}%"></div></div>
-        </div>`).join('')) : '';
-
     // e) Metas a este ritmo (estado actual: solo semana en curso o recién terminada)
     let projHTML = '';
     if (isRecent) {
@@ -223,7 +195,7 @@ const WeekSummary = (() => {
       if (goals.length) {
         projHTML = block('Metas a este ritmo', goals.map(g => {
           const p = projection(g);
-          return `<div class="ws-proj"><span class="ws-row-name">${escapeHtml(g.name)}</span><span class="ws-proj-txt ${p.ok ? 'ok' : 'warn'}">${escapeHtml(p.text)}</span></div>`;
+          return `<div class="ws-proj"><span class="ws-row-name">${escapeHtml(g.name)}</span><span class="ws-proj-txt ${p.ok ? 'ok' : ''}">${escapeHtml(p.text)}</span></div>`;
         }).join(''));
       }
     }
@@ -245,7 +217,7 @@ const WeekSummary = (() => {
     const wbHTML = wb.length ? block('Bienestar', `<div class="ws-wb">${wb.map(([ic, l, val, u]) => `
         <div class="ws-wb-item"><span class="ws-wb-val">${fmt1(val)}${u}</span><span class="ws-wb-lbl">${ic} ${l}</span></div>`).join('')}</div>`) : '';
 
-    c.innerHTML = hero + achHTML + impHTML + projHTML + finHTML + wbHTML;
+    c.innerHTML = hero + achHTML + projHTML + finHTML + wbHTML;
     return v;
   }
 
