@@ -758,7 +758,7 @@ const Habits = (() => {
       <div class="hab-archived ${archivedOpen ? 'open' : ''}">
         <button type="button" class="hab-archived-head" id="hab-archived-toggle" aria-expanded="${archivedOpen}">
           <span>📦 Archivados (${archivedList.length})</span>
-          <span class="hab-archived-chevron">▾</span>
+          <span class="coll-chev" aria-hidden="true">▸</span>
         </button>
         ${archivedOpen ? `<div class="hab-archived-body">${archivedList.map(renderArchivedItem).join('')}</div>` : ''}
       </div>` : '';

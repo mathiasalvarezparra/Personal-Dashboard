@@ -73,9 +73,8 @@ const GoalArchive = (() => {
     return tree;
   }
 
-  // Estado de expansión (persistente en la sesión).
+  // Estado de expansión: solo en memoria (la sesión). Todo parte colapsado.
   const expanded = { years: new Set(), months: new Set(), weeks: new Set() };
-  let defaultsSet = false;
 
   function subsection(title, goals) {
     if (!goals.length) return '';
@@ -86,8 +85,8 @@ const GoalArchive = (() => {
     const isOpen = expanded.weeks.has(wk);
     return `
       <div class="archive-week ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-week-toggle" data-gt-week="${wk}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+        <button class="archive-toggle archive-week-toggle" data-gt-week="${wk}" aria-expanded="${isOpen}">
+          <span class="coll-chev" aria-hidden="true">▸</span>
           <span class="archive-label">🗓️ ${weekRangeLabel(wk)}</span>
         </button>
         ${isOpen ? `<div class="archive-content">${goals.map(renderArchivedGoal).join('')}</div>` : ''}
@@ -99,8 +98,8 @@ const GoalArchive = (() => {
     const weeks = Object.keys(data.weeks).sort().reverse();
     return `
       <div class="archive-month ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-month-toggle" data-gt-month="${mk}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+        <button class="archive-toggle archive-month-toggle" data-gt-month="${mk}" aria-expanded="${isOpen}">
+          <span class="coll-chev" aria-hidden="true">▸</span>
           <span class="archive-label">${monthLabel(mk)}</span>
         </button>
         ${isOpen ? `<div class="archive-content">${subsection('📆 Metas mensuales', data.monthGoals)}${weeks.map(wk => renderWeek(wk, data.weeks[wk])).join('')}</div>` : ''}
@@ -112,8 +111,8 @@ const GoalArchive = (() => {
     const months = Object.keys(data.months).sort().reverse();
     return `
       <div class="archive-year ${isOpen ? 'is-open' : ''}">
-        <button class="archive-toggle archive-year-toggle" data-gt-year="${year}">
-          <span class="archive-arrow">${isOpen ? '▼' : '▶'}</span>
+        <button class="archive-toggle archive-year-toggle" data-gt-year="${year}" aria-expanded="${isOpen}">
+          <span class="coll-chev" aria-hidden="true">▸</span>
           <span class="archive-label">📅 ${year}</span>
         </button>
         ${isOpen ? `<div class="archive-content">${subsection('🏆 Metas anuales', data.yearGoals)}${months.map(mk => renderMonth(mk, data.months[mk])).join('')}</div>` : ''}
@@ -128,14 +127,6 @@ const GoalArchive = (() => {
     if (years.length === 0) {
       c.innerHTML = '<div class="empty">Aún no hay metas archivadas · cuando termine la semana, el mes o el año verás aquí lo cerrado</div>';
       return;
-    }
-    // Defaults la primera vez: año más reciente abierto + su mes más reciente abierto.
-    if (!defaultsSet) {
-      const y0 = years[0];
-      expanded.years.add(y0);
-      const m0 = Object.keys(tree[y0].months).sort().reverse()[0];
-      if (m0) expanded.months.add(m0);
-      defaultsSet = true;
     }
     c.innerHTML = years.map(y => renderYear(y, tree[y])).join('');
 

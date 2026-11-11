@@ -403,16 +403,8 @@ const Tasks = (() => {
 
     // Orden de meses: más reciente arriba
     const monthKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-    const todayMonth = (() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    })();
-
-    // Por defecto: mes actual abierto, resto cerrados. Pero respeta lo que el usuario haya tocado.
-    const isMonthOpen = (mk) => {
-      if (mk in doneMonthsOpen) return doneMonthsOpen[mk];
-      return mk === todayMonth;
-    };
+    // Todo parte colapsado; se recuerda lo que el usuario abra (solo en memoria).
+    const isMonthOpen = (mk) => doneMonthsOpen[mk] === true;
 
     const monthCardHTML = (mk) => {
       const tasks = groups[mk];
@@ -427,7 +419,7 @@ const Tasks = (() => {
       return `
         <div class="done-month ${open ? 'open' : ''}">
           <button class="done-month-head" data-month-toggle="${mk}" aria-expanded="${open}">
-            <span class="done-month-arrow">${open ? '▼' : '▶'}</span>
+            <span class="coll-chev" aria-hidden="true">▸</span>
             <span class="done-month-title">${monthLabel}</span>
             <span class="done-month-meta">${tasks.length} ${tasks.length === 1 ? 'hecha' : 'hechas'}</span>
           </button>
@@ -438,9 +430,8 @@ const Tasks = (() => {
       `;
     };
 
-    // Agrupar los meses por AÑO. Año más reciente abierto por defecto.
-    const todayYear = String(new Date().getFullYear());
-    const isYearOpen = (yk) => (yk in doneYearsOpen) ? doneYearsOpen[yk] : (yk === todayYear);
+    // Agrupar los meses por AÑO (colapsados por defecto)
+    const isYearOpen = (yk) => doneYearsOpen[yk] === true;
     const yearKeys = [...new Set(monthKeys.map(mk => mk.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
 
     const monthsHTML = yearKeys.map(yk => {
@@ -450,10 +441,10 @@ const Tasks = (() => {
       const yOpen = isYearOpen(yk);
       return `
         <div class="hist-year ${yOpen ? 'open' : ''}">
-          <button class="hist-year-label" data-year-toggle="${yk}" type="button">
+          <button class="hist-year-label" data-year-toggle="${yk}" type="button" aria-expanded="${yOpen}">
             <span class="hist-year-name">${yearLabel}</span>
             <span class="hist-year-count">${yearCount}</span>
-            <span class="hist-year-chevron">▾</span>
+            <span class="coll-chev" aria-hidden="true">▸</span>
           </button>
           <div class="hist-year-body">${monthsOfYear.map(monthCardHTML).join('')}</div>
         </div>
@@ -499,9 +490,7 @@ const Tasks = (() => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const yk = btn.dataset.yearToggle;
-        const todayYear = String(new Date().getFullYear());
-        const current = (yk in doneYearsOpen) ? doneYearsOpen[yk] : (yk === todayYear);
-        doneYearsOpen[yk] = !current;
+        doneYearsOpen[yk] = !(doneYearsOpen[yk] === true);
         renderFull();
       });
     });
@@ -509,12 +498,7 @@ const Tasks = (() => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const mk = btn.dataset.monthToggle;
-        const todayMonth = (() => {
-          const d = new Date();
-          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        })();
-        const current = (mk in doneMonthsOpen) ? doneMonthsOpen[mk] : (mk === todayMonth);
-        doneMonthsOpen[mk] = !current;
+        doneMonthsOpen[mk] = !(doneMonthsOpen[mk] === true);
         renderFull();
       });
     });

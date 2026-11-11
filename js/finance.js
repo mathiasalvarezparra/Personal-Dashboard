@@ -1360,6 +1360,8 @@ const Finance = (() => {
 
   // Mes que se está analizando (se reinicia al mes actual al entrar a la vista)
   let analysisMk = null;
+  // "Registros del mes" desplegado (solo en memoria; parte colapsado)
+  let recordsOpen = false;
 
   function openAnalysis() {
     analysisMk = getCurrentMonthKey();
@@ -1432,10 +1434,22 @@ const Finance = (() => {
       </div>
       ${chart}
       <div class="analysis-block">
-        <div class="analysis-block-title">Registros del mes</div>
-        <div class="month-records">${sortByRecent(expenses).map(m => renderMovementItem(m)).join('')}</div>
+        <button type="button" class="coll-head analysis-records-head" data-records-toggle aria-expanded="${recordsOpen}">
+          <span class="analysis-block-title">Registros del mes · ${expenses.length}</span>
+          ${expenses.length ? `<span class="coll-sum">${formatCLP(sumAmount(expenses))}</span>` : ''}
+          <span class="coll-chev" aria-hidden="true">▸</span>
+        </button>
+        <div class="month-records" ${recordsOpen ? '' : 'hidden'}>${expenses.length ? sortByRecent(expenses).map(m => renderMovementItem(m)).join('') : '<div class="empty" style="margin:6px 0">Sin registros este mes</div>'}</div>
       </div>
     `;
+    const recToggle = c.querySelector('[data-records-toggle]');
+    recToggle.addEventListener('click', () => {
+      recordsOpen = !recordsOpen;
+      recToggle.setAttribute('aria-expanded', String(recordsOpen));
+      const list = recToggle.nextElementSibling;
+      list.hidden = !recordsOpen;
+      if (recordsOpen) Animate.reveal(list);
+    });
     bindAnalysis(c);
     bindMovementActions(c);
   }
@@ -1791,7 +1805,7 @@ const Finance = (() => {
       return `
         <div class="archive-month ${open ? 'open' : ''}">
           <button class="archive-month-head" data-archive-toggle="${mk}" aria-expanded="${open}">
-            <span class="archive-month-arrow">${open ? '▼' : '▶'}</span>
+            <span class="coll-chev" aria-hidden="true">▸</span>
             <span class="archive-month-title">${monthLabel}</span>
             <span class="archive-month-meta">${archiveAmounts(movs)}</span>
           </button>
@@ -1802,9 +1816,8 @@ const Finance = (() => {
       `;
     };
 
-    // Agrupar los meses por AÑO. Año más reciente abierto por defecto.
-    const todayYear = String(new Date().getFullYear());
-    const isYearOpen = (yk) => (yk in archiveYearOpen) ? archiveYearOpen[yk] : (yk === todayYear);
+    // Agrupar los meses por AÑO (colapsados por defecto; lo abierto se recuerda en memoria)
+    const isYearOpen = (yk) => archiveYearOpen[yk] === true;
     const yearKeys = [...new Set(monthKeys.map(mk => mk.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
 
     c.innerHTML = yearKeys.map(yk => {
@@ -1814,10 +1827,10 @@ const Finance = (() => {
       const yOpen = isYearOpen(yk);
       return `
         <div class="hist-year ${yOpen ? 'open' : ''}">
-          <button class="hist-year-label" data-archive-year-toggle="${yk}" type="button">
+          <button class="hist-year-label" data-archive-year-toggle="${yk}" type="button" aria-expanded="${yOpen}">
             <span class="hist-year-name">${yk}</span>
             <span class="archive-month-meta" style="margin-left:auto">${archiveAmounts(yMovs)}</span>
-            <span class="hist-year-chevron">▾</span>
+            <span class="coll-chev" aria-hidden="true">▸</span>
           </button>
           <div class="hist-year-body">${monthsOfYear.map(monthCardHTML).join('')}</div>
         </div>

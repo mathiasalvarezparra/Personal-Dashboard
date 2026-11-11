@@ -172,12 +172,26 @@ const Goals = (() => {
     return { rows, linked };
   }
 
+  // Bloques "Aporta a esta meta" abiertos (por id de meta). Solo en memoria:
+  // al recargar la app todos parten colapsados.
+  const openOrigins = new Set();
+
   function originHTML(g) {
     const { rows, linked } = originBreakdown(g);
+    const open = openOrigins.has(g.id);
+    const head = rows.length
+      ? `<button type="button" class="coll-head goal-origin-head" data-origin-toggle="${g.id}" aria-expanded="${open}">
+              <span class="goal-origin-title">Aporta a esta meta</span>
+              <span class="coll-sum">${rows.length} ${rows.length === 1 ? 'fuente' : 'fuentes'}</span>
+              <span class="coll-chev" aria-hidden="true">▸</span>
+            </button>
+            <div class="goal-origin-body" ${open ? '' : 'hidden'}>
+              ${rows.map(x => `<div class="goal-origin-row ${x.kind}">${escapeHtml(x.label)} · <strong>${fmtNum(x.value)}</strong></div>`).join('')}
+            </div>`
+      : '<div class="goal-origin-title">Aporta a esta meta</div>';
     return `
           <div class="goal-origin">
-            <div class="goal-origin-title">Aporta a esta meta</div>
-            ${rows.map(x => `<div class="goal-origin-row ${x.kind}">${escapeHtml(x.label)} · <strong>${fmtNum(x.value)}</strong></div>`).join('')}
+            ${head}
             ${linked ? '' : '<div class="goal-origin-empty">Sin acciones vinculadas</div>'}
           </div>`;
   }
@@ -789,8 +803,8 @@ const Goals = (() => {
           const periodWord = { week: 'Semanas', month: 'Meses', year: 'Años' }[h];
           html += `
             <div class="archived-section">
-              <button class="archived-toggle" data-toggle-archived data-horizon-toggle="${h}">
-                <span>${isOpen ? '▼' : '▶'}</span>
+              <button class="archived-toggle" data-toggle-archived data-horizon-toggle="${h}" aria-expanded="${isOpen}">
+                <span class="coll-chev" aria-hidden="true">▸</span>
                 <span>${periodWord} anteriores (${archived.length} meta${archived.length>1?'s':''} · ${sortedKeys.length} ${sortedKeys.length>1?'períodos':'período'})</span>
               </button>
               <div style="display:${isOpen ? 'block' : 'none'}">
@@ -803,6 +817,19 @@ const Goals = (() => {
       c.innerHTML = html;
       bindCardEvents(c);
       bindArchivedCardEvents(c);
+
+      // "Aporta a esta meta": desplegar/plegar en el lugar (recordado en la sesión)
+      c.querySelectorAll('[data-origin-toggle]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.originToggle;
+          const body = btn.nextElementSibling;
+          const open = !openOrigins.has(id);
+          if (open) openOrigins.add(id); else openOrigins.delete(id);
+          btn.setAttribute('aria-expanded', String(open));
+          body.hidden = !open;
+          if (open) Animate.reveal(body);
+        });
+      });
 
       // Bind toggle de archivadas
       const togBtn = c.querySelector('[data-toggle-archived]');
