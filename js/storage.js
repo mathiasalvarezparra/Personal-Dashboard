@@ -15,7 +15,6 @@ const Storage = (() => {
       onboarded: false,
       lastWeekKey: null,
       vacation: null, // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } o null
-      pendingWeekClose: null, // weekKey de una semana terminada sin cerrar
       // Plan de Finanzas (Movimientos › Plan)
       monthlyBudget: null,      // tope de gasto mensual en CLP (sin Ahorro) o null
       categoryBudgets: {},      // { categoryId: CLP } límite mensual por categoría
@@ -34,9 +33,11 @@ const Storage = (() => {
     habits: [],
     tasks: [],
     goals: [],
+    // Legado (ya no se muestra ni se escribe; se conserva en el JSON): foco de la semana
     focus: { week: '', updatedAt: null },
     closures: {},
-    // Cierres de semana: { 'YYYY-Www': { worked, blocked, focus, savedAt } }
+    // Legado: respuestas del antiguo cierre de semana { 'YYYY-Www': { worked, blocked, focus, savedAt } }.
+    // Ya no se muestran ni se escriben (el cierre semanal es solo el resumen de WeekSummary).
     weekClosures: {},
     // Snapshot de % logrado por día (para que el strip semanal mantenga el círculo de días pasados)
     // Formato: { 'YYYY-MM-DD': pct }

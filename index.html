@@ -86,7 +86,7 @@
 
     <!-- Cierres -->
     <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
-    <button class="btn-secondary close-day-btn week-close-btn" id="week-close-btn" hidden></button>
+    <button class="btn-secondary close-day-btn week-summary-btn" id="week-summary-btn" hidden></button>
   </div>
 
   <div class="bottom-spacer"></div>
@@ -300,6 +300,19 @@
   <div class="bottom-spacer"></div>
 </section>
 
+<!-- ===== RESUMEN DE LA SEMANA (solo lectura) ===== -->
+<section id="view-week-summary" class="view">
+  <header class="topbar">
+    <button class="icon-btn" data-back aria-label="Cerrar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <h1 class="page-title">Resumen de la semana</h1>
+    <span class="topbar-spacer"></span>
+  </header>
+  <div id="week-summary-content"></div>
+  <div class="bottom-spacer"></div>
+</section>
+
 <!-- ===== CONFIGURACIÓN ===== -->
 <section id="view-settings" class="view">
   <header class="topbar">
@@ -443,6 +456,7 @@
 <script src="js/goal-rollover.js"></script>
 <script src="js/vacation.js"></script>
 <script src="js/stats.js"></script>
+<script src="js/week-summary.js"></script>
 <script src="js/onboarding.js"></script>
 <script src="js/app.js"></script>
 <script src="js/main.js"></script>

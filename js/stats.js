@@ -86,7 +86,7 @@ const Stats = (() => {
       const label = new Date(d.start + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
       const showLbl = (data.length - 1 - i) % 3 === 0;
       return `
-        <div class="trend-col ${d.isCurrent ? 'is-current' : ''} ${d.pct === null ? 'is-empty' : ''}" title="${label}: ${d.pct === null ? 'sin datos' : d.pct + '%'}">
+        <div class="trend-col ${d.isCurrent ? 'is-current' : ''} ${d.pct === null ? 'is-empty' : ''}" data-week-summary="${d.wk}" role="button" tabindex="0" aria-label="Resumen de la semana del ${label}${d.isCurrent ? ' (en curso)' : ''}" title="${label}: ${d.pct === null ? 'sin datos' : d.pct + '%'}">
           <div class="trend-val">${d.pct === null ? '' : d.pct}</div>
           <div class="trend-bar-wrap"><div class="trend-bar" style="height:${h}%"></div></div>
           <div class="trend-lbl">${showLbl ? label.replace('.', '') : ''}</div>
@@ -102,7 +102,13 @@ const Stats = (() => {
         ${deltaHTML}
         <div class="trend-summary-side">Promedio ${avg}%</div>
       </div>
-      <div class="trend-chart">${bars}</div>`;
+      <div class="trend-chart">${bars}</div>
+      <div class="trend-hint">Toca una barra para ver el resumen de esa semana</div>`;
+    c.querySelectorAll('[data-week-summary]').forEach(col => {
+      const openIt = () => { UI.buzz(8); WeekSummary.open(col.dataset.weekSummary); };
+      col.addEventListener('click', openIt);
+      col.addEventListener('keydown', e => { if (e.key === 'Enter') openIt(); });
+    });
   }
 
   /* ---------- Metas del período ---------- */
@@ -227,13 +233,10 @@ const Stats = (() => {
     if (!c) return;
     const state = Storage.get();
 
+    // Solo cierres del día. Las respuestas del antiguo cierre semanal (weekClosures)
+    // son datos legados: se conservan en el JSON pero no se muestran.
     const dayItems = Object.keys(state.closures || {}).map(dk => ({ kind: 'day', key: dk, sort: dk }));
-    const weekItems = Object.keys(state.weekClosures || {}).map(wk => {
-      const r = App.weekRange(wk) || {};
-      // La semana se ubica por su fecha de FIN (domingo): el cierre semanal se
-      // hace al terminar la semana, así que va DESPUÉS de sus días.
-      return { kind: 'week', key: wk, sort: r.end || r.start || wk };
-    });
+    const weekItems = [];
 
     if (dayItems.length + weekItems.length === 0) {
       c.innerHTML = '<div class="empty">Todavía no hay cierres guardados</div>';
@@ -262,18 +265,6 @@ const Stats = (() => {
           <span class="hist-icon">🌙</span>
           <div class="hist-body">
             <div class="hist-title">${label}</div>
-            <div class="hist-preview">${escapeHtml(preview)}</div>
-          </div>
-        </div>`;
-    };
-    const weekCard = it => {
-      const e = state.weekClosures[it.key];
-      const preview = e.focus || e.worked || e.blocked || 'Sin notas';
-      return `
-        <div class="hist-item" data-kind="week" data-key="${it.key}">
-          <span class="hist-icon">📅</span>
-          <div class="hist-body">
-            <div class="hist-title">Semana ${App.weekLabelFor(it.key)}</div>
             <div class="hist-preview">${escapeHtml(preview)}</div>
           </div>
         </div>`;
@@ -307,7 +298,7 @@ const Stats = (() => {
           <span class="hist-month-chevron">▾</span>
         </button>`;
         monthsHTML += `<div class="hist-month-body">`;
-        monthsHTML += monthItems.map(it => it.kind === 'week' ? weekCard(it) : dayCard(it)).join('');
+        monthsHTML += monthItems.map(dayCard).join('');
         monthsHTML += `</div></div>`;
       });
 
@@ -348,14 +339,9 @@ const Stats = (() => {
     });
   }
 
-  // Desde el historial, tocar un cierre lo abre editable (mismo formulario del
-  // cierre real). App expone los abridores para reutilizar la lógica.
+  // Desde el historial, tocar un cierre del día lo abre editable (mismo formulario).
   function openClosure(kind, key) {
-    if (kind === 'week') {
-      App.openWeekCloseModal(key);
-    } else {
-      App.openDayCloseModal(key);
-    }
+    App.openDayCloseModal(key);
   }
 
   function bind() {
