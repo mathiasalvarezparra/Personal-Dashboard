@@ -1430,7 +1430,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 
 /* ============== METAS UNIFICADAS EN HOY ============== */
 .goals-inner-tabs,
-.task-tabs {
+.task-tabs,
+.fin-tabs {
   display: flex;
   gap: 6px;
   padding-bottom: 12px;
@@ -1440,9 +1441,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   scrollbar-width: none;
 }
 .goals-inner-tabs::-webkit-scrollbar,
-.task-tabs::-webkit-scrollbar { display: none; }
+.task-tabs::-webkit-scrollbar,
+.fin-tabs::-webkit-scrollbar { display: none; }
 .goals-inner-tab,
-.task-tab {
+.task-tab,
+.fin-tab {
   flex-shrink: 0;
   padding: 6px 12px;
   font-family: var(--font-mono);
@@ -1458,9 +1461,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   transition: all 0.15s;
 }
 .goals-inner-tab:active,
-.task-tab:active { transform: scale(0.96); }
+.task-tab:active,
+.fin-tab:active { transform: scale(0.96); }
 .goals-inner-tab.active,
-.task-tab.active {
+.task-tab.active,
+.fin-tab.active {
   background: var(--accent-yellow);
   color: #000;
   border-color: var(--accent-yellow);
@@ -2371,6 +2376,11 @@ label {
 .tp-item.overdue { border-left-color: var(--accent-red); }
 .tp-item.today   { border-left-color: var(--accent-yellow); }
 .tp-item.soon    { border-left-color: var(--border); }
+/* Finanzas en Enfoque: Atrasados arriba y pestañas de pagos por plazo */
+.fin-overdue { margin-top: 4px; }
+.fin-overdue + .fin-tabs { margin-top: 2px; }
+.fin-tab-meta { font-weight: 500; opacity: 0.8; }
+.fin-tab-empty { padding: 14px 0; }
 .tp-main { flex: 1; min-width: 0; }
 .tp-name {
   font-size: 14px;
