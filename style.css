@@ -1058,12 +1058,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   padding: 1px 7px;
   border-radius: 9px;
 }
-.hist-month-chevron {
-  font-size: 12px;
-  color: var(--text-faint);
-  transition: transform 0.2s;
-}
-.hist-month.open .hist-month-chevron { transform: rotate(180deg); }
 .hist-month-body { display: none; }
 .hist-month.open .hist-month-body { display: block; animation: fadeIn 0.2s ease; }
 
@@ -1094,8 +1088,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   padding: 1px 7px;
   border-radius: 9px;
 }
-.hist-year-chevron { font-size: 12px; color: var(--text-faint); transition: transform 0.2s; }
-.hist-year.open .hist-year-chevron { transform: rotate(180deg); }
 .hist-year-body { display: none; padding-left: 12px; }
 .hist-year.open .hist-year-body { display: block; animation: fadeIn 0.2s ease; }
 .hist-group-label {
@@ -1387,12 +1379,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   margin-bottom: 8px;
 }
 .archive-toggle:active { background: var(--bg-card-hover); }
-.archive-arrow {
-  font-size: 10px;
-  color: var(--text-dim);
-  width: 14px;
-  display: inline-block;
-}
 .archive-label { flex: 1; }
 .archive-content { padding: 4px 0 4px 14px; margin-bottom: 6px; }
 .archive-year > .archive-toggle { font-size: 15px; background: var(--bg-card); }
@@ -3446,12 +3432,6 @@ label {
   transition: background 0.15s;
 }
 .done-month-head:active { background: var(--bg-card-hover); }
-.done-month-arrow {
-  font-size: 11px;
-  color: var(--text-dim);
-  width: 12px;
-  flex-shrink: 0;
-}
 .done-month-title {
   font-size: 13px;
   font-weight: 700;
@@ -3790,12 +3770,6 @@ label {
   text-align: left;
 }
 .archive-month-head:active { background: var(--bg-card-hover); }
-.archive-month-arrow {
-  font-size: 11px;
-  color: var(--text-dim);
-  width: 12px;
-  flex-shrink: 0;
-}
 .archive-month-title {
   font-size: 13px;
   font-weight: 700;
@@ -4331,8 +4305,6 @@ label {
   font-weight: 600;
   color: var(--text-dim);
 }
-.hab-archived-chevron { transition: transform 0.2s; }
-.hab-archived.open .hab-archived-chevron { transform: rotate(180deg); }
 .archived-item { opacity: 0.75; }
 .item-reactivate {
   padding: 5px 10px;
@@ -4706,3 +4678,33 @@ label {
 .ws-wb-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .ws-wb-val { font-family: var(--font-mono); font-size: 17px; font-weight: 800; }
 .ws-wb-lbl { font-size: 11px; color: var(--text-dim); }
+
+/* ============== SECCIONES COLAPSABLES (historiales y detalles) ============== */
+/* Indicador único: ▸ cerrado, girado 90° (▾) abierto. El estado abierto vive en
+   aria-expanded del encabezado; el contenido entra con Animate (TAB_TRIGGERS / reveal). */
+.coll-chev {
+  display: inline-block;
+  width: 12px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: transform 0.2s var(--anim-ease);
+}
+[aria-expanded="true"] > .coll-chev { transform: rotate(90deg); }
+.coll-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+  text-align: left;
+  cursor: pointer;
+}
+.coll-head:active { opacity: 0.7; }
+.coll-sum { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); }
+.goal-origin-head .goal-origin-title { margin-bottom: 0; }
+.goal-origin-body { margin-top: 4px; }
+.goal-origin-body[hidden], .month-records[hidden] { display: none; }
+.analysis-records-head .analysis-block-title { margin-bottom: 0; }
+.analysis-records-head + .month-records { margin-top: 8px; }

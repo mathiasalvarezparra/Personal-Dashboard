@@ -278,7 +278,7 @@ const Stats = (() => {
     yearKeys.forEach((yk, yIdx) => {
       const monthsOfYear = orderedMonths.filter(mk => mk.slice(0, 4) === yk);
       const yearItemCount = [...dayItems, ...weekItems].filter(it => it.sort.slice(0, 4) === yk).length;
-      const yearOpen = (yk in histYearsOpen) ? histYearsOpen[yk] : (yIdx === 0);
+      const yearOpen = histYearsOpen[yk] === true; // todo parte colapsado
 
       let monthsHTML = '';
       monthsOfYear.forEach((mk, mIdx) => {
@@ -290,12 +290,12 @@ const Stats = (() => {
             return a.kind === 'week' ? 1 : -1;
           });
         // Mes abierto: el más reciente del año más reciente por defecto.
-        const monthOpen = (mk in histMonthsOpen) ? histMonthsOpen[mk] : (yIdx === 0 && mIdx === 0);
+        const monthOpen = histMonthsOpen[mk] === true;
         monthsHTML += `<div class="hist-month ${monthOpen ? 'open' : ''}">`;
-        monthsHTML += `<button class="hist-month-label" data-hist-month="${mk}" type="button">
+        monthsHTML += `<button class="hist-month-label" data-hist-month="${mk}" type="button" aria-expanded="${monthOpen}">
           <span class="hist-month-name">${monthLabel(mk)}</span>
           <span class="hist-month-count">${monthItems.length}</span>
-          <span class="hist-month-chevron">▾</span>
+          <span class="coll-chev" aria-hidden="true">▸</span>
         </button>`;
         monthsHTML += `<div class="hist-month-body">`;
         monthsHTML += monthItems.map(dayCard).join('');
@@ -303,10 +303,10 @@ const Stats = (() => {
       });
 
       html += `<div class="hist-year ${yearOpen ? 'open' : ''}">`;
-      html += `<button class="hist-year-label" data-hist-year="${yk}" type="button">
+      html += `<button class="hist-year-label" data-hist-year="${yk}" type="button" aria-expanded="${yearOpen}">
         <span class="hist-year-name">${yk}</span>
         <span class="hist-year-count">${yearItemCount}</span>
-        <span class="hist-year-chevron">▾</span>
+        <span class="coll-chev" aria-hidden="true">▸</span>
       </button>`;
       html += `<div class="hist-year-body">${monthsHTML}</div></div>`;
     });
@@ -320,6 +320,7 @@ const Stats = (() => {
         const nowOpen = !yearEl.classList.contains('open');
         histYearsOpen[yk] = nowOpen;
         yearEl.classList.toggle('open', nowOpen);
+        btn.setAttribute('aria-expanded', String(nowOpen));
       });
     });
 
@@ -331,6 +332,7 @@ const Stats = (() => {
         const nowOpen = !monthEl.classList.contains('open');
         histMonthsOpen[mk] = nowOpen;
         monthEl.classList.toggle('open', nowOpen);
+        btn.setAttribute('aria-expanded', String(nowOpen));
       });
     });
 

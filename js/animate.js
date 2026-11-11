@@ -22,7 +22,7 @@ const Animate = (() => {
   const SVG_BAR = '.chart-bar';
   const DONUT = '.donut-svg';
   // Controles que cambian de pestaña/sub-vista: lo que rendericen entra "desde 0"
-  const TAB_TRIGGERS = '[data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-fin-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
+  const TAB_TRIGGERS = '[data-gt-year], [data-gt-month], [data-gt-week], [data-toggle-archived], [data-year-toggle], [data-archive-year-toggle], #hab-archived-toggle, [data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-fin-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
 
   const memory = new Map();       // clave estable → último valor final
   const handled = new WeakSet();  // elementos ya preparados (evita doble proceso)
@@ -263,6 +263,15 @@ const Animate = (() => {
     donuts.forEach(animateDonut);
   }
 
+  // Despliegue de una sección colapsable sin re-render: sus hijos entran con
+  // anim-rise escalonado y sus barras/números se animan desde 0.
+  function reveal(box) {
+    if (reduced || !box) return;
+    const kids = Array.from(box.children);
+    playClass(kids.map((el, i) => [el, Math.min(i * STAGGER, STAGGER * MAX_STAGGER_STEPS)]), 'anim-rise');
+    process([box], true, true);
+  }
+
   // Re-anima todo lo visible dentro de `scope` desde 0 (al entrar a una vista)
   function enter(scope) {
     if (reduced || !scope) return;
@@ -303,5 +312,5 @@ const Animate = (() => {
     document.addEventListener('DOMContentLoaded', openEnterWindow);
   }
 
-  return { enter };
+  return { enter, reveal };
 })();
