@@ -28,7 +28,7 @@ Fuente de verdad: `js/storage.js` (`Storage.defaultState` y `Storage.load()`). T
 | `onboarded` | boolean | si ya pasó por `Onboarding` |
 | `lastWeekKey` | string\|null | **deprecado**, migrado a `lastPeriodKeys.week` |
 | `vacation` | object\|null | `{ start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }` |
-| `pendingWeekClose` | string\|null | `weekKey` de una semana terminada sin cerrar |
+| `pendingWeekClose` | string\|null | **Legado** (ya no se lee ni se escribe; puede quedar en datos antiguos): marcaba una semana terminada sin cerrar |
 | `areasEspiritualidadAdded` | boolean | flag de migración (ver arriba) |
 | `quarterRemoved` | boolean | flag de migración (ver arriba) |
 | `lastPeriodKeys` | object | `{ week?, month?, year?: string }`, último período procesado por `GoalRollover` |
@@ -48,7 +48,7 @@ Ejemplo de los campos del plan de Finanzas:
 
 Los tres campos están en `defaultState.settings`; el merge de un nivel de `Storage.load()` se los agrega a los datos existentes (no hizo falta subir `version`). Se editan en Movimientos › Plan y se guardan al salir de cada campo. "Gastado" del mes = gastos registrados (`Finance.isTrackedExpense`) excepto Ahorro; "Ahorrado" = gastos en Ahorro.
 
-Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones y `pendingWeekClose`; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`; `Finance` lee y escribe `monthlyBudget`, `categoryBudgets` y `monthlySavingsGoal`.
+Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`; `Finance` lee y escribe `monthlyBudget`, `categoryBudgets` y `monthlySavingsGoal`.
 
 ### `areas` (array, catálogo fijo editable)
 
@@ -231,25 +231,27 @@ Leído/escrito por: `Finance` (dueño; incluye la tarjeta "💰 Gastos" de Hoy y
 
 ### `focus` (objeto único)
 
-`{ week: string, weekKey: string|null, updatedAt: number|null }` — el "foco de la semana" en texto libre, mostrado en "Hoy". Dueño: `App`.
+`{ week: string, weekKey: string|null, updatedAt: number|null }` — **legado**: el antiguo "foco de la semana". Se eliminó de la app: no se muestra ni se escribe, pero se conserva en el estado y en exportar/importar.
 
 ### `closures` (objeto, clave = `YYYY-MM-DD`)
 
 ```json
 { "gratitude": ["..."], "learn": "...", "energy": 4, "stress": 2, "sleep": 7, "savedAt": 1732000000000 }
 ```
-Cierre de día. `energy`/`stress`/`sleep` solo se guardan si el usuario los marcó (si no, la clave ni existe). Dueño: `App`. Leído por `Stats`.
+Cierre de día. `energy`/`stress`/`sleep` solo se guardan si el usuario los marcó (si no, la clave ni existe). Dueño: `App`. Leído por `Stats` y `WeekSummary` (Bienestar de la semana).
 
 ### `weekClosures` (objeto, clave = `YYYY-Www`)
 
 ```json
 { "worked": "...", "blocked": "...", "focus": "...", "savedAt": 1732000000000 }
 ```
-Cierre de semana. Dueño: `App`. Leído por `Stats`.
+Respuestas del antiguo cierre de semana (legado, ver abajo).
+
+**Legado:** el cierre semanal ya no tiene preguntas (es solo el resumen de `WeekSummary`, calculado al vuelo sin guardar nada). `weekClosures` no se muestra (tampoco en Estadísticas › Cierres) ni se escribe, pero se conserva intacto en el estado y en exportar/importar.
 
 ### `dailySnapshots` (objeto, clave = `YYYY-MM-DD`, valor = número 0-100)
 
-% de cumplimiento del día, guardado como snapshot para que el strip semanal no tenga que recalcular días pasados. Dueño: `App`. Leído por `Stats`.
+% de cumplimiento del día, guardado como snapshot para que el strip semanal no tenga que recalcular días pasados. Dueño: `App`. Leído por `Stats` (tendencia) y `WeekSummary` (puntaje de la semana).
 
 ### `user` (objeto único)
 
@@ -274,5 +276,6 @@ Cierre de semana. Dueño: `App`. Leído por `Stats`.
 | `goals` | `Goals`, `GoalRollover` | `GoalArchive`, `Habits`, `Tasks`, `Stats` |
 | `recurringExpenses` | `Finance` | — |
 | `movements` | `Finance` (solo gastos; ingresos/ajustes legados ocultos) | `App` (resumen del día) |
-| `focus`, `closures`, `weekClosures`, `dailySnapshots` | `App` | `Stats` |
+| `closures`, `dailySnapshots` | `App` | `Stats`, `WeekSummary` |
+| `focus`, `weekClosures` (legados) | — (no se escriben) | — (no se muestran; solo viajan en exportar/importar) |
 | `user` | `Onboarding` / Configuración | — |

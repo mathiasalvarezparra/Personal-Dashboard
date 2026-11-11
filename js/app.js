@@ -45,7 +45,7 @@ const App = (() => {
     Finance.render();
     refreshKPIs();
     renderCloseDay();
-    renderWeekClose();
+    renderWeekSummaryBtn();
     bindAll();
     Stats.bind();
     renderWeekLabel();
@@ -72,7 +72,7 @@ const App = (() => {
     Finance.render();
     refreshKPIs();
     renderCloseDay();
-    renderWeekClose();
+    renderWeekSummaryBtn();
     renderWeekLabel();
     if (typeof Stats !== 'undefined') Stats.render();
     if (typeof Habits.renderDetail === 'function') Habits.renderDetail();
@@ -501,7 +501,7 @@ const App = (() => {
       Tasks.renderToday();
       refreshKPIs();
       renderCloseDay();
-      renderWeekClose();
+      renderWeekSummaryBtn();
     } else if (tab === 'habitos') {
       Habits.renderOverview();
       refreshKPIs();
@@ -531,7 +531,6 @@ const App = (() => {
     const pct = total === 0 ? 0 : Math.round((habitsPctSum + tasksPctSum) / total);
 
     renderGreeting();
-    renderFocusCard();
 
     // Persistir el % del día (alimenta la Tendencia semanal). El strip visual
     // ya no existe: renderWeekStrip solo guarda el snapshot y no pinta.
@@ -561,97 +560,6 @@ const App = (() => {
 
   let countersAnimated = false;
 
-  // ---------- Tarjeta de foco ----------
-  // El foco de la semana en curso se escribió al cerrar la semana ANTERIOR
-  // ("foco de la próxima semana"), así que se busca ahí.
-  function currentWeekFocus() {
-    const s = Storage.get();
-    const curWk = UI.weekKey();
-    // Foco escrito directamente desde Hoy para la semana en curso
-    if (s.focus && s.focus.week && s.focus.weekKey === curWk) {
-      return { text: s.focus.week, editable: true };
-    }
-    // Si no, el "foco de la próxima semana" del cierre de la semana pasada
-    const prevWk = UI.weekKey(new Date(Date.now() - 7 * 86400000));
-    const e = (s.weekClosures || {})[prevWk];
-    return e && e.focus ? { text: e.focus, wk: prevWk } : null;
-  }
-
-  function openFocusEditor() {
-    const f = currentWeekFocus();
-    const cur = f ? f.text : '';
-    UI.openModal({
-      title: '🎯 Foco de la semana',
-      okText: 'Guardar',
-      bodyHTML: `
-        <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px;line-height:1.45">Una frase corta que te recuerde qué priorizar esta semana.</p>
-        <textarea id="focus-input" rows="2" placeholder="Ej: Proteger la primera hora del día">${escapeHtml(cur)}</textarea>
-      `,
-      onSave: () => {
-        const val = document.getElementById('focus-input').value.trim();
-        const st = Storage.get();
-        if (!val) { st.focus = { week: '', weekKey: null, updatedAt: Date.now() }; }
-        else { st.focus = { week: val, weekKey: UI.weekKey(), updatedAt: Date.now() }; }
-        Storage.save();
-        renderFocusCard();
-        UI.toast(val ? 'Foco actualizado' : 'Foco borrado');
-      }
-    });
-  }
-
-  // Sin foco escrito: rota entre tus propios destacados, estable durante el día
-  function pickPastLearning() {
-    const cl = Storage.get().closures || {};
-    const todayKey = UI.todayKey();
-    const items = Object.keys(cl)
-      .filter(dk => dk !== todayKey && cl[dk] && cl[dk].learn && cl[dk].learn.trim())
-      .sort();
-    if (!items.length) return null;
-    let hash = 0;
-    for (const ch of todayKey) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-    const dk = items[hash % items.length];
-    return { text: cl[dk].learn, dk };
-  }
-
-  function renderFocusCard() {
-    const c = document.getElementById('focus-card-slot');
-    if (!isLive(c)) return;
-
-    const f = currentWeekFocus();
-    if (f) {
-      c.innerHTML = `
-        <div class="focus-card" data-editable="1">
-          <div class="focus-card-label">Esta semana</div>
-          <div class="focus-card-text">${escapeHtml(f.text)}</div>
-        </div>`;
-      // Tocar la tarjeta abre los avances de la semana (foco editable dentro)
-      c.querySelector('.focus-card').addEventListener('click', () => openWeekCloseModal(UI.weekKey()));
-      return;
-    }
-
-    const p = pickPastLearning();
-    if (p) {
-      const label = new Date(p.dk + 'T12:00:00')
-        .toLocaleDateString('es-CL', { day: 'numeric', month: 'long' });
-      c.innerHTML = `
-        <div class="focus-card past" data-focus-day="${p.dk}">
-          <div class="focus-card-label">Lo anotaste el ${label}</div>
-          <div class="focus-card-text">${escapeHtml(p.text)}</div>
-        </div>`;
-      c.querySelector('.focus-card').addEventListener('click', () => openDaySummary(p.dk));
-      return;
-    }
-
-    // Sin foco ni destacados: invitación discreta a definir uno
-    c.innerHTML = `
-      <button class="focus-card focus-card-empty">
-        <span class="focus-card-empty-icon">🎯</span>
-        <span>Define tu foco de la semana</span>
-      </button>`;
-    c.querySelector('.focus-card').addEventListener('click', openFocusEditor);
-  }
-
-
   // ====== HELPERS DE SEMANA ======
   // Devuelve { start, end } (YYYY-MM-DD) del lunes y domingo de una weekKey ISO
   function weekRange(wk) {
@@ -678,202 +586,28 @@ const App = (() => {
     return `${fmt(r.start)} – ${fmt(r.end)}`;
   }
 
-  // Estadísticas agregadas de una semana (para el cierre semanal)
-  function weekStats(wk) {
-    const state = Storage.get();
-    const r = weekRange(wk);
-    const todayKey = UI.todayKey();
-    if (!r) return null;
-
-    // Solo días ya transcurridos
-    const past = r.days.filter(d => d <= todayKey);
-
-    // Promedio del anillo diario
-    const snaps = past.map(d => state.dailySnapshots[d]).filter(v => typeof v === 'number');
-    const ringAvg = snaps.length ? Math.round(snaps.reduce((a, b) => a + b, 0) / snaps.length) : 0;
-
-    // Hábitos: promedio de cumplimiento sobre días programados
-    let hSum = 0, hCount = 0;
-    state.habits.forEach(h => {
-      if (h.archived) return;
-      const born = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
-      past.forEach(dk => {
-        if (born && dk < born) return;
-        if (Vacation.isDateInVacation(dk)) return;
-        if (!Habits.countsForDate(h, new Date(dk + 'T12:00:00'))) return;
-        hSum += Habits.getHabitDayPct(h, dk);
-        hCount++;
-      });
-    });
-    const habitsPct = hCount ? Math.round(hSum / hCount) : 0;
-
-    // Tareas de la semana
-    const tasks = state.tasks.filter(t => t.date >= r.start && t.date <= r.end);
-    const tasksDone = tasks.filter(t => t.done).length;
-
-    // Metas semanales de esa semana (activas y archivadas)
-    const goals = state.goals
-      .filter(g => g.horizon === 'week' && UI.weekKey(new Date(g.createdAt)) === wk)
-      .map(g => ({
-        name: g.name,
-        done: !!g.done,
-        pct: g.done ? 100 : (g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0),
-        detail: g.target ? `${g.current || 0}/${g.target} ${g.unit || ''}`.trim() : '',
-      }))
-      .sort((a, b) => (a.done === b.done) ? b.pct - a.pct : (a.done ? -1 : 1));
-
-    return {
-      ringAvg, habitsPct,
-      tasksDone, tasksTotal: tasks.length,
-      goals, goalsDone: goals.filter(g => g.done).length,
-    };
-  }
-
-  // ====== CIERRE DE SEMANA ======
-  // Devuelve la weekKey que corresponde cerrar, o null si no toca
-  function weekCloseTarget() {
-    const s = Storage.get();
+  // ====== RESUMEN DE LA SEMANA ======
+  // Botón de Enfoque: domingo → semana en curso; lunes → la que terminó.
+  // Otros días no aparece. Abre WeekSummary (solo lectura, sin preguntas).
+  function weekSummaryTarget() {
     const day = new Date().getDay(); // 0 = domingo, 1 = lunes
-    const pending = s.settings.pendingWeekClose;
-
-    // Semana pendiente sin cerrar → se ofrece hasta el domingo siguiente.
-    // Después caduca (se olvida el pendiente); sigue en el historial.
-    if (pending && !s.weekClosures[pending]) {
-      const nextSunday = weekEndDateKey(shiftWeek(pending, 1));
-      if (UI.todayKey() <= nextSunday) return pending;
-      s.settings.pendingWeekClose = null;
-      Storage.save();
-    }
-
-    // Domingo o lunes: se puede cerrar la semana que corresponde.
-    // Lunes cierra la semana que recién terminó (por si te atrasas un día).
     if (day === 0) return UI.weekKey();
-    if (day === 1) return shiftWeek(UI.weekKey(), -1);
-
-    // Cualquier otro día: solo si ya la cerraste, para poder editarla.
-    const cur = UI.weekKey();
-    if (s.weekClosures[cur]) return cur;
+    if (day === 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      return UI.weekKey(d);
+    }
     return null;
   }
 
-  // Desplaza una weekKey n semanas
-  function shiftWeek(wk, n) {
-    const r = weekRange(wk);
-    if (!r) return wk;
-    const d = new Date(r.start + 'T12:00:00');
-    d.setDate(d.getDate() + n * 7);
-    return UI.weekKey(d);
-  }
-
-  // Domingo (fin) de una weekKey, en YYYY-MM-DD
-  function weekEndDateKey(wk) {
-    const r = weekRange(wk);
-    return r ? r.end : wk;
-  }
-
-  function renderWeekClose() {
-    const btn = document.getElementById('week-close-btn');
+  function renderWeekSummaryBtn() {
+    const btn = document.getElementById('week-summary-btn');
     if (!btn) return;
-    const wk = weekCloseTarget();
-    if (!wk) { btn.hidden = true; return; }
-    const s = Storage.get();
-    const closed = !!s.weekClosures[wk];
-    const isPast = wk !== UI.weekKey();
-    btn.hidden = false;
+    const wk = weekSummaryTarget();
+    btn.hidden = !wk;
+    if (!wk) return;
     btn.dataset.week = wk;
-    btn.textContent = closed
-      ? `✓ Semana cerrada · editar`
-      : (isPast ? `📅 Cerrar la semana pasada` : `📅 Cerrar la semana`);
-    btn.classList.toggle('is-closed', closed);
-  }
-
-  // Modal de la semana. Si wk es la semana en curso → "Avances de la semana"
-  // (revisión + foco editable). Si es una semana terminada → cierre completo.
-  function openWeekCloseModal(wk) {
-    const s = Storage.get();
-    const e = s.weekClosures[wk] || {};
-    const st = weekStats(wk);
-    if (!st) return;
-    const isCurrent = wk === UI.weekKey();
-
-    const goalsHTML = st.goals.length === 0
-      ? '<div class="wc-empty">No definiste metas esta semana</div>'
-      : st.goals.map(g => `
-          <div class="wc-goal ${g.done ? 'done' : ''}">
-            <div class="wc-goal-top">
-              <span class="wc-goal-name">${g.done ? '✓ ' : ''}${escapeHtml(g.name)}</span>
-              <span class="wc-goal-pct">${g.detail || g.pct + '%'}</span>
-            </div>
-            <div class="wc-goal-bar"><div class="wc-goal-fill" style="width:${g.pct}%"></div></div>
-          </div>`).join('');
-
-    const statsHTML = `
-      <div class="wc-stats">
-        <div class="wc-stat"><span class="wc-stat-val">${st.ringAvg}%</span><span class="wc-stat-lbl">Promedio</span></div>
-        <div class="wc-stat"><span class="wc-stat-val">${st.habitsPct}%</span><span class="wc-stat-lbl">Hábitos</span></div>
-        <div class="wc-stat"><span class="wc-stat-val">${st.tasksDone}/${st.tasksTotal}</span><span class="wc-stat-lbl">Tareas</span></div>
-        <div class="wc-stat"><span class="wc-stat-val">${st.goalsDone}/${st.goals.length}</span><span class="wc-stat-lbl">Metas</span></div>
-      </div>`;
-
-    if (isCurrent) {
-      // Semana en curso: avances + solo el foco editable
-      const curFocus = currentWeekFocus();
-      UI.openModal({
-        title: '📊 Avances de la semana',
-        okText: 'Guardar foco',
-        cancelText: 'Cerrar',
-        bodyHTML: `
-          <div class="wc-period">${weekLabelFor(wk)} · en curso</div>
-          ${statsHTML}
-          <div class="wc-section-title">Tus metas semanales</div>
-          ${goalsHTML}
-          <label>🎯 Foco de la semana</label>
-          <textarea id="wc-focus-only" rows="2" placeholder="Ej: Proteger la primera hora del día">${escapeHtml(curFocus ? curFocus.text : '')}</textarea>
-        `,
-        onSave: () => {
-          const val = document.getElementById('wc-focus-only').value.trim();
-          const st2 = Storage.get();
-          st2.focus = val
-            ? { week: val, weekKey: UI.weekKey(), updatedAt: Date.now() }
-            : { week: '', weekKey: null, updatedAt: Date.now() };
-          Storage.save();
-          renderFocusCard();
-          UI.toast(val ? 'Foco actualizado' : 'Foco borrado');
-        }
-      });
-      return;
-    }
-
-    // Semana terminada: cierre completo
-    UI.openModal({
-      title: '📅 Cierre de semana',
-      okText: 'Guardar cierre',
-      bodyHTML: `
-        <div class="wc-period">${weekLabelFor(wk)}</div>
-        ${statsHTML}
-        <div class="wc-section-title">Tus metas semanales</div>
-        ${goalsHTML}
-        <label>¿Qué funcionó bien?</label>
-        <textarea id="wc-worked" rows="2">${escapeHtml(e.worked)}</textarea>
-        <label>¿Qué te frenó?</label>
-        <textarea id="wc-blocked" rows="2">${escapeHtml(e.blocked)}</textarea>
-        <label>Foco de la próxima semana</label>
-        <textarea id="wc-focus" rows="2">${escapeHtml(e.focus)}</textarea>
-      `,
-      onSave: () => {
-        const st2 = Storage.get();
-        st2.weekClosures[wk] = {
-          worked:  document.getElementById('wc-worked').value.trim(),
-          blocked: document.getElementById('wc-blocked').value.trim(),
-          focus:   document.getElementById('wc-focus').value.trim(),
-          savedAt: Date.now(),
-        };
-        if (st2.settings.pendingWeekClose === wk) st2.settings.pendingWeekClose = null;
-        Storage.save();
-        renderWeekClose();
-        UI.toast('Semana cerrada · buen inicio');
-      }
-    });
+    btn.textContent = '📊 Resumen de la semana';
   }
 
   // ====== CIERRE DEL DÍA ======
@@ -1021,7 +755,6 @@ const App = (() => {
         Storage.save();
         renderCloseDay();
         if (typeof Stats !== 'undefined') Stats.render();
-        if (saveKey === today) renderFocusCard();
         refreshKPIs();
         UI.toast(isClosingCurrent ? 'Día cerrado · buen descanso' : 'Cierre actualizado');
       }
@@ -1147,10 +880,10 @@ const App = (() => {
     const closeDay = document.getElementById('close-day-btn');
     if (closeDay) closeDay.addEventListener('click', () => openCloseDayModal());
 
-    const weekClose = document.getElementById('week-close-btn');
-    if (weekClose) weekClose.addEventListener('click', () => {
-      const wk = weekClose.dataset.week;
-      if (wk) openWeekCloseModal(wk);
+    const weekSummaryBtn = document.getElementById('week-summary-btn');
+    if (weekSummaryBtn) weekSummaryBtn.addEventListener('click', () => {
+      const wk = weekSummaryBtn.dataset.week;
+      if (wk) WeekSummary.open(wk);
     });
 
     // Ícono de Calendario del header de Hoy → abre el sheet de calendario
@@ -1308,5 +1041,5 @@ const App = (() => {
     });
   }
 
-  return { init, refreshKPIs, refreshAll, setFocusTab, renderFocusTab, weekRange, weekLabelFor, weekStats, openWeekCloseModal, openDayCloseModal: openCloseDayModal };
+  return { init, refreshKPIs, refreshAll, setFocusTab, renderFocusTab, weekRange, weekLabelFor, openDayCloseModal: openCloseDayModal };
 })();

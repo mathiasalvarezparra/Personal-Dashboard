@@ -58,10 +58,6 @@ const GoalRollover = (() => {
         totalArchived += result.archived;
         totalPropagated += result.propagated;
         totalCreated += result.created;
-        // Si terminó una semana sin cerrar, dejarla marcada para poder revisarla
-        if (horizon === 'week' && !(state.weekClosures || {})[lastKey]) {
-          state.settings.pendingWeekClose = lastKey;
-        }
       }
 
       // Actualizar tracker
