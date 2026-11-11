@@ -4341,9 +4341,8 @@ label {
 }
 .qe-more { margin-top: 4px; }
 
-/* ============== HÁBITOS: GRUPOS POR MOMENTO, SEMANALES Y ARCHIVO ============== */
-.hab-group + .hab-group,
-.hab-group + .hab-flex { margin-top: 6px; }
+/* ============== HÁBITOS: GRUPOS POR MOMENTO, MÍNIMO SEMANAL Y ARCHIVO ============== */
+.hab-group + .hab-group { margin-top: 6px; }
 .hab-group-head {
   display: flex;
   align-items: center;
@@ -4365,22 +4364,6 @@ label {
 .hab-group-check { margin-left: auto; color: var(--accent-green); font-size: 13px; }
 .hab-group.collapsed .hab-group-head { padding-bottom: 8px; border-bottom: 1px dashed var(--border-soft); }
 
-.hab-flex {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
-}
-.hab-flex-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 2px 2px 4px;
-}
-.hab-flex .hab-ov-item { opacity: 0.6; }
-
 .hab-week {
   display: flex;
   align-items: center;
@@ -4393,19 +4376,50 @@ label {
   color: var(--text-dim);
   white-space: nowrap;
 }
-.hab-week-txt.met { color: var(--accent-green); }
-.hab-week-bar {
-  flex: 1;
-  height: 3px;
-  background: var(--border);
-  border-radius: 100px;
+.hab-week-txt.met { color: var(--accent-green); font-weight: 700; }
+/* Semana en puntos (hábitos con mínimo semanal): L M M J V S D */
+.hab-dots { display: flex; gap: 4px; }
+.hab-dot {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  background: transparent;
 }
-.hab-week-fill {
-  height: 100%;
-  border-radius: 100px;
-  background: var(--text-dim);
-  transition: width var(--anim-dur) var(--anim-ease);
+.hab-dot.appears { border-color: var(--text-faint); }
+.hab-dot.off { opacity: 0.35; }
+.hab-dot.today { box-shadow: 0 0 0 1px var(--text-dim); }
+.hab-dot-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--accent-green);
+  transition: height var(--anim-dur) var(--anim-ease);
+}
+.hab-dot-letter {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.hab-dot.done .hab-dot-letter { color: #0a0e14; }
+.hab-week.celebrate .hab-dot.done { animation: hab-dot-pop 0.6s var(--anim-ease) both; }
+.hab-week.celebrate .hab-week-txt { animation: hab-dot-pop 0.6s var(--anim-ease) both; }
+@keyframes hab-dot-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hab-week.celebrate .hab-dot.done,
+  .hab-week.celebrate .hab-week-txt { animation: none; }
 }
 .hab-pace {
   margin-top: 4px;

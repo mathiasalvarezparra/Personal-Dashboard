@@ -8,10 +8,23 @@ const Habits = (() => {
   const MOMENTS = ['mañana', 'tarde', 'noche'];
   const MOMENT_LABELS = { 'mañana': 'Mañana', 'tarde': 'Tarde', 'noche': 'Noche', any: 'Cualquier momento' };
 
-  // ====== FRECUENCIA SEMANAL ('weekly': X veces por semana, semana lunes→domingo) ======
-  const isWeekly = h => !!(h.frequency && h.frequency.type === 'weekly');
-  const timesPerWeek = h => Math.min(7, Math.max(1, parseInt(h.frequency && h.frequency.timesPerWeek, 10) || 1));
-  const suggestedDays = h => (h.frequency && Array.isArray(h.frequency.suggestedDays)) ? h.frequency.suggestedDays : [];
+  // ====== FRECUENCIA: días en que aparece + mínimo semanal opcional para la racha ======
+  // frequency = { type: 'daily' } | { type: 'days', days: [0-6] }, ambos con weeklyMin opcional.
+  // El mínimo SOLO flexibiliza la racha (semanas con ≥ weeklyMin días cumplidos);
+  // el % del día y Enfoque siguen los días en que aparece.
+  const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
+  function appearDays(h) {
+    const f = h.frequency || { type: 'daily' };
+    if (f.type === 'days' && Array.isArray(f.days)) return ALL_DAYS.filter(d => f.days.includes(d));
+    return ALL_DAYS.slice();
+  }
+  // Mínimo semanal válido (1..días en que aparece) o null = racha diaria estricta
+  function weeklyMinOf(h) {
+    const n = parseInt(h.frequency && h.frequency.weeklyMin, 10);
+    if (!Number.isInteger(n) || n < 1) return null;
+    return Math.min(n, appearDays(h).length);
+  }
+  const hasWeeklyMin = h => weeklyMinOf(h) != null;
 
   // Lunes (12:00 para evitar saltos de horario) de la semana de `date`
   function mondayOf(date) {
@@ -30,26 +43,44 @@ const Habits = (() => {
       return UI.localDateKey(x);
     });
   }
-  // Sesiones de la semana = días de history dentro de esa semana
-  function weekSessions(h, date = new Date(), exceptKey = null) {
+
+  // Estado de la semana de `ref` para un hábito con mínimo semanal.
+  //  done      = días cumplidos de la semana (history)
+  //  min       = mínimo efectivo: se reduce en proporción a los días disponibles
+  //              (sin vacaciones, archivo ni días previos a la creación), ⌊⌋ y ≥ 1;
+  //              0 si no hay días disponibles (la semana no rompe ni suma)
+  //  remaining = días en que aparece que quedan (incluido hoy si aún no se cumple)
+  //  state     = 'met' | 'ok' | 'risk' (apenas alcanza) | 'unreachable' | 'none'
+  function weekMinInfo(h, ref = new Date()) {
+    const base = weeklyMinOf(h);
+    if (base == null) return null;
     const set = new Set(h.history || []);
-    return weekKeys(date).filter(k => k !== exceptKey && set.has(k)).length;
-  }
-  // Ritmo de la semana en curso. Un día cuenta una sola sesión, así que hoy
-  // solo es "disponible" si todavía no es sesión.
-  function weekPace(h, now = new Date()) {
-    const target = timesPerWeek(h);
-    const set = new Set(h.history || []);
-    const keys = weekKeys(now);
-    const todayKey = UI.localDateKey(now);
-    const sessions = keys.filter(k => set.has(k)).length;
-    const missing = Math.max(0, target - sessions);
-    const available = keys.filter(k => k > todayKey || (k === todayKey && !set.has(k))).length;
+    const todayKey = UI.todayKey();
+    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
+    const show = appearDays(h);
+    let scheduled = 0, available = 0, done = 0, remaining = 0;
+    const days = weekKeys(ref).map(k => {
+      const dow = new Date(k + 'T12:00:00').getDay();
+      const appears = show.includes(dow);
+      const isDone = set.has(k);
+      const blocked = appears && !isDone && (
+        (typeof Vacation !== 'undefined' && Vacation.isDateInVacation(k)) ||
+        archivedOn(h, k) || (bornKey && k < bornKey));
+      if (appears) scheduled++;
+      if (appears && !blocked) available++;
+      if (isDone) done++;
+      if (appears && !blocked && !isDone && k >= todayKey) remaining++;
+      return { key: k, dow, appears, done: isDone, blocked };
+    });
+    const min = available === 0 ? 0
+      : (available >= scheduled ? base : Math.max(1, Math.floor(base * available / scheduled)));
+    const missing = Math.max(0, min - done);
     let state = 'ok';
-    if (sessions >= target) state = 'met';
-    else if (missing > available) state = 'unreachable';
-    else if (missing >= available) state = 'alert';
-    return { target, sessions, missing, available, state };
+    if (min === 0) state = 'none';
+    else if (done >= min) state = 'met';
+    else if (missing > remaining) state = 'unreachable';
+    else if (missing === remaining) state = 'risk';
+    return { base, min, done, missing, remaining, state, days };
   }
 
   // ====== ARCHIVO ======
@@ -64,15 +95,10 @@ const Habits = (() => {
   function activeHabits() { return Storage.get().habits.filter(h => !h.archived); }
 
   // ¿Cuenta este hábito en el % del día `date`? (KPIs, resumen del día, semana)
-  // daily/days: igual que isHabitForDate. weekly: si ese día es sugerido y la
-  // semana aún no estaba cumplida, o si ese día se registró algo.
+  // Siempre según los días en que aparece; el mínimo semanal no lo flexibiliza.
   function countsForDate(h, date) {
     if (h.archived) return false;
-    if (!isWeekly(h)) return isHabitForDate(h, date);
-    const dk = UI.localDateKey(date);
-    if (archivedOn(h, dk)) return false;
-    if (getDailyProgress(h, dk) > 0) return true;
-    return suggestedDays(h).includes(date.getDay()) && weekSessions(h, date, dk) < timesPerWeek(h);
+    return isHabitForDate(h, date);
   }
 
   // Mover un hábito dentro de su grupo de timeOfDay (entre hábitos activos)
@@ -108,7 +134,7 @@ const Habits = (() => {
     return countsForDate(h, new Date());
   }
 
-  // ¿Se puede registrar el hábito ese día? Semanales: cualquier día.
+  // ¿Aparece / se puede registrar el hábito ese día? (días elegidos, sin días archivados)
   function isHabitForDate(h, date) {
     if (h.archived || h.archivedRanges) {
       const dk = UI.localDateKey(date);
@@ -154,6 +180,7 @@ const Habits = (() => {
     if (!isHabitForDate(h, dateObj)) { UI.toast('Este hábito no aplica este día'); return; }
 
     const target = getDailyTarget(h);
+    const minBefore = weekMinInfo(h);
 
     h.dailyProgress = h.dailyProgress || {};
     h.dailyProgress[dateKey] = (h.dailyProgress[dateKey] || 0) + amount;
@@ -170,7 +197,7 @@ const Habits = (() => {
       h._completedAt = h._completedAt || {};
       h._completedAt[dateKey] = Date.now();
       UI.buzz(20);
-      UI.toast(`✓ ${h.name} completado`);
+      if (!celebrateIfMinReached(h, dateKey, minBefore)) UI.toast(`✓ ${h.name} completado`);
     }
 
     // Si tiene meta vinculada, también suma a la meta (propagando a padres)
@@ -225,22 +252,22 @@ const Habits = (() => {
     Goals.renderAll(); Goals.renderWeeklyMini();
   }
 
-  // Semanales: veredicto de una semana para la racha.
+  // Con mínimo semanal: veredicto de una semana para la racha.
   //  'met'  → cumplida (suma) · 'miss' → no cumplida (rompe) · 'skip' → ni suma ni rompe
-  // No rompen ni suman: semanas con algún día de vacaciones o archivado (sin registro),
-  // la semana en curso mientras siga alcanzable y la semana de creación incompleta.
+  // No rompen ni suman: semanas sin días disponibles (vacaciones/archivo), la semana
+  // en curso mientras el mínimo siga alcanzable y la semana de creación incompleta.
   function weekVerdict(h, monday, isCurrent) {
+    const info = weekMinInfo(h, monday);
+    if (info.state === 'none') return 'skip';
+    if (info.state === 'met') return 'met';
+    if (isCurrent && info.state !== 'unreachable') return 'skip';
     const keys = weekKeys(monday);
-    const set = new Set(h.history || []);
-    if (keys.some(k => Vacation.isDateInVacation(k) || (archivedOn(h, k) && !set.has(k)))) return 'skip';
-    if (keys.filter(k => set.has(k)).length >= timesPerWeek(h)) return 'met';
-    if (isCurrent && weekPace(h).state !== 'unreachable') return 'skip';
     const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
     if (bornKey && keys[0] < bornKey && keys[6] >= bornKey) return 'skip';
     return 'miss';
   }
 
-  // Racha semanal: semanas consecutivas cumplidas (se muestra como "N semanas")
+  // Racha en semanas consecutivas con el mínimo cumplido (se muestra como "N semanas")
   function weeklyStreak(h) {
     if (!h.history || h.history.length === 0) return 0;
     const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
@@ -273,14 +300,14 @@ const Habits = (() => {
     return best;
   }
 
-  // Texto de racha: "5🔥" (días) o "2 semanas🔥" (semanales)
+  // Texto de racha: "5🔥" (días) o "2 semanas🔥" (con mínimo semanal)
   function streakLabel(h, streak) {
-    if (!isWeekly(h)) return `${streak}🔥`;
+    if (!hasWeeklyMin(h)) return `${streak}🔥`;
     return `${streak} ${streak === 1 ? 'semana' : 'semanas'}🔥`;
   }
 
   function calcStreak(h) {
-    if (isWeekly(h)) return weeklyStreak(h);
+    if (hasWeeklyMin(h)) return weeklyStreak(h);
     if (!h.history || h.history.length === 0) return 0;
     const set = new Set(h.history);
     let streak = 0;
@@ -317,10 +344,10 @@ const Habits = (() => {
     return streak;
   }
 
-  // Racha máxima en días entre hábitos activos (los semanales se miden en semanas: no entran)
+  // Racha máxima en días entre hábitos activos (los de mínimo semanal se miden en semanas: no entran)
   function maxStreakAcrossAll() {
     let max = 0;
-    activeHabits().filter(h => !isWeekly(h)).forEach(h => { const s = calcStreak(h); if (s > max) max = s; });
+    activeHabits().filter(h => !hasWeeklyMin(h)).forEach(h => { const s = calcStreak(h); if (s > max) max = s; });
     return max;
   }
 
@@ -451,9 +478,11 @@ const Habits = (() => {
       `,
       onSave: () => {
         const note = document.getElementById('note-input').value.trim();
+        const minBefore = weekMinInfo(habit);
         if (!habit.history.includes(dateKey)) {
           habit.history.push(dateKey);
         }
+        celebrateIfMinReached(habit, dateKey, minBefore);
         // Marca de tiempo de completado (para ordenar al final en Hoy)
         habit._completedAt = habit._completedAt || {};
         habit._completedAt[dateKey] = Date.now();
@@ -599,9 +628,11 @@ const Habits = (() => {
         const note = document.getElementById('qty-note').value.trim();
 
         // Marcar el hábito como cumplido (si no estaba ya)
+        const minBefore = weekMinInfo(habit);
         if (!habit.history.includes(dateKey)) {
           habit.history.push(dateKey);
         }
+        const celebrated = celebrateIfMinReached(habit, dateKey, minBefore);
         habit._completedAt = habit._completedAt || {};
         habit._completedAt[dateKey] = Date.now();
         habit.contributions = habit.contributions || {};
@@ -627,7 +658,7 @@ const Habits = (() => {
         renderOverview(); renderFull(); renderHeatmap(); App.refreshKPIs();
         Goals.renderAll(); Goals.renderWeeklyMini();
 
-        if (amount > 0) {
+        if (amount > 0 && !celebrated) {
           UI.toast(`+${amount} ${goal.unit || ''} a "${goal.name}"`);
         }
       }
@@ -758,7 +789,6 @@ const Habits = (() => {
   function complianceLast30(h) { return complianceWindow(h, 30); }
 
   function complianceWindow(h, nDays) {
-    if (isWeekly(h)) return weeklyComplianceWindow(h, nDays);
     let total = 0, sum = 0, full = 0;
     const base = new Date();
     // No contar días anteriores a la creación del hábito (falsearían el %)
@@ -776,27 +806,6 @@ const Habits = (() => {
       if (p >= 100) full++;
     }
     return { pct: total === 0 ? 0 : Math.round(sum / total), full, total };
-  }
-
-  // Semanales: sesiones realizadas / sesiones esperadas en el período
-  // (timesPerWeek × días válidos / 7). Sin vacaciones, archivo ni días previos a la creación.
-  function weeklyComplianceWindow(h, nDays) {
-    const set = new Set(h.history || []);
-    const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
-    let days = 0, done = 0;
-    const base = new Date();
-    for (let i = 0; i < nDays; i++) {
-      const d = new Date(base);
-      d.setDate(d.getDate() - i);
-      const dk = UI.localDateKey(d);
-      if (bornKey && dk < bornKey) continue;
-      if (typeof Vacation !== 'undefined' && Vacation.isDateInVacation && Vacation.isDateInVacation(dk)) continue;
-      if (archivedOn(h, dk) && !set.has(dk)) continue;
-      days++;
-      if (set.has(dk)) done++;
-    }
-    const expected = timesPerWeek(h) * days / 7;
-    return { pct: expected > 0 ? Math.min(100, Math.round((done / expected) * 100)) : 0, full: done, total: Math.round(expected) };
   }
 
   // Lista de hábitos de la pestaña "Hábitos" de Enfoque.
@@ -848,15 +857,17 @@ const Habits = (() => {
   // Grupos ya completos que el usuario expandió a mano (se colapsan solos al completarse)
   const expandedGroups = new Set();
 
-  // ¿Un hábito de Hoy se considera hecho? Semanales: hecho hoy o semana ya cumplida.
-  function isDoneForToday(h) {
-    if (isCompletedToday(h)) return true;
-    return isWeekly(h) && weekPace(h).state === 'met';
-  }
+  // ¿Un hábito de Hoy se considera hecho? Solo si se cumplió hoy (también con mínimo semanal).
+  function isDoneForToday(h) { return isCompletedToday(h); }
+
+  // Hábito que acaba de asegurar su mínimo semanal (animación breve en sus puntos).
+  // Se limpia solo a los 2 s (varios repintados seguidos mantienen la clase) y
+  // entonces su grupo, si quedó completo, se colapsa como siempre.
+  let celebrateId = null;
+  let celebrateTimer = 0;
 
   // Lista de hábitos del panel "Hoy", agrupada por momento del día.
-  // Semanales: prioritarios si hoy es día sugerido, si están en alerta de ritmo o si
-  // ya se registró algo hoy; si no, van a "Flexibles esta semana" (salvo semana cumplida).
+  // Solo los que aparecen hoy (días elegidos), con o sin mínimo semanal.
   function renderTodayHabits() {
     const c = document.getElementById('today-habits-list');
     if (!isLive(c)) return;
@@ -869,35 +880,22 @@ const Habits = (() => {
 
     const now = new Date();
     const todayKey = UI.todayKey();
-    const dow = now.getDay();
-    const priority = [], flexible = [];
-    state.habits.forEach(h => {
-      if (h.archived) return;
-      if (!isWeekly(h)) {
-        if (isHabitForDate(h, now)) priority.push(h);
-        return;
-      }
-      const pace = weekPace(h, now);
-      const registeredToday = getDailyProgress(h, todayKey) > 0;
-      const suggested = suggestedDays(h).includes(dow);
-      if (registeredToday || pace.state === 'alert' || (suggested && pace.state !== 'met')) priority.push(h);
-      else if (suggested) priority.push(h);            // día sugerido con la semana ya cumplida: se ve como hecho
-      else if (pace.state !== 'met') flexible.push(h);  // otro día: bloque discreto para adelantar o recuperar
-    });
+    const list = state.habits.filter(h => countsForDate(h, now));
 
-    if (priority.length + flexible.length === 0) {
+    if (list.length === 0) {
       c.innerHTML = '<div class="empty">No hay hábitos para hoy · disfruta 🌿</div>';
       return;
     }
 
     const byCompletion = (a, b) => ((a._completedAt && a._completedAt[todayKey]) || 0) - ((b._completedAt && b._completedAt[todayKey]) || 0);
-    const groupsHTML = momentOrder(now).map(m => {
-      const items = priority.filter(h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any') === m);
+    c.innerHTML = momentOrder(now).map(m => {
+      const items = list.filter(h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any') === m);
       if (!items.length) return '';
       const pending = items.filter(h => !isDoneForToday(h));   // respeta el orden manual (moveHabit)
       const done = items.filter(isDoneForToday).sort(byCompletion);
       const allDone = pending.length === 0;
-      const collapsed = allDone && !expandedGroups.has(m);
+      // Mientras celebra el mínimo semanal, el grupo sigue abierto para ver la animación
+      const collapsed = allDone && !expandedGroups.has(m) && !items.some(h => h.id === celebrateId);
       return `
         <div class="hab-group ${allDone ? 'complete' : ''} ${collapsed ? 'collapsed' : ''}">
           <button type="button" class="hab-group-head" data-group-toggle="${m}" ${allDone ? '' : 'disabled'} aria-expanded="${!collapsed}">
@@ -908,14 +906,6 @@ const Habits = (() => {
           ${collapsed ? '' : `<div class="hab-group-body">${[...pending, ...done].map(h => renderOverviewItem(h, true)).join('')}</div>`}
         </div>`;
     }).join('');
-
-    const flexHTML = flexible.length ? `
-      <div class="hab-flex">
-        <div class="hab-flex-title">Flexibles esta semana</div>
-        ${flexible.map(h => renderOverviewItem(h, true)).join('')}
-      </div>` : '';
-
-    c.innerHTML = (priority.length ? groupsHTML : '<div class="empty">No hay hábitos para hoy · disfruta 🌿</div>') + flexHTML;
     bindOverviewClicks(c);
     c.querySelectorAll('[data-group-toggle]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -926,9 +916,44 @@ const Habits = (() => {
     });
   }
 
+  // Semana en puntos (L M M J V S D) para hábitos con mínimo semanal:
+  // cumplidos rellenos (animados), días en que aparece con borde, el resto apagados.
+  const DOT_LETTERS = { 1: 'L', 2: 'M', 3: 'M', 4: 'J', 5: 'V', 6: 'S', 0: 'D' };
+  function weekDotsHTML(h) {
+    const info = weekMinInfo(h);
+    if (!info) return '';
+    const todayKey = UI.todayKey();
+    const dots = info.days.map(d => `
+          <span class="hab-dot ${d.done ? 'done' : ''} ${d.appears ? 'appears' : 'off'} ${d.key === todayKey ? 'today' : ''}" title="${DAY_NAMES[d.dow]}">
+            <span class="hab-dot-fill" style="height:${d.done ? 100 : 0}%"></span>
+            <span class="hab-dot-letter">${DOT_LETTERS[d.dow]}</span>
+          </span>`).join('');
+    let status = '';
+    if (info.state === 'risk') status = `<div class="hab-pace alert">Racha en riesgo: te faltan ${info.missing}</div>`;
+    else if (info.state === 'unreachable') status = '<div class="hab-pace">Esta semana no alcanza el mínimo</div>';
+    return `
+          <div class="hab-week ${celebrateId === h.id ? 'celebrate' : ''}">
+            <div class="hab-dots">${dots}</div>
+            ${info.min > 0 ? `<span class="hab-week-txt ${info.state === 'met' ? 'met' : ''}">${Math.min(info.done, 99)}/${info.min} mín.</span>` : ''}
+          </div>
+          ${status}`;
+  }
+
+  // Si el registro de `dk` asegura el mínimo de la semana en curso: toast + animación
+  function celebrateIfMinReached(h, dk, before) {
+    if (!before || before.state === 'met') return false;
+    if (weekKeys(new Date())[0] !== weekKeys(new Date(dk + 'T12:00:00'))[0]) return false;
+    const after = weekMinInfo(h);
+    if (!after || after.state !== 'met') return false;
+    celebrateId = h.id;
+    clearTimeout(celebrateTimer);
+    celebrateTimer = setTimeout(() => { celebrateId = null; renderTodayHabits(); }, 2000);
+    UI.toast('Racha asegurada esta semana 💪');
+    return true;
+  }
+
   function renderOverviewItem(h, clean = false) {
-    const weekly  = isWeekly(h);
-    const today   = weekly ? true : isHabitForDate(h, new Date());
+    const today   = isHabitForDate(h, new Date());
     const done    = isCompletedToday(h);
     const target  = getDailyTarget(h);
     const unit    = getUnit(h);
@@ -951,25 +976,6 @@ const Habits = (() => {
       ].filter(Boolean).join(' · ');
     }
 
-    // Semanales: avance de la semana con mini barra y alerta de ritmo
-    let weekHTML = '';
-    if (weekly) {
-      const pace = weekPace(h);
-      const wPct = Math.min(100, Math.round((pace.sessions / pace.target) * 100));
-      let paceHTML = '';
-      if (pace.state === 'alert') {
-        paceHTML = `<div class="hab-pace alert">Te faltan ${pace.missing}, quedan ${pace.available} ${pace.available === 1 ? 'día' : 'días'}</div>`;
-      } else if (pace.state === 'unreachable') {
-        paceHTML = '<div class="hab-pace">Meta semanal no alcanzable esta semana</div>';
-      }
-      weekHTML = `
-          <div class="hab-week">
-            <span class="hab-week-txt ${pace.state === 'met' ? 'met' : ''}">${pace.sessions}/${pace.target} esta semana</span>
-            <div class="hab-week-bar"><div class="hab-week-fill" style="width:${wPct}%"></div></div>
-          </div>
-          ${paceHTML}`;
-    }
-
     return `
       <div class="hab-ov-item ${done ? 'done' : ''} ${today ? '' : 'off-day'}" data-id="${h.id}">
         <button class="hab-ov-icon" data-action="quant-modal" aria-label="Registrar cantidad exacta">${h.icon || '⭐'}</button>
@@ -977,7 +983,7 @@ const Habits = (() => {
           <div class="hab-ov-name">${escapeHtml(h.name)}${done ? ' <span class="hab-ov-check">✓</span>' : ''}</div>
           <div class="hab-ov-meta">${meta}</div>
           <div class="hab-ov-bar"><div class="hab-ov-bar-fill" style="width:${dayPct}%;background:${color}"></div></div>
-          ${weekHTML}
+          ${weekDotsHTML(h)}
         </div>
         <div class="hab-ov-actions">
           <button class="hab-ov-btn" data-action="minus" data-step="${step}" ${cur > 0 ? '' : 'disabled'} aria-label="Restar ${step}">−${step}</button>
@@ -1041,15 +1047,17 @@ const Habits = (() => {
       </div>`;
   }
 
+  // "Diario" / "Lun Mié Vie"; con mínimo semanal: "Todos los días · mín. 5/sem", "L M M J V · mín. 3/sem"
   function formatFreq(f) {
-    if (!f || f.type === 'daily') return 'Diario';
-    if (f.type === 'days') return f.days.map(d => DAY_NAMES[d]).join(' ');
-    if (f.type === 'weekly') {
-      const n = Math.min(7, Math.max(1, parseInt(f.timesPerWeek, 10) || 1));
-      const sug = Array.isArray(f.suggestedDays) ? [1, 2, 3, 4, 5, 6, 0].filter(d => f.suggestedDays.includes(d)) : [];
-      return `${n}× por semana${sug.length ? ' · ' + sug.map(d => DAY_NAMES[d]).join(' ') : ''}`;
+    const min = parseInt(f && f.weeklyMin, 10);
+    if (!f || f.type !== 'days' || !Array.isArray(f.days)) {
+      return min >= 1 ? `Todos los días · mín. ${Math.min(min, 7)}/sem` : 'Diario';
     }
-    return 'Diario';
+    if (min >= 1) {
+      const days = ALL_DAYS.filter(d => f.days.includes(d));
+      return `${days.map(d => DOT_LETTERS[d]).join(' ')} · mín. ${Math.min(min, days.length)}/sem`;
+    }
+    return f.days.map(d => DAY_NAMES[d]).join(' ');
   }
 
   function bindClicks(c) {
@@ -1165,16 +1173,10 @@ const Habits = (() => {
     const tods = [['', 'Cualquier momento'], ['mañana','◐ Mañana'],['tarde','◑ Tarde'],['noche','◓ Noche']];
     const curTod = editing && MOMENTS.includes(editing.timeOfDay) ? editing.timeOfDay : '';
     const todOpts = tods.map(([v,l]) => `<option value="${v}" ${curTod === v ? 'selected' : ''}>${l}</option>`).join('');
-    const freqOpts = [['daily','Todos los días'],['days','Días específicos'],['weekly','Veces por semana']]
+    const freqOpts = [['daily','Todos los días'],['days','Días específicos']]
       .map(([v,l]) => `<option value="${v}" ${editing && editing.frequency?.type === v ? 'selected' : ''}>${l}</option>`).join('');
     const showDays = editing && editing.frequency?.type === 'days' ? 'block' : 'none';
-    const editingWeekly = !!(editing && editing.frequency?.type === 'weekly');
-    const showWeekly = editingWeekly ? 'block' : 'none';
-    const timesVal = editingWeekly ? timesPerWeek(editing) : 3;
-    const sugPicker = [1,2,3,4,5,6,0].map(d => {
-      const checked = editingWeekly && suggestedDays(editing).includes(d) ? 'checked' : '';
-      return `<label><input type="checkbox" name="sday" value="${d}" ${checked} /><span class="day-pill">${DAY_NAMES[d]}</span></label>`;
-    }).join('');
+    const minVal = editing ? (weeklyMinOf(editing) || '') : '';
 
     // Metas activas para vincular (no archivadas, no cumplidas)
     const linkableGoals = state.goals.filter(g => !g.done && !g.archived);
@@ -1209,14 +1211,10 @@ const Habits = (() => {
           <label>Días</label>
           <div class="day-picker">${dayPicker}</div>
         </div>
-        <div id="h-weekly-wrap" style="display:${showWeekly}">
-          <label for="h-times">Veces por semana</label>
-          <input type="number" id="h-times" inputmode="numeric" min="1" max="7" step="1" value="${timesVal}" />
-          <label>Días sugeridos <span style="text-transform:none;color:var(--text-faint)">(opcional)</span></label>
-          <div class="day-picker">${sugPicker}</div>
-          <p style="color:var(--text-dim);font-size:11px;margin-top:6px">Días ideales; puedes cumplir otros días.</p>
-          <p class="qe-error" id="h-weekly-error" hidden></p>
-        </div>
+        <label for="h-min">Mínimo semanal para la racha <span style="text-transform:none;color:var(--text-faint)">(opcional)</span></label>
+        <input type="number" id="h-min" inputmode="numeric" min="1" max="7" step="1" placeholder="Sin mínimo (racha diaria)" value="${minVal}" />
+        <p style="color:var(--text-dim);font-size:11px;margin-top:6px">Si cumples al menos este número de días en la semana, tu racha no se pierde</p>
+        <p class="qe-error" id="h-min-error" hidden></p>
 
         <label for="h-tod">Momento del día</label>
         <select id="h-tod">${todOpts}</select>
@@ -1262,19 +1260,22 @@ const Habits = (() => {
           if (days.length === 0) { UI.toast('Selecciona al menos un día'); return false; }
           frequency = { type: 'days', days };
         }
-        if (freqType === 'weekly') {
-          const errEl = document.getElementById('h-weekly-error');
-          const timesRaw = document.getElementById('h-times').value.trim();
-          const times = Number(timesRaw);
-          const sug = [...document.querySelectorAll('input[name=sday]:checked')].map(i => +i.value);
-          let err = '';
-          if (!Number.isInteger(times) || times < 1 || times > 7) err = 'Las veces por semana deben ser entre 1 y 7';
-          else if (sug.length > 0 && sug.length < times) err = `Elige al menos ${times} días sugeridos (o ninguno)`;
-          errEl.textContent = err;
-          errEl.hidden = !err;
-          if (err) return false;
-          frequency = { type: 'weekly', timesPerWeek: times, suggestedDays: sug };
+        // Mínimo semanal opcional (solo flexibiliza la racha): entre 1 y los días elegidos
+        const minEl = document.getElementById('h-min');
+        const minErr = document.getElementById('h-min-error');
+        const minRaw = minEl.value.trim();
+        const maxMin = frequency.type === 'days' ? frequency.days.length : 7;
+        if (minRaw) {
+          const n = Number(minRaw);
+          if (!Number.isInteger(n) || n < 1 || n > maxMin) {
+            minErr.textContent = `El mínimo debe estar entre 1 y ${maxMin}`;
+            minErr.hidden = false;
+            minEl.focus();
+            return false;
+          }
+          frequency.weeklyMin = n;
         }
+        minErr.hidden = true;
         if (editing) {
           editing.name = name;
           editing.icon = icon;
@@ -1305,10 +1306,12 @@ const Habits = (() => {
       const sel = document.getElementById('h-freq');
       sel.addEventListener('change', () => {
         document.getElementById('h-days-wrap').style.display = sel.value === 'days' ? 'block' : 'none';
-        document.getElementById('h-weekly-wrap').style.display = sel.value === 'weekly' ? 'block' : 'none';
       });
 
       // Mostrar/ocultar campo de cantidad según meta seleccionada
+      const minInp = document.getElementById('h-min');
+      minInp.addEventListener('input', () => { document.getElementById('h-min-error').hidden = true; });
+
       const goalSel = document.getElementById('h-goal');
       goalSel.addEventListener('change', () => {
         const gid = goalSel.value;
@@ -1370,11 +1373,11 @@ const Habits = (() => {
       }
       return total === 0 ? 0 : Math.round((done / total) * 100);
     };
-    const weekly = isWeekly(h);
-    // Semanales: sesiones realizadas / esperadas (proporcional a las semanas)
-    const pct7 = weekly ? complianceWindow(h, 7).pct : pct(7);
-    const pct30 = weekly ? complianceWindow(h, 30).pct : pct(30);
-    const pct90 = weekly ? complianceWindow(h, 90).pct : pct(90);
+    // Cumplimiento sobre los días en que aparece (independiente del mínimo semanal)
+    const weekly = hasWeeklyMin(h);
+    const pct7 = pct(7);
+    const pct30 = pct(30);
+    const pct90 = pct(90);
 
     // Total cumplido
     const totalDone = history.length;
@@ -1635,7 +1638,7 @@ const Habits = (() => {
   }
 
   function calcBestStreak(h) {
-    if (isWeekly(h)) return weeklyBestStreak(h);
+    if (hasWeeklyMin(h)) return weeklyBestStreak(h);
     if (!h.history || h.history.length === 0) return 0;
     const set = new Set(h.history);
     const sortedDates = [...set].sort();
@@ -1699,9 +1702,7 @@ const Habits = (() => {
       const applicableDays = days.filter(dk => isHabitForDate(h, new Date(dk + 'T12:00:00')));
       const completed = applicableDays.filter(dk => set.has(dk)).length;
       const totalApplicable = applicableDays.length;
-      const weekly = isWeekly(h);
-      // Semanales: % = sesiones realizadas / esperadas en los 30 días
-      const pct = weekly ? complianceWindow(h, 30).pct : (totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0);
+      const pct = totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0;
       const streak = calcStreak(h);
       return `
         <div class="heatmap-block">
@@ -1712,9 +1713,7 @@ const Habits = (() => {
           </div>
           <div class="heatmap-cells">${cells}</div>
           <div class="heatmap-stats">
-            ${weekly
-              ? `<span><strong>${completed}</strong> sesiones · meta ${timesPerWeek(h)}× por semana</span>`
-              : `<span><strong>${completed}</strong>/${totalApplicable} días aplicables</span>`}
+            <span><strong>${completed}</strong>/${totalApplicable} días aplicables</span>
             <span><strong>${pct}%</strong> cumplimiento</span>
           </div>
         </div>`;
@@ -1729,5 +1728,5 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { findGoalForDate, countsForDate, isWeekly, weekPace, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { findGoalForDate, countsForDate, hasWeeklyMin, weeklyMinOf, weekMinInfo, formatFreq, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();
