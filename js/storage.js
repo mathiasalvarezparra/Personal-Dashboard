@@ -146,5 +146,5 @@ const Storage = (() => {
   function replace(next) { state = next; save(); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
-  return { get: () => state, save, exportJSON, importJSON, reset, replace, uid };
+  return { KEY, get: () => state, save, exportJSON, importJSON, reset, replace, uid };
 })();

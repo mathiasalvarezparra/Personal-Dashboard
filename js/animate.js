@@ -13,7 +13,7 @@ const Animate = (() => {
   const CELL_STAGGER = 12;
   const CELL_MAX_DELAY = 480;
 
-  const BAR_W = '.subtask-fill, .fin-bar-fill, .hab-ov-bar-fill, .goal-bar-fill, .qty-bar-fill, .sg-fill, .wb-fill, .archive-goal-bar-fill, .dc-fill';
+  const BAR_W = '.subtask-fill, .fin-bar-fill, .hab-ov-bar-fill, .goal-bar-fill, .qty-bar-fill, .sg-fill, .wb-fill, .archive-goal-bar-fill, .dc-fill, .storage-bar-fill';
   const BAR_H = '.trend-bar, .sh-win-fill, .hab-dot-fill';
   const RING = '.week-day-ring .ring-bar, .ws-ring-bar, .cal-ring-bar';
   const NUM = '.trend-summary-val, .trend-val, .sg-val, .sh-win-val, .sh-streak-val, .wb-val, .cd-stat-val, .ws-score-num, .ws-fin-num, .ws-wb-val, .ms-val, .donut-total, .stat-value, .fin-prog-pct';

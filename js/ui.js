@@ -34,6 +34,9 @@ const UI = (() => {
     });
     const target = opts.restore ? (scrollPos[view] || 0) : 0;
     window.scrollTo({ top: 0, behavior: 'instant' });
+    if (view === 'settings' && typeof App !== 'undefined' && App.renderStorageUsage) {
+      App.renderStorageUsage();
+    }
     if (view === 'finance-settings' && typeof Finance !== 'undefined' && Finance.render) {
       Finance.render();
     }

@@ -605,6 +605,28 @@ const App = (() => {
     g.textContent = name ? `${saludo}, ${name}` : saludo;
   }
 
+  // ====== PESO DE LOS DATOS (Configuración) ======
+  // Tamaño en bytes del JSON guardado en localStorage frente al límite típico de 5 MB.
+  const STORAGE_LIMIT = 5 * 1024 * 1024;
+  function formatBytes(b) {
+    if (b > 1024 * 1024) return (b / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB';
+    return Math.max(1, Math.round(b / 1024)) + ' KB';
+  }
+  function renderStorageUsage() {
+    const c = document.getElementById('storage-usage');
+    if (!isLive(c)) return;
+    let raw = '';
+    try { raw = localStorage.getItem(Storage.KEY) || ''; } catch (e) { raw = ''; }
+    const bytes = new TextEncoder().encode(raw).length;
+    // Mínimo visual de 1% para que la barra se vea aunque el peso sea pequeño
+    const pct = Math.max(1, Math.min(100, (bytes / STORAGE_LIMIT) * 100));
+    c.innerHTML = `
+      <div class="storage-usage-top">
+        <span class="storage-usage-label">Datos guardados: <strong>${formatBytes(bytes)}</strong> de 5 MB</span>
+      </div>
+      <div class="storage-bar"><div class="storage-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>`;
+  }
+
   function progressColor(pct) {
     if (pct >= 100) return 'var(--accent-green)';
     if (pct >= 50) return 'var(--accent-yellow)';
@@ -1094,5 +1116,5 @@ const App = (() => {
     });
   }
 
-  return { init, refreshKPIs, refreshAll, setFocusTab, renderFocusTab, weekRange, weekLabelFor, openDayCloseModal: openCloseDayModal };
+  return { init, renderStorageUsage, refreshKPIs, refreshAll, setFocusTab, renderFocusTab, weekRange, weekLabelFor, openDayCloseModal: openCloseDayModal };
 })();
