@@ -80,7 +80,7 @@ const Onboarding = (() => {
   function openFromSettings() {
     UI.openModal({
       title: '📦 Plantillas',
-      okText: 'Cerrar',
+      single: true, // elegir una plantilla abre su propia confirmación
       bodyHTML: `
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px">Selecciona una plantilla para agregar hábitos y metas. Se suman a lo que ya tienes (no se reemplaza nada).</p>
         <div id="settings-templates"></div>

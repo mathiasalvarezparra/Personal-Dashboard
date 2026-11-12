@@ -5,8 +5,17 @@ const UI = (() => {
   // Historial de navegación: rastrear de qué vista venimos para botones "volver"
   let currentView = 'today';
   const navHistory = [];
+  // Posición de scroll de cada vista (solo en memoria), para volver al mismo lugar
+  const scrollPos = {};
 
-  function go(view) {
+  function saveScroll() {
+    if (currentView) scrollPos[currentView] = window.scrollY;
+  }
+
+  // Navegar a una vista. Hacia adelante empieza arriba; con { restore: true }
+  // (goBack y barra inferior) vuelve a la posición guardada de esa vista.
+  function go(view, opts = {}) {
+    if (!opts.skipSave) saveScroll();
     // Al navegar, cerrar cualquier sheet a pantalla completa abierto
     document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; });
     // Guardar la vista anterior en el historial (excepto si es la misma)
@@ -23,6 +32,7 @@ const UI = (() => {
     document.querySelectorAll('.nav-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.go === view);
     });
+    const target = opts.restore ? (scrollPos[view] || 0) : 0;
     window.scrollTo({ top: 0, behavior: 'instant' });
     if (view === 'finance-settings' && typeof Finance !== 'undefined' && Finance.render) {
       Finance.render();
@@ -46,15 +56,24 @@ const UI = (() => {
       App.renderFocusTab();
     }
     if (typeof Animate !== 'undefined') Animate.enter(t);
+    // Restaurar tras el render (sin animación de scroll); se repite tras dos
+    // frames por si el alto final de la vista se termina de calcular después.
+    if (target > 0) {
+      window.scrollTo({ top: target, behavior: 'instant' });
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (currentView === view) window.scrollTo({ top: target, behavior: 'instant' });
+      }));
+    }
   }
 
   // Vuelve a la vista anterior. Si no hay historial, va a 'today'.
   function goBack(fallback = 'today') {
     const prev = navHistory.pop();
     const target = prev || fallback;
+    saveScroll();
     // Evitar registrar este goBack como nueva entrada en el historial
     currentView = null;
-    go(target);
+    go(target, { restore: true, skipSave: true });
   }
 
   let toastTO;
@@ -67,16 +86,25 @@ const UI = (() => {
   }
 
   let modalSave = null;
-  function openModal({ title, bodyHTML, onSave, okText = 'Guardar', cancelText = 'Cancelar' }) {
+  // Tres tipos de modal (mismos botones: alto, padding, tipografía y radio):
+  //  · Formulario (por defecto): "Cancelar" (secundario) + acción (primario), 50/50.
+  //  · Confirmación (confirm2): "Cancelar" + acción (primario o peligro si danger).
+  //  · Solo lectura (single: true): un solo botón "Cerrar" de ancho completo.
+  function openModal({ title, bodyHTML, onSave, okText = 'Guardar', cancelText = 'Cancelar', single = false, danger = false }) {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-body').innerHTML = bodyHTML;
     const okBtn = document.getElementById('modal-ok');
-    okBtn.textContent = okText;
+    const cancelBtn = document.getElementById('modal-cancel');
+    okBtn.textContent = single ? 'Cerrar' : okText;
     okBtn.style.background = '';
     okBtn.style.color = '';
-    document.getElementById('modal-cancel').textContent = cancelText;
+    okBtn.classList.toggle('is-close', single);
+    okBtn.classList.toggle('is-danger', !single && danger);
+    cancelBtn.textContent = cancelText;
+    cancelBtn.hidden = single;
+    document.querySelector('#modal .modal-actions').classList.toggle('single', single);
     document.getElementById('modal-backdrop').hidden = false;
-    modalSave = onSave;
+    modalSave = single ? (onSave || (() => true)) : onSave;
   }
   function closeModal() {
     document.getElementById('modal-backdrop').hidden = true;
@@ -88,16 +116,9 @@ const UI = (() => {
     openModal({
       title,
       bodyHTML: `<p style="color:var(--text-dim);font-size:14px;line-height:1.5">${message}</p>`,
-      okText, cancelText,
+      okText, cancelText, danger,
       onSave: () => { onConfirm(); }
     });
-    if (danger) {
-      setTimeout(() => {
-        const btn = document.getElementById('modal-ok');
-        btn.style.background = 'var(--accent-red)';
-        btn.style.color = 'white';
-      }, 30);
-    }
   }
 
   function todayKey() {
@@ -144,7 +165,8 @@ const UI = (() => {
     }
     const b = e.target.closest('[data-go]');
     if (b) {
-      go(b.dataset.go);
+      // Barra inferior (Enfoque ↔ Estadísticas): recuerda la posición de cada una
+      go(b.dataset.go, { restore: b.classList.contains('nav-btn') });
       return;
     }
   });

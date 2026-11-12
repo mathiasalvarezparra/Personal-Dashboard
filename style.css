@@ -2089,13 +2089,24 @@ label {
   margin-bottom: calc(-20px - env(safe-area-inset-bottom));
   background: var(--bg-elev);
 }
+/* Botones de modal: mismo alto, padding, tipografía y radio en los tres tipos
+   (formulario y confirmación 50/50; solo lectura = un "Cerrar" a ancho completo) */
 .modal-actions button {
-  flex: 1;
-  padding: 11px;
-  border-radius: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 46px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.2;
 }
+.modal-actions .btn-secondary { border-color: var(--border); }
+.modal-actions button[hidden] { display: none; }
+.modal-actions .btn-primary.is-danger { background: var(--accent-red); color: #fff; }
+.modal-actions .btn-primary.is-close { background: var(--bg-card); color: var(--text); border-color: var(--border); }
 
 /* ============== SHEETS (pantalla completa) ============== */
 .today-topbar-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
