@@ -620,7 +620,7 @@ const Goals = (() => {
     const pct = getProgress(g);
     UI.openModal({
       title: `📌 ${g.name}`,
-      okText: 'Cerrar',
+      single: true, // los +/− aplican al momento: solo "Cerrar"
       bodyHTML: `
         <div class="qty-modal-info">
           <div class="qty-goal-row">

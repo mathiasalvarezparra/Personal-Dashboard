@@ -313,9 +313,8 @@ const App = (() => {
 
     UI.openModal({
       title: `📅 ${dateLabel}`,
-      okText: 'Cerrar',
+      single: true, // solo lectura: un botón "Cerrar"
       bodyHTML: html,
-      onSave: () => true
     });
   }
 

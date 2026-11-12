@@ -434,7 +434,6 @@ const Habits = (() => {
           title: '🔥 Romper racha',
           message: `Tienes una racha activa de <strong style="color:var(--accent-orange)">${streak} días</strong> en "<strong>${escapeHtml(h.name)}</strong>". ¿Seguro quieres desmarcar este hábito hoy?`,
           okText: 'Romper racha',
-          cancelText: 'Mantener',
           danger: true,
           onConfirm: doUnmark,
         });
@@ -1568,8 +1567,7 @@ const Habits = (() => {
 
     UI.openModal({
       title: `✎ Editar · ${h.name}`,
-      okText: 'Listo',
-      cancelText: 'Cerrar',
+      single: true, // cada toque se guarda al momento: solo "Cerrar"
       bodyHTML: `
         <div class="retro-edit-hint">Toca un día para marcar o desmarcar · hoy + últimos ${RETRO_DAYS_LIMIT} días</div>
         <div class="retro-edit-list" id="retro-edit-list">${renderRows()}</div>

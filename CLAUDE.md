@@ -55,6 +55,11 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 
 - Cambiar de vista: cualquier elemento con `data-go="nombre-de-vista"` dispara `UI.go('nombre-de-vista')` (listener delegado en `ui.js`). También se puede llamar `UI.go(...)` directo desde código.
 - Volver atrás: `data-back` dispara `UI.goBack()` (pila de historial interna).
+- **Posición al volver:** `UI.go` guarda en memoria el scroll de la vista que se deja. Navegar hacia adelante empieza arriba; `UI.goBack()` (volver / `data-back`) y la barra inferior (Enfoque ↔ Estadísticas) restauran la posición guardada de la vista de destino tras el render, sin animación de scroll.
+- **Tres tipos de modal** (`UI.openModal` / `UI.confirm2`), con botones del mismo alto, padding, tipografía y radio, siempre abajo:
+  · **Formulario** (crear/editar, por defecto): "Cancelar" (secundario, izquierda) + acción (primario, derecha: "Guardar", "Crear", "Guardar cambios", "Crear metas"…), 50/50.
+  · **Confirmación** (`UI.confirm2`): "Cancelar" + acción (primario, o rojo con `danger: true` para eliminar/borrar), 50/50.
+  · **Solo lectura/información** (`openModal({ single: true })`): un solo botón "Cerrar" a ancho completo. Nunca "Cancelar" + "Cerrar" juntos; no usar "Listo" para cerrar.
 - Cada vista es una sección `<section id="view-nombre-de-vista" class="view">` en `index.html`.
 - Bottom-nav: solo **Enfoque** (`today`) y **Estadísticas** (`stats`). Finanzas no tiene pestaña propia.
 - **Regla: historiales y detalles parten colapsados; se abren al tocar y el estado se recuerda solo durante la sesión** (en memoria; al recargar todo vuelve cerrado). Aplica a archivos e historiales agrupados por año/mes/semana (Archivo de metas, metas anteriores de la gestión, tareas hechas, Movimientos › Archivo, Estadísticas › Cierres, hábitos archivados) y a bloques de detalle ("Aporta a esta meta", "Registros del mes" en Estadísticas › Finanzas). El encabezado muestra su resumen (período, totales, contadores) y el indicador común `.coll-chev` (▸ cerrado / ▾ abierto, según `aria-expanded`); el contenido entra con `Animate` (`TAB_TRIGGERS` o `Animate.reveal`).
