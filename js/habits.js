@@ -472,11 +472,11 @@ const Habits = (() => {
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:6px">${isRetroactive ? 'Marcar como cumplido ese día' : '¡Cumpliste este hábito hoy! 🎉'}</p>
         <div class="note-input-block">
           <label>Nota (opcional)</label>
-          <textarea id="note-input" placeholder="¿Algo destacable? Ej: corrí 5 km en 28 min">${escapeHtml(existingNote)}</textarea>
+          <textarea id="note-input" autocapitalize="sentences" placeholder="¿Algo destacable? Ej: corrí 5 km en 28 min">${escapeHtml(existingNote)}</textarea>
         </div>
       `,
       onSave: () => {
-        const note = document.getElementById('note-input').value.trim();
+        const note = capitalizeFirst(document.getElementById('note-input').value.trim());
         const minBefore = weekMinInfo(habit);
         if (!habit.history.includes(dateKey)) {
           habit.history.push(dateKey);
@@ -618,13 +618,13 @@ const Habits = (() => {
         </div>
         <div class="note-input-block">
           <label>Nota (opcional)</label>
-          <textarea id="qty-note" placeholder="Ej: capítulo 4 sobre microservicios">${habit.notes && habit.notes[dateKey] ? escapeHtml(habit.notes[dateKey]) : ''}</textarea>
+          <textarea id="qty-note" autocapitalize="sentences" placeholder="Ej: capítulo 4 sobre microservicios">${habit.notes && habit.notes[dateKey] ? escapeHtml(habit.notes[dateKey]) : ''}</textarea>
         </div>
       `,
       onSave: () => {
         const amount = parseFloat(document.getElementById('qty-input').value) || 0;
         if (amount < 0) { UI.toast('Cantidad inválida'); return false; }
-        const note = document.getElementById('qty-note').value.trim();
+        const note = capitalizeFirst(document.getElementById('qty-note').value.trim());
 
         // Marcar el hábito como cumplido (si no estaba ya)
         const minBefore = weekMinInfo(habit);
@@ -1117,13 +1117,13 @@ const Habits = (() => {
         ${cur > 0 ? `<button type="button" class="qty-undo" id="qty-undo">↶ Restar ${step} (corregir)</button>` : ''}
         <div class="note-input-block">
           <label>Nota (opcional)</label>
-          <textarea id="qty-note" placeholder="Ej: capítulo 4">${h.notes && h.notes[dateKey] ? escapeHtml(h.notes[dateKey]) : ''}</textarea>
+          <textarea id="qty-note" autocapitalize="sentences" placeholder="Ej: capítulo 4">${h.notes && h.notes[dateKey] ? escapeHtml(h.notes[dateKey]) : ''}</textarea>
         </div>
       `,
       onSave: () => {
         const amount = parseFloat(document.getElementById('qty-input').value) || 0;
         if (amount <= 0) { UI.toast('Cantidad inválida'); return false; }
-        const note = document.getElementById('qty-note').value.trim();
+        const note = capitalizeFirst(document.getElementById('qty-note').value.trim());
         addToHabitProgress(habitId, amount, dateKey, note || null);
       }
     });
@@ -1196,7 +1196,7 @@ const Habits = (() => {
       okText: editing ? 'Guardar cambios' : 'Crear',
       bodyHTML: `
         <label>Nombre del hábito</label>
-        <input type="text" id="h-name" placeholder="Ej: Leer 20 páginas" value="${editing ? escapeAttr(editing.name) : ''}" />
+        <input type="text" id="h-name" autocapitalize="sentences" placeholder="Ej: Leer 20 páginas" value="${editing ? escapeAttr(editing.name) : ''}" />
         <label>Emoji (opcional)</label>
         <input type="text" id="h-icon" placeholder="📚" maxlength="2" value="${editing ? escapeAttr(editing.icon) : ''}" />
         <label>Área de vida</label>
@@ -1238,7 +1238,7 @@ const Habits = (() => {
         <div class="color-picker">${colorOpts}</div>
       `,
       onSave: () => {
-        const name = document.getElementById('h-name').value.trim();
+        const name = capitalizeFirst(document.getElementById('h-name').value.trim());
         if (!name) { UI.toast('Falta el nombre'); return false; }
         const icon = document.getElementById('h-icon').value.trim() || '⭐';
         const area = document.getElementById('h-area').value;

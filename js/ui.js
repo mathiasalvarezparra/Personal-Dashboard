@@ -106,6 +106,8 @@ const UI = (() => {
     cancelBtn.textContent = cancelText;
     cancelBtn.hidden = single;
     document.querySelector('#modal .modal-actions').classList.toggle('single', single);
+    document.getElementById('modal-body').scrollTop = 0;
+    syncViewport();
     document.getElementById('modal-backdrop').hidden = false;
     modalSave = single ? (onSave || (() => true)) : onSave;
   }
@@ -113,6 +115,35 @@ const UI = (() => {
     document.getElementById('modal-backdrop').hidden = true;
     modalSave = null;
   }
+
+  // ====== VIEWPORT VISIBLE (iPhone: barras de Safari y teclado) ======
+  // --vvh / --vv-top = alto y desplazamiento del área realmente visible. Modales,
+  // sheets y overlays se ajustan a ella, así el pie queda sobre el teclado.
+  function syncViewport() {
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    if (!vv) return;
+    root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+    root.style.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+    // Teclado abierto: el área visible es bastante más baja que la ventana
+    root.classList.toggle('kb-open', window.innerHeight - vv.height > 120);
+  }
+
+  // Desplaza el cuerpo del modal (único con scroll) para dejar `el` a la vista.
+  // block 'center' lo centra; 'end' lo deja justo sobre el pie de botones.
+  function revealInModal(el, block = 'center') {
+    const body = document.getElementById('modal-body');
+    if (!el || !body || !body.contains(el)) return;
+    const b = body.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const pad = 16;
+    let delta = 0;
+    if (block === 'center') delta = (r.top + r.height / 2) - (b.top + b.height / 2);
+    else if (r.bottom > b.bottom - pad) delta = r.bottom - (b.bottom - pad);
+    else if (r.top < b.top + pad) delta = r.top - (b.top + pad);
+    if (delta) body.scrollTop += delta;
+  }
+  const isField = el => el && el.matches && el.matches('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
 
   // Confirmación visual (en lugar de confirm() del navegador)
   function confirm2({ title, message, okText = 'Confirmar', cancelText = 'Cancelar', danger = false, onConfirm }) {
@@ -175,6 +206,25 @@ const UI = (() => {
   });
 
   document.addEventListener('DOMContentLoaded', () => {
+    syncViewport();
+    const vv = window.visualViewport;
+    // Al cambiar el área visible (teclado, barras de Safari, rotación), reajustar y
+    // mantener a la vista el campo enfocado del modal
+    const onViewport = () => {
+      syncViewport();
+      const a = document.activeElement;
+      if (isField(a) && !document.getElementById('modal-backdrop').hidden) {
+        requestAnimationFrame(() => revealInModal(a, 'center'));
+      }
+    };
+    if (vv) { vv.addEventListener('resize', onViewport); vv.addEventListener('scroll', syncViewport); }
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', syncViewport);
+    // Al enfocar un campo del modal: dejarlo visible dentro del cuerpo (siguiente frame)
+    document.getElementById('modal-body').addEventListener('focusin', (e) => {
+      if (isField(e.target)) requestAnimationFrame(() => revealInModal(e.target, 'center'));
+    });
+
     document.getElementById('modal-backdrop').addEventListener('click', (e) => {
       if (e.target.id === 'modal-backdrop') closeModal();
     });
@@ -186,5 +236,5 @@ const UI = (() => {
     });
   });
 
-  return { go, goBack, toast, openModal, closeModal, confirm2, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
+  return { go, goBack, toast, openModal, closeModal, confirm2, revealInModal, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
 })();

@@ -218,7 +218,7 @@ const Goals = (() => {
       <div class="g-split-sec" data-split-sec="${h}">
         <div class="g-split-title">${title}</div>
         <label for="gs-${h}-name">Nombre</label>
-        <input type="text" id="gs-${h}-name" autocomplete="off" />
+        <input type="text" id="gs-${h}-name" autocomplete="off" autocapitalize="sentences" />
         <div class="g-split-row">
           <div><label for="gs-${h}-target">Objetivo</label><input type="number" id="gs-${h}-target" min="1" step="1" /></div>
           <div><label for="gs-${h}-unit">Unidad</label><input type="text" id="gs-${h}-unit" autocomplete="off" /></div>
@@ -279,7 +279,7 @@ const Goals = (() => {
           return null;
         }
         out[h] = {
-          name: $(`gs-${h}-name`).value.trim() || p.name,
+          name: capitalizeFirst($(`gs-${h}-name`).value.trim() || p.name),
           target,
           unit: $(`gs-${h}-unit`).value.trim(),
         };
@@ -1060,7 +1060,7 @@ const Goals = (() => {
       bodyHTML: `
         ${archivedBanner}
         <label>Nombre de la meta</label>
-        <input type="text" id="g-name" placeholder="Ej: Leer 100 páginas" value="${editing ? escapeAttr(editing.name) : ''}" />
+        <input type="text" id="g-name" autocapitalize="sentences" placeholder="Ej: Leer 100 páginas" value="${editing ? escapeAttr(editing.name) : ''}" />
         <label>Horizonte</label>
         <select id="g-horizon" ${isArchived ? 'disabled' : ''}>${horizonOpts}</select>
         ${isArchived ? '<p style="color:var(--text-faint);font-size:11px;margin-top:4px">El horizonte no se puede cambiar en metas archivadas.</p>' : ''}
@@ -1100,7 +1100,7 @@ const Goals = (() => {
         `}
       `,
       onSave: () => {
-        const name = document.getElementById('g-name').value.trim();
+        const name = capitalizeFirst(document.getElementById('g-name').value.trim());
         if (!name) { UI.toast('Falta el nombre'); return false; }
         // Si es archivada, mantener el horizon original (input deshabilitado igual lo devuelve)
         const horizon = isArchived ? editing.horizon : document.getElementById('g-horizon').value;

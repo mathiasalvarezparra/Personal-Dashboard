@@ -784,11 +784,11 @@ const App = (() => {
         ${summaryHTML}
         ${dateBlock}
         <label>3 cosas por las que estás agradecido</label>
-        <input type="text" id="cd-g1" placeholder="1." value="${escapeAttr(e.gratitude?.[0])}" />
-        <input type="text" id="cd-g2" placeholder="2." value="${escapeAttr(e.gratitude?.[1])}" style="margin-top:6px" />
-        <input type="text" id="cd-g3" placeholder="3." value="${escapeAttr(e.gratitude?.[2])}" style="margin-top:6px" />
+        <input type="text" id="cd-g1" autocapitalize="sentences" placeholder="1." value="${escapeAttr(e.gratitude?.[0])}" />
+        <input type="text" id="cd-g2" autocapitalize="sentences" placeholder="2." value="${escapeAttr(e.gratitude?.[1])}" style="margin-top:6px" />
+        <input type="text" id="cd-g3" autocapitalize="sentences" placeholder="3." value="${escapeAttr(e.gratitude?.[2])}" style="margin-top:6px" />
         <label>¿Qué destacas o aprendiste hoy?</label>
-        <textarea id="cd-learn" rows="3">${escapeHtml(e.learn)}</textarea>
+        <textarea id="cd-learn" autocapitalize="sentences" rows="3">${escapeHtml(e.learn)}</textarea>
         <label>Energía</label>
         ${scale('energy', e.energy)}
         <label>Estrés</label>

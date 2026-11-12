@@ -232,10 +232,10 @@ const Tasks = (() => {
       bodyHTML: `
         <p style="color:var(--text-dim);font-size:13px;margin-bottom:8px">Bitácora opcional: detalles, lo que quieras recordar.</p>
         <label>Nota (opcional)</label>
-        <textarea id="task-complete-note" placeholder="Ej: detalles relevantes"></textarea>
+        <textarea id="task-complete-note" autocapitalize="sentences" placeholder="Ej: detalles relevantes"></textarea>
       `,
       onSave: () => {
-        const note = document.getElementById('task-complete-note').value.trim();
+        const note = capitalizeFirst(document.getElementById('task-complete-note').value.trim());
         onConfirm({ note: note || null });
       }
     });
@@ -738,7 +738,7 @@ const Tasks = (() => {
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-soft)">
         <p style="color:var(--text-dim);font-size:11px;margin-bottom:8px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px">Bitácora</p>
         <label>Nota (opcional)</label>
-        <textarea id="t-note" placeholder="Detalles relevantes">${editing.note ? escapeHtml(editing.note) : ''}</textarea>
+        <textarea id="t-note" autocapitalize="sentences" placeholder="Detalles relevantes">${editing.note ? escapeHtml(editing.note) : ''}</textarea>
       </div>
     ` : '';
 
@@ -749,7 +749,7 @@ const Tasks = (() => {
       okText: editing ? 'Guardar cambios' : 'Guardar',
       bodyHTML: `
         <label for="t-name">Tarea</label>
-        <input type="text" id="t-name" placeholder="Ej: Pagar la luz" autocomplete="off" value="${editing ? escapeAttr(editing.name) : ''}" />
+        <input type="text" id="t-name" placeholder="Ej: Pagar la luz" autocomplete="off" autocapitalize="sentences" value="${editing ? escapeAttr(editing.name) : ''}" />
         <p class="qe-error" id="t-name-error" hidden></p>
 
         <label>Fecha</label>
@@ -782,13 +782,13 @@ const Tasks = (() => {
           <label for="t-sub-input">Subtareas</label>
           <div class="t-sub-list" id="t-sub-list"></div>
           <p class="qe-error" id="t-sub-error" hidden></p>
-          <input type="text" id="t-sub-input" placeholder="Agregar subtarea y presiona Enter" autocomplete="off" />
+          <input type="text" id="t-sub-input" placeholder="Agregar subtarea y presiona Enter" autocomplete="off" autocapitalize="sentences" enterkeyhint="enter" />
         </div>
         ${doneFieldsHTML}
       `,
       onSave: () => {
         const nameEl = document.getElementById('t-name');
-        const name = nameEl.value.trim();
+        const name = capitalizeFirst(nameEl.value.trim());
         const errEl = document.getElementById('t-name-error');
         if (!name) {
           errEl.textContent = 'Escribe el nombre de la tarea';
@@ -814,7 +814,7 @@ const Tasks = (() => {
         const recurrence = date ? document.getElementById('t-recurrence').value : 'none';
         const subtasks = modalState.subtasks
           .filter(x => x.name.trim())
-          .map(x => ({ id: x.id, name: x.name, done: !!x.done, date: x.date || null }));
+          .map(x => ({ id: x.id, name: capitalizeFirst(x.name), done: !!x.done, date: x.date || null }));
 
         if (editing) {
           editing.name = name;
@@ -829,7 +829,7 @@ const Tasks = (() => {
           if (isEditingDone) {
             const noteInp = document.getElementById('t-note');
             if (noteInp) {
-              const note = noteInp.value.trim();
+              const note = capitalizeFirst(noteInp.value.trim());
               if (note) editing.note = note;
               else delete editing.note;
             }
@@ -965,7 +965,7 @@ const Tasks = (() => {
       validateSubtasks();
     }
     function addPendingSubtask() {
-      const v = subInput.value.trim();
+      const v = capitalizeFirst(subInput.value.trim());
       if (!v) return false;
       modalState.subtasks.push({ id: Storage.uid(), name: v, done: false, date: null });
       subInput.value = '';
@@ -976,7 +976,12 @@ const Tasks = (() => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       addPendingSubtask();
+      // blur + focus dentro del mismo gesto: el teclado del iPhone vuelve a mayúscula
+      // automática sin cerrarse (un focus diferido fuera del gesto no lo reabriría)
+      subInput.blur();
       subInput.focus();
+      // Tras pintar la lista: el input (y la última subtarea) quedan sobre el pie y el teclado
+      requestAnimationFrame(() => UI.revealInModal(subInput, 'end'));
     });
 
     // Enter en el nombre guarda (con validación inline)
