@@ -1446,7 +1446,7 @@ const Habits = (() => {
           <div class="stat-label">${weekly ? 'Racha (semanas) 🔥' : 'Racha 🔥'}</div>
           <div class="stat-value">${streak}</div>
         </div>
-        <div class="stat-card" style="--stat-color:var(--accent-yellow)">
+        <div class="stat-card" style="--stat-color:var(--primary-text)">
           <div class="stat-label">${weekly ? 'Mejor (semanas) 🏆' : 'Mejor 🏆'}</div>
           <div class="stat-value">${bestStreak}</div>
         </div>
@@ -1465,15 +1465,15 @@ const Habits = (() => {
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
           <div style="text-align:center">
-            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--accent-yellow)">${pct7}%</div>
+            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--primary-text)">${pct7}%</div>
             <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">7 DÍAS</div>
           </div>
           <div style="text-align:center">
-            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--accent-yellow)">${pct30}%</div>
+            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--primary-text)">${pct30}%</div>
             <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">30 DÍAS</div>
           </div>
           <div style="text-align:center">
-            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--accent-yellow)">${pct90}%</div>
+            <div style="font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--primary-text)">${pct90}%</div>
             <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">90 DÍAS</div>
           </div>
         </div>

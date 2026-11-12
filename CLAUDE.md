@@ -27,7 +27,7 @@ HTML, CSS y JS **vanilla**. Scripts clásicos (`<script src="...">`, sin `type="
 13. `stats.js` — `Stats`: vista de estadísticas (tendencias, cumplimiento, bienestar, finanzas). Cada barra de la tendencia de 12 semanas abre el resumen de esa semana.
 14. `week-summary.js` — `WeekSummary`: resumen motivador de una semana (vista `week-summary`, solo lectura, sin guardar nada).
 15. `onboarding.js` — `Onboarding`: flujo de bienvenida para usuarios nuevos.
-16. `app.js` — `App`: controlador principal, orquesta el resto, migraciones one-shot, cierre del día y botón "📊 Resumen de la semana".
+16. `app.js` — `App`: controlador principal, orquesta el resto, migraciones one-shot, cierre del día, botón "📊 Resumen de la semana" y peso de los datos en Configuración.
 17. `main.js` — una línea: `document.addEventListener('DOMContentLoaded', App.init)`.
 
 Cada módulo es un IIFE (`const Nombre = (() => {...})()`) que queda en el scope global del documento (no en `window`, pero accesible como identificador en cualquier script posterior). El orden de carga importa: un módulo puede referenciar a otro definido más abajo, pero solo dentro de funciones que se ejecutan después de que todos los scripts cargaron — nunca en el cuerpo del IIFE al momento de definirse.
@@ -49,9 +49,24 @@ Estructura completa de cada entidad, relaciones y qué módulo lee/escribe qué:
 - **Tono positivo:** el avance se muestra en positivo (lo logrado frente a lo esperado). No se muestran avisos de ritmo atrasado ni de racha en riesgo. Ámbar/rojo solo para tareas atrasadas, pagos y presupuesto excedido.
 - **Uso obligatorio** de `escapeHtml()` al insertar cualquier texto ingresado por el usuario dentro de HTML, y `escapeAttr()` al insertarlo dentro de un atributo (ej. `value="${escapeAttr(x)}"`).
 
-## Sistema de diseño y navegación: pendiente de rediseño
+## Sistema de diseño
 
-Los estilos viven en `style.css`. El diseño visual y el menú/navegación completos se van a rediseñar — no están documentados en detalle acá a propósito. Solo lo mínimo para operar hoy:
+Estilos en `style.css`; todas las variables están al inicio, en `:root` (modo oscuro, por defecto) y `[data-theme="light"]` (modo claro, se activa desde Configuración › Tema con `data-theme` en `<html>`). **Regla: todo componente nuevo debe usar estas variables**; no escribir píxeles sueltos de espaciado, radio, tamaño de letra ni sombra.
+
+- **Paleta:** fondos `--bg` (página), `--bg-elev`, `--bg-card`, `--bg-card-hover`; bordes `--border`, `--border-soft`; texto `--text`, `--text-dim`, `--text-faint`. Acento amarillo `--accent-yellow` (#f5c842) = `--primary`. Fuentes: Inter (`--font-sans`) y JetBrains Mono (`--font-mono`).
+- **Acento en texto:** `--primary` solo para rellenos (barras, anillos, fondos de botón y chips activos; el texto encima usa `--on-primary`). Todo texto, ícono o borde en color de acento usa `--primary-text`: en oscuro es el mismo amarillo; en claro es ocre `#8a6700` (contraste AA sobre blanco y sobre fondos amarillos tenues).
+- **Espaciados:** escala única `--space-1` 4px · `--space-2` 8px · `--space-3` 12px · `--space-4` 16px · `--space-5` 24px · `--space-6` 32px (solo se permiten 1–3px literales para bordes y ajustes finos).
+- **Radios:** `--radius-sm` 8px (botones, chips, pestañas, inputs) · `--radius-md` 12px (ítems internos de una tarjeta, mosaicos) · `--radius-lg` 16px (tarjetas de sección, modales). Píldoras y círculos (100px / 50%) solo para barras, puntos y badges mínimos.
+- **Tipografía:** `--fs-hero` 22px (saludo de Enfoque, veredicto) · `--fs-view-title` 18px (título de vista, modal o sheet) · `--fs-card-title` 15px (título de tarjeta) · `--fs-item` 14px (nombre de ítem, peso `--fw-item` 600) · `--fs-body` 13px (botones, inputs, texto de apoyo) · `--fs-secondary` 12px · `--fs-meta` 11px (montos/fechas mono) · `--fs-label` 10px (etiqueta mono en mayúsculas con `--ls-label`, ej. "MAÑANA · 2/3") · `--fs-micro` 9px (badges). Títulos con `--fw-title` 700. Números grandes de estadísticas e íconos conservan su tamaño propio.
+- **Controles:** `--control-h` 44px (botones e inputs), `--chip-h` 30px (chips y pestañas de Tareas/Finanzas/Metas, todos con `--radius-sm`), `--icon-btn` 38px (botones de ícono).
+- **Sombras:** `--shadow-card` (una sola, sutil, para tarjetas) y `--shadow-modal` (modales, toast).
+- **Tarjetas sobre fondo gris:** la página usa `--bg` (claro: `#f7f8fa`); cada sección (Tareas, Finanzas, Hábitos, Metas, calendario, bloques de Estadísticas, gestión, Configuración, resumen semanal) va en su tarjeta `--bg-card` con borde `--border`, `--radius-lg`, `--shadow-card`, padding `--space-4` y `--space-4` de separación vertical. Encabezado común `.section-head`: título (`.section-title`) + subtítulo mono (`.section-subtitle`) a la izquierda y botones de ícono (`.section-icon-btn`) a la derecha.
+- **Colores semánticos (sin cambios):** verde (`--accent-green`) = cumplido/ahorro; ámbar (`--accent-amber`) y rojo (`--accent-red`) solo para tareas atrasadas, pagos atrasados o por vencer y presupuesto excedido.
+- **Animaciones:** duraciones y easing en `--anim-*` (ver `js/animate.js`).
+
+## Navegación y componentes
+
+Lo mínimo para operar hoy:
 
 - Cambiar de vista: cualquier elemento con `data-go="nombre-de-vista"` dispara `UI.go('nombre-de-vista')` (listener delegado en `ui.js`). También se puede llamar `UI.go(...)` directo desde código.
 - Volver atrás: `data-back` dispara `UI.goBack()` (pila de historial interna).
@@ -87,8 +102,7 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 - Pago programado puntual: en el modal de gasto, "No se repite" con **fecha futura** se guarda como pago pendiente (`recurringExpenses` con `recurrence: 'once'` y `dueDate`) en vez de gasto ya hecho. Al pagarlo se registra el movimiento y el puntual sale de la lista.
 - Subpestañas de Movimientos: **Pagos programados, Pagado [mes], Archivo, Plan**. "Pagado [mes]" (id `'once'`) lleva el nombre del mes actual en minúscula, generado al renderizar (ej. "Pagado noviembre"), y lista los gastos registrados en el mes en curso. En **Plan** se definen presupuesto mensual, meta de ahorro mensual y presupuesto por categoría (`Finance.openPlan()` abre directo esa pestaña).
 - El análisis mensual vive en Estadísticas › Finanzas: resumen Gastado/Ahorrado/%, bloques Presupuesto y Meta de ahorro (o estado vacío con link a Plan), dona, "Gastos y ahorro · 6 meses" (con línea punteada del presupuesto) y "Registros del mes" con editar/eliminar.
-
-Esta sección se completará después del rediseño.
+- Configuración › Respaldo de datos muestra el peso del estado guardado: "Datos guardados: X KB de 5 MB" (MB con un decimal sobre 1 MB) con una barra (`App.renderStorageUsage`, se recalcula al entrar a Configuración; tamaño = bytes del JSON en `localStorage`). Sin avisos.
 
 ## Cómo agregar un módulo nuevo (ej. "Deporte")
 

@@ -522,7 +522,7 @@ const Finance = (() => {
                   style="font-family:var(--font-mono)" />
               </div>
             </div>
-            <p id="mv-inst-computed" style="color:var(--primary);font-size:12px;font-weight:600;margin-top:6px">Cuota mensual: —</p>
+            <p id="mv-inst-computed" style="color:var(--primary-text);font-size:12px;font-weight:600;margin-top:6px">Cuota mensual: —</p>
             <p class="qe-help">La cuota se calcula como monto total ÷ total de cuotas. Al pagar la última, deja de repetirse.</p>
           </div>
 
@@ -1685,7 +1685,7 @@ const Finance = (() => {
           <rect x="${x}" y="${baseY - totalH}" width="${barW}" height="${savedH}" rx="2" fill="var(--accent-green)" opacity="${op}" />
         </g>
         ${totalLabel}
-        <text x="${x + barW / 2}" y="${baseY + 14}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${isCurrent ? 'var(--accent-yellow)' : 'var(--text-dim)'}" font-weight="${isCurrent ? '700' : '400'}">${monthShort(d.mk)}</text>
+        <text x="${x + barW / 2}" y="${baseY + 14}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${isCurrent ? 'var(--primary-text)' : 'var(--text-dim)'}" font-weight="${isCurrent ? '700' : '400'}">${monthShort(d.mk)}</text>
         ${savedLabel}
       `;
     }).join('');
