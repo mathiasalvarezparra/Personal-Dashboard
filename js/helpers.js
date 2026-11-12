@@ -15,6 +15,12 @@ function isLive(el) {
   return !panel || panel.classList.contains('active');
 }
 
+// Mayúscula inicial: si el texto empieza con letra minúscula, solo esa letra pasa
+// a mayúscula (respaldo de autocapitalize="sentences" al guardar).
+function capitalizeFirst(s) {
+  return String(s == null ? '' : s).replace(/^(\s*)(\p{Ll})/u, (m, sp, c) => sp + c.toLocaleUpperCase('es'));
+}
+
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }

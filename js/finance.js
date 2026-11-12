@@ -472,7 +472,7 @@ const Finance = (() => {
         <div class="qe-row">
           <div class="qe-name">
             <label for="mv-name">Nombre <span class="qe-opt">(opcional)</span></label>
-            <input type="text" id="mv-name" placeholder="Se usa la categoría"
+            <input type="text" id="mv-name" autocapitalize="sentences" placeholder="Se usa la categoría"
               value="${src ? escapeAttr(src.name) : ''}" />
           </div>
           <div class="qe-date" id="mv-date-wrap">
@@ -527,7 +527,7 @@ const Finance = (() => {
           </div>
 
           <label for="mv-note">Nota (opcional)</label>
-          <textarea id="mv-note" placeholder="Detalles, observaciones">${escapeHtml(noteInit)}</textarea>
+          <textarea id="mv-note" autocapitalize="sentences" placeholder="Detalles, observaciones">${escapeHtml(noteInit)}</textarea>
         </div>
       `,
       onSave: () => saveMovement(modalState, editing, editingRecurring)
@@ -714,8 +714,8 @@ const Finance = (() => {
     }
 
     // Nombre opcional: si queda vacío, el de la categoría
-    const name = document.getElementById('mv-name').value.trim() || getExpenseCategory(category).name;
-    const note = document.getElementById('mv-note').value.trim() || null;
+    const name = capitalizeFirst(document.getElementById('mv-name').value.trim()) || getExpenseCategory(category).name;
+    const note = capitalizeFirst(document.getElementById('mv-note').value.trim()) || null;
 
     const s = Storage.get();
     s.movements = s.movements || [];
@@ -1298,7 +1298,7 @@ const Finance = (() => {
         <input type="date" id="pay-date" value="${defaultDate}" />
 
         <label>Nota (opcional)</label>
-        <textarea id="pay-note" placeholder="Detalles, observaciones"></textarea>
+        <textarea id="pay-note" autocapitalize="sentences" placeholder="Detalles, observaciones"></textarea>
       `,
       onSave: () => {
         const amountRaw = document.getElementById('pay-amount').value.trim();
@@ -1318,7 +1318,7 @@ const Finance = (() => {
         }
 
         const date = document.getElementById('pay-date').value || UI.todayKey();
-        const note = document.getElementById('pay-note').value.trim() || null;
+        const note = capitalizeFirst(document.getElementById('pay-note').value.trim()) || null;
 
         const ss = Storage.get();
         ss.movements = ss.movements || [];

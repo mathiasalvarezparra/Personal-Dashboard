@@ -64,10 +64,19 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, monospace;
 
+  /* Viewport visible: --vvh lo actualiza UI con window.visualViewport
+     (se achica con el teclado del iPhone). Fallback: dvh, y vh solo si no hay dvh. */
+  --vvh: 100vh;
+  --vv-top: 0px;
+
   /* Animaciones de entrada (ver js/animate.js) */
   --anim-dur: 800ms;
   --anim-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --anim-stagger: 50ms;
+}
+
+@supports (height: 100dvh) {
+  :root { --vvh: 100dvh; }
 }
 
 [data-theme="light"] {
@@ -101,6 +110,7 @@ html, body {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   padding-bottom: env(safe-area-inset-bottom);
   padding-top: env(safe-area-inset-top);
   background: var(--bg);
@@ -1790,8 +1800,12 @@ label {
 
 /* ============== MODAL ============== */
 .modal-backdrop {
+  /* Ocupa solo el área visible (sobre el teclado y bajo las barras de Safari) */
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top);
+  height: var(--vvh);
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -1801,41 +1815,54 @@ label {
   animation: fadeIn 0.2s ease;
 }
 .modal-backdrop[hidden] { display: none; }
+/* Modal = columna de tres partes: encabezado fijo, cuerpo con scroll y pie fijo.
+   Altura máxima según el viewport visible (nunca vh). */
 .modal {
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
   width: 100%;
   max-width: 520px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
-  max-height: 88vh;
-  overflow-y: auto;
+  padding: 0;
+  max-height: calc(var(--vvh) - var(--space-6) - env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-modal);
+}
+#modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-4) var(--space-5);
 }
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
 .modal h3 {
+  flex-shrink: 0;
+  padding: var(--space-5) var(--space-4) var(--space-3);
+  margin: 0;
   font-size: var(--fs-view-title);
   font-weight: var(--fw-title);
-  margin-bottom: var(--space-3);
   letter-spacing: -0.2px;
 }
 .modal-actions {
+  /* Pie fijo dentro del modal: no se superpone al cuerpo */
+  flex-shrink: 0;
   display: flex;
   gap: var(--space-2);
-  margin-top: var(--space-4);
-  /* Si el contenido del modal es largo, los botones quedan siempre a la vista.
-     Se extiende sobre el padding inferior del modal para tapar lo que scrollea debajo. */
-  position: sticky;
-  bottom: 0;
-  padding-top: var(--space-2);
-  padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
-  margin-bottom: calc(calc(-1 * var(--space-5)) - env(safe-area-inset-bottom));
+  margin: 0;
+  padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-soft);
   background: var(--bg-elev);
 }
+/* Con el teclado abierto el pie queda sobre el teclado: sin margen de la barra de inicio */
+html.kb-open .modal-actions { padding-bottom: var(--space-3); }
 /* Botones de modal: mismo alto, padding, tipografía y radio en los tres tipos
    (formulario y confirmación 50/50; solo lectura = un "Cerrar" a ancho completo) */
 .modal-actions button {
@@ -1859,7 +1886,10 @@ label {
 .today-topbar-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .sheet {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top);
+  height: var(--vvh);
   background: var(--bg);
   z-index: 200;
   display: flex;
@@ -2316,7 +2346,10 @@ label {
 /* ============== ONBOARDING ============== */
 .onboarding-overlay {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top);
+  height: var(--vvh);
   background: var(--bg);
   z-index: 300;
   overflow-y: auto;
@@ -3988,6 +4021,8 @@ label {
   border-radius: var(--radius-sm);
 }
 .subtask-row:active { background: var(--bg-card-hover); }
+.subtask-row { width: 100%; }
+.subtask-name { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
 .subtask-check {
   width: 18px;
   height: 18px;
@@ -4041,7 +4076,6 @@ label {
 .t-sub-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-soft);
@@ -4050,7 +4084,16 @@ label {
   font-size: var(--fs-body);
 }
 .t-sub-row.done .t-sub-name { color: var(--text-faint); }
-.t-sub-del { color: var(--text-faint); font-size: 16px; padding: 0 var(--space-1); }
+.t-sub-del {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font-size: 16px;
+  padding: 0;
+}
 .t-sub-del:active { color: var(--accent-red); }
 #t-date[hidden] { display: none; }
 
@@ -4082,9 +4125,11 @@ label {
 
 /* Modal: fecha opcional por subtarea */
 .t-sub-item { display: flex; flex-direction: column; gap: var(--space-2); }
-.t-sub-row .t-sub-name { flex: 1; min-width: 0; }
+.t-sub-row .t-sub-name { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+#t-sub-input { width: 100%; }
 .t-sub-cal {
   flex-shrink: 0;
+  white-space: nowrap;
   padding: 2px var(--space-2);
   border-radius: 100px;
   border: 1px solid var(--border);
