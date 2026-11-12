@@ -15,14 +15,14 @@ const Animate = (() => {
 
   const BAR_W = '.subtask-fill, .fin-bar-fill, .hab-ov-bar-fill, .goal-bar-fill, .qty-bar-fill, .sg-fill, .wb-fill, .archive-goal-bar-fill, .dc-fill';
   const BAR_H = '.trend-bar, .sh-win-fill, .hab-dot-fill';
-  const RING = '.week-day-ring .ring-bar, .ws-ring-bar';
+  const RING = '.week-day-ring .ring-bar, .ws-ring-bar, .cal-ring-bar';
   const NUM = '.trend-summary-val, .trend-val, .sg-val, .sh-win-val, .sh-streak-val, .wb-val, .cd-stat-val, .ws-score-num, .ws-fin-num, .ws-wb-val, .ms-val, .donut-total, .stat-value, .fin-prog-pct';
   const LIST = '.item, .hab-ov-item, .goal-card, .goal-mini-item, .recurring-expense-item, .hist-item, .sh-item, .archive-goal, .donut-legend-row, .sg-row, .wb-row, .day-summary-item, .ws-block';
   const CELL = '.heatmap-cell';
   const SVG_BAR = '.chart-bar';
   const DONUT = '.donut-svg';
   // Controles que cambian de pestaña/sub-vista: lo que rendericen entra "desde 0"
-  const TAB_TRIGGERS = '[data-gt-year], [data-gt-month], [data-gt-week], [data-toggle-archived], [data-year-toggle], [data-archive-year-toggle], #hab-archived-toggle, [data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-fin-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
+  const TAB_TRIGGERS = '#open-calendar-sheet, #cal-prev, #cal-next, [data-gt-year], [data-gt-month], [data-gt-week], [data-toggle-archived], [data-year-toggle], [data-archive-year-toggle], #hab-archived-toggle, [data-stats-tab], [data-finance-subtab], [data-mnav], [data-jump], [data-horizon-tab], [data-filter], [data-today-horizon], [data-task-tab], [data-fin-tab], [data-archive-toggle], [data-month-toggle], .hist-month-label, .hist-year-label, .focus-tab, .chip';
 
   const memory = new Map();       // clave estable → último valor final
   const handled = new WeakSet();  // elementos ya preparados (evita doble proceso)

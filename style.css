@@ -2153,17 +2153,18 @@ label {
 }
 
 /* ============== CALENDARIO MENSUAL ============== */
+.cal-card { padding: 14px 12px 12px; }
 .cal-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .cal-nav button {
-  width: 42px; height: 42px;
+  width: 38px; height: 38px;
   display: grid; place-items: center;
-  border-radius: 11px;
-  background: var(--bg-card);
+  border-radius: 10px;
+  background: var(--bg-elev);
   color: var(--text);
   font-size: 22px;
   line-height: 1;
@@ -2179,7 +2180,8 @@ label {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  row-gap: 6px;
+  column-gap: 2px;
 }
 .cal-dow {
   text-align: center;
@@ -2188,41 +2190,49 @@ label {
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
-.cal-cell {
+/* Cada día: solo su número dentro de su anillo, sobre el fondo de la tarjeta */
+.cal-day {
   position: relative;
   aspect-ratio: 1;
+  max-width: 48px;
+  width: 100%;
+  justify-self: center;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: var(--bg-card);
+  background: transparent;
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
-  border: 1.5px solid transparent;
   transition: transform 0.12s;
 }
-.cal-cell.empty { background: transparent; }
-.cal-cell.is-today {
-  border-color: var(--accent-yellow);
-  color: var(--accent-yellow);
-  font-weight: 800;
-}
-.cal-cell.is-future { opacity: 0.38; }
-.cal-cell:not(.empty):active { transform: scale(0.9); }
-.cal-num { line-height: 1; }
+.cal-day:not(.empty):not([disabled]):active { transform: scale(0.9); }
+.cal-ring { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); transform: rotate(-90deg); }
+.cal-ring circle { fill: none; stroke-width: 3; stroke-linecap: round; }
+.cal-ring-track { stroke: var(--border); }
+.cal-ring-bar { stroke: var(--accent-green); transition: stroke-dashoffset var(--anim-dur) var(--anim-ease); }
+.cal-day.is-full .cal-ring-track { fill: var(--accent-green); stroke: var(--accent-green); }
+.cal-day.is-full .cal-num { color: #0a0e14; font-weight: 800; }
+.cal-num { position: relative; line-height: 1; }
+.cal-day.is-today .cal-num { color: var(--accent-yellow); font-weight: 800; }
+.cal-day.is-today.is-full .cal-num { color: #0a0e14; }
+.cal-day.is-future, .cal-day.is-before { color: var(--text-faint); opacity: 0.55; }
+.cal-day.is-future { cursor: default; }
+.cal-day.is-vacation { color: var(--text-dim); }
+.cal-vac { position: absolute; top: 1px; right: 2px; font-size: 9px; line-height: 1; opacity: 0.85; }
 .cal-dot {
   position: absolute;
-  bottom: 5px;
+  bottom: 20%;
   left: 50%;
   transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--accent-green);
 }
-.cal-cell.is-today .cal-dot { background: var(--accent-yellow); }
+.cal-day.is-full .cal-dot { background: #0a0e14; }
+.cal-day.is-today .cal-dot { background: var(--accent-yellow); }
 .cal-hint {
   text-align: center;
   font-size: 11.5px;

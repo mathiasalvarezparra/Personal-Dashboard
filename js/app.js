@@ -99,6 +99,18 @@ const App = (() => {
     }
   }
 
+  // % del día en vivo (mismo cálculo que refreshKPIs): promedio de % de cada hábito/tarea
+  function computeTodayPct() {
+    const state = Storage.get();
+    const onVacation = Vacation.isActive();
+    const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
+    const tasksToday = state.tasks.filter(Tasks.countsForToday);
+    const habitsPctSum = habitsToday.reduce((acc, h) => acc + Habits.getHabitDayPct(h), 0);
+    const tasksPctSum = tasksToday.reduce((acc, t) => acc + (t.done ? 100 : 0), 0);
+    const total = habitsToday.length + tasksToday.length;
+    return total === 0 ? 0 : Math.round((habitsPctSum + tasksPctSum) / total);
+  }
+
   function renderWeekStrip(precomputedPct) {
     const c = document.getElementById('week-strip');
     const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -109,20 +121,7 @@ const App = (() => {
     const monday = new Date(today);
     monday.setDate(today.getDate() + offsetToMonday);
 
-    let pctToday;
-    if (typeof precomputedPct === 'number') {
-      pctToday = precomputedPct;
-    } else {
-      // Mismo cálculo que refreshKPIs: promedio de % de cada hábito/tarea
-      const state = Storage.get();
-      const onVacation = Vacation.isActive();
-      const habitsToday = onVacation ? [] : state.habits.filter(Habits.isHabitForToday);
-      const tasksToday = state.tasks.filter(Tasks.countsForToday);
-      const habitsPctSum = habitsToday.reduce((acc, h) => acc + Habits.getHabitDayPct(h), 0);
-      const tasksPctSum = tasksToday.reduce((acc, t) => acc + (t.done ? 100 : 0), 0);
-      const total = habitsToday.length + tasksToday.length;
-      pctToday = total === 0 ? 0 : Math.round((habitsPctSum + tasksPctSum) / total);
-    }
+    const pctToday = (typeof precomputedPct === 'number') ? precomputedPct : computeTodayPct();
 
     // Persistir el % de hoy en dailySnapshots (para que mañana, cuando este día sea
     // pasado, conserve su anillo). Se guarda aunque el strip no esté a la vista,
@@ -326,10 +325,45 @@ const App = (() => {
     const now = new Date();
     calYear = now.getFullYear();
     calMonth = now.getMonth();
-    renderCalendar();
+    // Primero visible y después el render: así Animate llena los anillos al abrir
     const s = document.getElementById('sheet-calendar');
     if (s) s.hidden = false;
+    renderCalendar();
   }
+
+  // ---- % por día para los anillos del calendario (solo lectura, no guarda nada) ----
+  // Días pasados sin snapshot: mismo cálculo del % del día aplicado a esa fecha
+  // (hábitos que contaban ese día y ya existían + tareas con esa fecha).
+  // null = sin datos (anillo vacío).
+  function computeDayPct(dk) {
+    const s = Storage.get();
+    const date = new Date(dk + 'T12:00:00');
+    const habits = s.habits.filter(h => Habits.countsForDate(h, date) &&
+      (!h.createdAt || UI.localDateKey(new Date(h.createdAt)) <= dk));
+    const tasks = s.tasks.filter(t => t.date === dk);
+    const total = habits.length + tasks.length;
+    if (!total) return null;
+    const sum = habits.reduce((a, h) => a + Habits.getHabitDayPct(h, dk), 0) + tasks.reduce((a, t) => a + (t.done ? 100 : 0), 0);
+    return Math.round(sum / total);
+  }
+  function dayPctFor(dk, todayKey) {
+    if (dk === todayKey) return computeTodayPct();
+    const snap = (Storage.get().dailySnapshots || {})[dk];
+    return typeof snap === 'number' ? snap : computeDayPct(dk);
+  }
+  // Primer día con datos (snapshots, cierres, historial o creación de hábitos)
+  function firstDataKey() {
+    const s = Storage.get();
+    const keys = [...Object.keys(s.dailySnapshots || {}), ...Object.keys(s.closures || {})];
+    (s.habits || []).forEach(h => {
+      if (h.createdAt) keys.push(UI.localDateKey(new Date(h.createdAt)));
+      (h.history || []).forEach(k => keys.push(k));
+    });
+    const valid = keys.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+    return valid[0] || UI.todayKey();
+  }
+  const CAL_R = 17;
+  const CAL_C = 2 * Math.PI * CAL_R;
 
   function calNav(delta) {
     calMonth += delta;
@@ -347,6 +381,7 @@ const App = (() => {
 
     const dows = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
     let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join('');
+    const startKey = firstDataKey();
 
     const first = new Date(calYear, calMonth, 1);
     // Lunes = 0 ... Domingo = 6
@@ -355,22 +390,41 @@ const App = (() => {
     const todayKey = UI.todayKey();
     const closures = Storage.get().closures || {};
 
-    for (let i = 0; i < startDow; i++) html += '<div class="cal-cell empty"></div>';
+    for (let i = 0; i < startDow; i++) html += '<span class="cal-day empty" aria-hidden="true"></span>';
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = UI.localDateKey(new Date(calYear, calMonth, d));
       const isToday = dk === todayKey;
       const isFuture = dk > todayKey;
-      const hasClosure = !!closures[dk];
-      const cls = ['cal-cell'];
+      const isBefore = dk < startKey;
+      const onVacation = !isFuture && Vacation.isDateInVacation(dk);
+      const cls = ['cal-day'];
       if (isToday) cls.push('is-today');
+      let inner = '';
       if (isFuture) cls.push('is-future');
-      const dot = hasClosure ? '<span class="cal-dot" aria-hidden="true"></span>' : '';
-      html += `<button class="${cls.join(' ')}" data-cal-day="${dk}" type="button"><span class="cal-num">${d}</span>${dot}</button>`;
+      else if (isBefore) cls.push('is-before');
+      else if (onVacation) {
+        cls.push('is-vacation');
+        inner = '<span class="cal-vac" aria-hidden="true">🏖️</span>';
+      } else {
+        // Anillo verde según el % del día (valor final en stroke-dashoffset; lo anima Animate)
+        const pct = dayPctFor(dk, todayKey);
+        const p = Math.max(0, Math.min(100, pct || 0));
+        if (p >= 100) cls.push('is-full');
+        inner = `<svg class="cal-ring" viewBox="0 0 40 40" aria-hidden="true">
+            <circle class="cal-ring-track" cx="20" cy="20" r="${CAL_R}"></circle>
+            <circle class="cal-ring-bar" cx="20" cy="20" r="${CAL_R}" stroke-dasharray="${CAL_C.toFixed(2)}" stroke-dashoffset="${(CAL_C * (1 - p / 100)).toFixed(2)}"></circle>
+          </svg>`;
+        cls.push(pct === null ? 'no-data' : 'has-data');
+      }
+      const dot = closures[dk] ? '<span class="cal-dot" aria-hidden="true"></span>' : '';
+      const label = new Date(calYear, calMonth, d).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+      html += `<button class="${cls.join(' ')}" data-cal-day="${dk}" type="button" aria-label="${label}" ${isFuture ? 'disabled' : ''}>${inner}<span class="cal-num">${d}</span>${dot}</button>`;
     }
 
     grid.innerHTML = html;
-    grid.querySelectorAll('[data-cal-day]').forEach(b => {
+    // Días pasados y hoy abren su resumen; los futuros no hacen nada
+    grid.querySelectorAll('[data-cal-day]:not([disabled])').forEach(b => {
       b.addEventListener('click', () => openDaySummary(b.dataset.calDay));
     });
   }
