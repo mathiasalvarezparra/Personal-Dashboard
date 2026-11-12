@@ -85,7 +85,7 @@ Los estilos viven en `style.css`. El diseño visual y el menú/navegación compl
 - **Foco de la semana eliminado** y respuestas del antiguo cierre semanal (`weekClosures`) ocultas en toda la app (incluido Estadísticas › Cierres): son datos legados que se conservan en el JSON pero no se muestran ni se escriben. No existe lógica de "semana pendiente sin cerrar". El cierre del DÍA no cambia.
 - Finanzas en Hoy: la tarjeta **"💰 Finanzas"** (`Finance.renderTodayPending`, contenedor `#today-pending`) se muestra siempre. Si hay presupuesto o meta de ahorro, muestra sus barras ("Gastado $X de $Y", "Ahorro $A de $B"). Debajo, "⚠ Atrasados" (fuera de las pestañas, uno por pago con su período más antiguo) y pestañas de pagos con cantidad y total (clase `.fin-tab`, estilo de las de Tareas/Metas): **Hoy**, **Semana** (mañana → domingo), **Mes** (lunes siguiente → fin de mes) y **Más adelante**. Hoy/Semana/Mes incluyen todo pago programado no pagado (mensual, trimestral, anual, cuotas y puntual) que venza en ese rango; **regla: "Más adelante" solo muestra pagos programados puntuales (`recurrence 'once'`) que vencen después del mes actual**, nunca recurrentes ni cuotas. Vencimientos vía `Finance` `getPaymentOccurrences` (extiende `getAllPending` con el mes siguiente y los puntuales). Cada pago: nombre, monto, vencimiento corto y "Cuota N/M"; "Pagar" en todas las pestañas (permite adelantar). Por defecto Hoy; la pestaña se recuerda en la sesión (`sessionStorage`). Subtítulo "N pendientes este mes · $total" (Atrasados + Hoy + Semana + Mes) o "Gastado este mes · $X"; sin pagos en ningún lado: "No hay gastos pendientes". Su "+" abre el modal de registro rápido y la billetera ("Ver movimientos") lleva a **"🧾 Movimientos"** (vista `finance-settings`), cuyo "volver" regresa a donde se entró.
 - Pago programado puntual: en el modal de gasto, "No se repite" con **fecha futura** se guarda como pago pendiente (`recurringExpenses` con `recurrence: 'once'` y `dueDate`) en vez de gasto ya hecho. Al pagarlo se registra el movimiento y el puntual sale de la lista.
-- Subpestañas de Movimientos: **Pagos programados, Puntuales, Archivo, Plan**. En **Plan** se definen presupuesto mensual, meta de ahorro mensual y presupuesto por categoría (`Finance.openPlan()` abre directo esa pestaña).
+- Subpestañas de Movimientos: **Pagos programados, Pagado [mes], Archivo, Plan**. "Pagado [mes]" (id `'once'`) lleva el nombre del mes actual en minúscula, generado al renderizar (ej. "Pagado noviembre"), y lista los gastos registrados en el mes en curso. En **Plan** se definen presupuesto mensual, meta de ahorro mensual y presupuesto por categoría (`Finance.openPlan()` abre directo esa pestaña).
 - El análisis mensual vive en Estadísticas › Finanzas: resumen Gastado/Ahorrado/%, bloques Presupuesto y Meta de ahorro (o estado vacío con link a Plan), dona, "Gastos y ahorro · 6 meses" (con línea punteada del presupuesto) y "Registros del mes" con editar/eliminar.
 
 Esta sección se completará después del rediseño.
@@ -102,6 +102,21 @@ Esta sección se completará después del rediseño.
 ## Regla de documentación
 
 Cualquier cambio que agregue, elimine o renombre archivos, módulos, vistas o campos de datos debe actualizar `CLAUDE.md` y `docs/DATA_MODEL.md` en el mismo commit.
+
+## Flujo de Git
+
+Procedimiento estándar para cada cambio (nunca `--force`; si un paso falla por permisos o autenticación, detenerse e informar):
+
+1. Desde `main` actualizado: `git checkout main && git pull`, luego rama nueva `git checkout -b tipo/nombre-corto`.
+2. Commit con mensaje descriptivo (un commit por cambio).
+3. `git push -u origin tipo/nombre-corto`.
+4. Abrir PR hacia `main` con resumen de cambios.
+5. Squash merge del PR.
+6. Eliminar la rama remota y verificar con `git ls-remote --heads origin tipo/nombre-corto`; si sigue existiendo, `git push origin --delete tipo/nombre-corto` (o el botón "Delete branch" del PR en GitHub).
+7. Eliminar la rama local: `git branch -D tipo/nombre-corto`.
+8. Volver a `main`, `git pull` y `git fetch --prune`; confirmar con `git ls-remote --heads origin` que solo queda `main` (más ramas con PR abierto).
+
+Recomendado: activar en GitHub *Settings › General › Pull Requests › "Automatically delete head branches"*, así GitHub borra la rama al mergear aunque la herramienta que mergea no lo haga.
 
 ## Flujo de trabajo
 

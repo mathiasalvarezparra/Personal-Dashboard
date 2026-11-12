@@ -44,12 +44,18 @@ const Finance = (() => {
   // Sub-tabs (orden visible)
   const SUB_TABS = [
     { id: 'scheduled', label: 'Pagos programados' },
-    { id: 'once',      label: 'Puntuales' },
+    { id: 'once',      label: () => `Pagado ${currentMonthName()}` }, // gastos registrados este mes
     { id: 'archive',   label: 'Archivo' },
     { id: 'plan',      label: 'Plan' },
   ];
 
   let activeSubTab = 'scheduled'; // por defecto: pagos programados (recurrentes)
+
+  // Nombre del mes actual en español y en minúscula (ej. "noviembre")
+  const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function currentMonthName() {
+    return MONTH_NAMES[new Date().getMonth()];
+  }
 
   function getExpenseCategory(id) {
     return EXPENSE_CATEGORIES.find(c => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
@@ -147,7 +153,7 @@ const Finance = (() => {
     const c = document.getElementById('finance-subtabs');
     if (!c) return;
     c.innerHTML = SUB_TABS.map(t =>
-      `<button class="chip ${activeSubTab === t.id ? 'active' : ''}" data-finance-subtab="${t.id}">${t.label}</button>`
+      `<button class="chip ${activeSubTab === t.id ? 'active' : ''}" data-finance-subtab="${t.id}">${typeof t.label === 'function' ? t.label() : t.label}</button>`
     ).join('');
     c.querySelectorAll('[data-finance-subtab]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -192,7 +198,7 @@ const Finance = (() => {
     bindRecurringActions(c);
   }
 
-  // --- Movimientos puntuales: gastos puntuales + pagos hechos a gastos recurrentes
+  // --- Pagado [mes]: gastos puntuales + pagos hechos a gastos recurrentes
   // (ambos comparten naturaleza de "movimiento real registrado" y deben ser editables/eliminables)
   function renderOnceExpensesList(c) {
     const { start, end } = getMonthRange(getCurrentMonthKey());
