@@ -802,7 +802,7 @@ const Tasks = (() => {
         if (!validateSubtasks()) {
           const more = document.getElementById('t-more');
           if (more.hidden) moreToggle.click();
-          document.getElementById('t-sub-error').scrollIntoView({ block: 'center' });
+          UI.revealInModal(document.getElementById('t-sub-error'), 'center');
           return false;
         }
 

@@ -48,6 +48,7 @@
   --fs-meta: 11px;        /* metadatos mono (montos, fechas, contadores) */
   --fs-label: 10px;       /* etiqueta mono en mayúsculas ("MAÑANA · 2/3") */
   --fs-micro: 9px;        /* badges y marcas mínimas */
+  --fs-input: 16px;       /* campos editables: nunca < 16px (evita el zoom automático de iOS) */
   --fw-title: 700;
   --fw-item: 600;
   --ls-label: 0.6px;
@@ -1742,7 +1743,7 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
   background: var(--bg-elev);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: var(--fs-item);
+  font-size: var(--fs-input);
   margin-top: var(--space-2);
   transition: border-color 0.15s;
   min-height: var(--control-h);
@@ -1815,6 +1816,18 @@ label {
   animation: fadeIn 0.2s ease;
 }
 .modal-backdrop[hidden] { display: none; }
+/* Franja del color del modal bajo el área visible: mientras el teclado de iOS
+   termina de abrirse nunca se ve la página de fondo entre el modal y el teclado */
+.modal-backdrop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 100vh;
+  background: var(--bg-elev);
+  pointer-events: none;
+}
 /* Modal = columna de tres partes: encabezado fijo, cuerpo con scroll y pie fijo.
    Altura máxima según el viewport visible (nunca vh). */
 .modal {
@@ -3474,7 +3487,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
   min-height: 60px;
   resize: vertical;
   font-family: inherit;
-  font-size: var(--fs-item);
+  font-size: var(--fs-input);
 }
 
 /* ============== VACATION BANNER ============== */
@@ -3755,7 +3768,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
 }
 .plan-currency { font-family: var(--font-mono); color: var(--text-faint); }
 .plan-cats { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
-.plan-cat .plan-money input { padding: var(--space-2) 0 !important; font-size: var(--fs-body); }
+.plan-cat .plan-money input { padding: var(--space-2) 0 !important; font-size: var(--fs-input); }
 .plan-cat {
   display: grid;
   grid-template-columns: 1fr 140px;
@@ -3829,7 +3842,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
   align-items: end;
 }
 .qe-opt { text-transform: none; letter-spacing: normal; color: var(--text-faint); font-weight: 400; }
-.qe-date input { width: 148px; padding-left: var(--space-2); padding-right: var(--space-2); font-size: var(--fs-body); }
+.qe-date input { width: 160px; padding-left: var(--space-2); padding-right: var(--space-2); font-size: var(--fs-input); }
 .qe-more-toggle {
   margin-top: var(--space-4);
   padding: var(--space-2) 0;
@@ -4061,7 +4074,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
   font-weight: 600;
 }
 .someday-btn:active { transform: scale(0.96); background: var(--bg-card-hover); }
-.someday-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-secondary) !important; }
+.someday-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-input) !important; }
 .chip-count {
   margin-left: var(--space-1);
   font-family: var(--font-mono);
@@ -4141,7 +4154,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
 .t-sub-item.invalid .t-sub-row { border-color: var(--accent-red); }
 .t-sub-item.invalid .t-sub-cal { color: var(--accent-red); border-color: var(--accent-red); }
 .t-sub-when { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-left: var(--space-1); }
-.t-sub-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-secondary) !important; }
+.t-sub-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-input) !important; }
 .t-sub-date[hidden] { display: none; }
 
 /* ============== METAS: RITMO ESPERADO, ORIGEN DEL AVANCE Y DIVISIÓN ============== */

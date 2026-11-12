@@ -9,13 +9,16 @@ const UI = (() => {
   const scrollPos = {};
 
   function saveScroll() {
-    if (currentView) scrollPos[currentView] = window.scrollY;
+    // Con el fondo bloqueado (modal/sheet abierto) la posición real es la guardada
+    if (currentView) scrollPos[currentView] = lockedY !== null ? lockedY : window.scrollY;
   }
 
   // Navegar a una vista. Hacia adelante empieza arriba; con { restore: true }
   // (goBack y barra inferior) vuelve a la posición guardada de esa vista.
   function go(view, opts = {}) {
     if (!opts.skipSave) saveScroll();
+    // Navegar libera el bloqueo del fondo sin restaurar (la vista nueva decide su scroll)
+    unlockScroll(false);
     // Al navegar, cerrar cualquier sheet a pantalla completa abierto
     document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; });
     // Guardar la vista anterior en el historial (excepto si es la misma)
@@ -108,12 +111,54 @@ const UI = (() => {
     document.querySelector('#modal .modal-actions').classList.toggle('single', single);
     document.getElementById('modal-body').scrollTop = 0;
     syncViewport();
+    lockScroll();
     document.getElementById('modal-backdrop').hidden = false;
     modalSave = single ? (onSave || (() => true)) : onSave;
   }
   function closeModal() {
+    clearTimeout(focusTO);
     document.getElementById('modal-backdrop').hidden = true;
     modalSave = null;
+    syncScrollLock();
+  }
+
+  // ====== BLOQUEO DEL FONDO (modales y sheets) ======
+  // Mientras hay un modal o sheet abierto el body queda fijo en su posición, así
+  // Safari no desplaza la página de fondo al enfocar un campo. Al cerrar el
+  // último, se restaura la posición exacta sin animación.
+  let lockedY = null;
+  function anyOverlayOpen() {
+    const bd = document.getElementById('modal-backdrop');
+    return (bd && !bd.hidden) || [...document.querySelectorAll('.sheet')].some(s => !s.hidden);
+  }
+  function lockScroll() {
+    if (lockedY !== null) return;
+    lockedY = window.scrollY;
+    Object.assign(document.body.style, { position: 'fixed', top: `-${lockedY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden' });
+  }
+  function unlockScroll(restore = true) {
+    if (lockedY === null) return;
+    const y = lockedY;
+    lockedY = null;
+    Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '', overflow: '' });
+    if (restore) window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+  }
+  function syncScrollLock() {
+    if (anyOverlayOpen()) lockScroll(); else unlockScroll();
+  }
+  // Apertura/cierre de sheets a pantalla completa (mismo bloqueo que los modales)
+  function openSheet(id) {
+    const s = document.getElementById(id);
+    if (!s) return;
+    syncViewport();
+    lockScroll();
+    s.hidden = false;
+  }
+  function closeSheet(sheet) {
+    const s = typeof sheet === 'string' ? document.getElementById(sheet) : sheet;
+    if (!s) return;
+    s.hidden = true;
+    syncScrollLock();
   }
 
   // ====== VIEWPORT VISIBLE (iPhone: barras de Safari y teclado) ======
@@ -129,9 +174,10 @@ const UI = (() => {
     root.classList.toggle('kb-open', window.innerHeight - vv.height > 120);
   }
 
-  // Desplaza el cuerpo del modal (único con scroll) para dejar `el` a la vista.
-  // block 'center' lo centra; 'end' lo deja justo sobre el pie de botones.
-  function revealInModal(el, block = 'center') {
+  // Desplaza SOLO el cuerpo del modal (único con scroll; nunca la página) para dejar
+  // `el` a la vista. 'nearest' (o 'end'): no hace nada si ya se ve completo; si no,
+  // mueve lo mínimo para que quede sobre el pie. 'center': lo centra.
+  function revealInModal(el, block = 'nearest') {
     const body = document.getElementById('modal-body');
     if (!el || !body || !body.contains(el)) return;
     const b = body.getBoundingClientRect();
@@ -144,6 +190,26 @@ const UI = (() => {
     if (delta) body.scrollTop += delta;
   }
   const isField = el => el && el.matches && el.matches('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
+
+  // Una sola actualización por frame en resize/scroll del visualViewport, sin
+  // transiciones: el modal queda anclado al borde inferior del área visible
+  // (encima del teclado). Después, si el campo enfocado quedó tapado, se ajusta
+  // solo el scroll del cuerpo del modal.
+  let vvRaf = 0;
+  let focusTO = 0;
+  function ensureFocusedVisible() {
+    const a = document.activeElement;
+    const bd = document.getElementById('modal-backdrop');
+    if (bd && !bd.hidden && isField(a)) revealInModal(a, 'nearest');
+  }
+  function scheduleViewport() {
+    if (vvRaf) return;
+    vvRaf = requestAnimationFrame(() => {
+      vvRaf = 0;
+      syncViewport();
+      ensureFocusedVisible();
+    });
+  }
 
   // Confirmación visual (en lugar de confirm() del navegador)
   function confirm2({ title, message, okText = 'Confirmar', cancelText = 'Cancelar', danger = false, onConfirm }) {
@@ -208,21 +274,17 @@ const UI = (() => {
   document.addEventListener('DOMContentLoaded', () => {
     syncViewport();
     const vv = window.visualViewport;
-    // Al cambiar el área visible (teclado, barras de Safari, rotación), reajustar y
-    // mantener a la vista el campo enfocado del modal
-    const onViewport = () => {
-      syncViewport();
-      const a = document.activeElement;
-      if (isField(a) && !document.getElementById('modal-backdrop').hidden) {
-        requestAnimationFrame(() => revealInModal(a, 'center'));
-      }
-    };
-    if (vv) { vv.addEventListener('resize', onViewport); vv.addEventListener('scroll', syncViewport); }
-    window.addEventListener('resize', syncViewport);
-    window.addEventListener('orientationchange', syncViewport);
-    // Al enfocar un campo del modal: dejarlo visible dentro del cuerpo (siguiente frame)
+    // Teclado, barras de Safari o rotación: reajustar una vez por frame
+    if (vv) { vv.addEventListener('resize', scheduleViewport); vv.addEventListener('scroll', scheduleViewport); }
+    window.addEventListener('resize', scheduleViewport);
+    window.addEventListener('orientationchange', scheduleViewport);
+    // Al enfocar un campo del modal: esperar a que el teclado termine de cambiar el
+    // área visible (su resize ya llama a ensureFocusedVisible) y, como respaldo,
+    // revisar tras un instante. Si el campo ya se ve, no se mueve nada.
     document.getElementById('modal-body').addEventListener('focusin', (e) => {
-      if (isField(e.target)) requestAnimationFrame(() => revealInModal(e.target, 'center'));
+      if (!isField(e.target)) return;
+      clearTimeout(focusTO);
+      focusTO = setTimeout(ensureFocusedVisible, 350);
     });
 
     document.getElementById('modal-backdrop').addEventListener('click', (e) => {
@@ -236,5 +298,5 @@ const UI = (() => {
     });
   });
 
-  return { go, goBack, toast, openModal, closeModal, confirm2, revealInModal, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
+  return { go, goBack, toast, openModal, closeModal, confirm2, revealInModal, openSheet, closeSheet, todayKey, localDateKey, weekKey, monthKey, quarterKey, yearKey, formatDate, formatDateLong, getDayOfWeek, buzz };
 })();

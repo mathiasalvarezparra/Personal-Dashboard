@@ -326,8 +326,7 @@ const App = (() => {
     calYear = now.getFullYear();
     calMonth = now.getMonth();
     // Primero visible y después el render: así Animate llena los anillos al abrir
-    const s = document.getElementById('sheet-calendar');
-    if (s) s.hidden = false;
+    UI.openSheet('sheet-calendar');
     renderCalendar();
   }
 
@@ -971,8 +970,7 @@ const App = (() => {
     // Cerrar cualquier sheet
     document.querySelectorAll('[data-close-sheet]').forEach(b => {
       b.addEventListener('click', () => {
-        const s = b.closest('.sheet');
-        if (s) s.hidden = true;
+        UI.closeSheet(b.closest('.sheet'));
       });
     });
 
