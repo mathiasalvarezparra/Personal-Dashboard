@@ -103,9 +103,15 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 
 - `weeklyMin` es opcional: entero entre 1 y la cantidad de días en que aparece (`'daily'` = 7). Ausente = racha diaria estricta, como siempre.
 - **Solo flexibiliza la racha, nunca el % del día:** el hábito aparece en Enfoque y cuenta en el % del día y los KPIs todos sus días (`Habits.countsForDate` = `isHabitForDate`), se cumpla o no el mínimo.
-- La semana va de **lunes a domingo**; días cumplidos de la semana = días de `history` dentro de ella. Racha en **semanas** consecutivas con al menos `weeklyMin` días cumplidos ("N semanas"). La semana en curso no rompe mientras el mínimo siga alcanzable o ya esté cumplido.
+- La semana va de **lunes a domingo**; conteo de la semana = días completos × 1 + días parciales × 0,5 (ver "Días parciales"). Racha en **semanas** consecutivas con conteo ≥ `weeklyMin` ("N semanas"). La semana en curso no rompe mientras el mínimo siga alcanzable (cada día restante puede sumar hasta 1; hoy parcial, 0,5 más) o ya esté cumplido. El texto muestra decimales con coma: "3,5/5 mín." (sin decimal si es entero).
 - Semanas con días de vacaciones, archivados o previos a la creación: el mínimo se reduce en proporción a los días disponibles (`⌊weeklyMin × disponibles ÷ días en que aparece⌋`, mínimo 1); sin días disponibles la semana no rompe ni suma (`Habits.weekMinInfo`).
 - Cumplimiento (ventanas 7/30/90, heatmap, detalle, Estadísticas): sobre los días en que aparece, igual que `'days'`, independiente del mínimo.
+
+**Días parciales (sin campos nuevos; se calculan con `dailyProgress` y `history`, `Habits.dayStatus` / `Habits.dayValue`):**
+- **Completo:** progreso del día ≥ `dailyTarget` (queda en `history`) → vale 1.
+- **Parcial:** progreso ≥ 50% y < 100% del `dailyTarget`, **solo si `dailyTarget` > 1** (un hábito binario no puede ser parcial) → vale **0,5 para el mínimo semanal** y para el cumplimiento de Estadísticas/detalle; para la **racha diaria** (hábitos sin `weeklyMin`, también en `calcBestStreak`) es **neutro**: no la rompe ni la suma, igual que un día que no aplica.
+- **Menos del 50%:** vale 0 y rompe la racha diaria como siempre.
+- No cambian: el % del día (proporcional, `getHabitDayPct`), los aportes a la meta vinculada (cantidad real registrada) ni `complianceWindow` (ya era proporcional).
 
 **Archivado:** `archived`, `archivedAt` y `archivedRanges` son opcionales; los hábitos existentes no necesitan migración (no se subió `version`). Un hábito archivado no aparece en Hoy, no cuenta en KPIs, porcentajes, rachas globales ni en el heatmap general, y no se puede registrar (por eso deja de aportar a su meta vinculada, aunque conserva `linkedGoalId`). Al reactivar se conserva todo el historial.
 

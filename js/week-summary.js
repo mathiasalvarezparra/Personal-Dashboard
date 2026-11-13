@@ -55,7 +55,8 @@ const WeekSummary = (() => {
   }
 
   // Cumplimiento de cada hábito en la semana, sobre sus días programados
-  // (sin vacaciones ni días previos a crearlo; hoy cuenta solo si ya se cumplió)
+  // (sin vacaciones ni días previos a crearlo; hoy cuenta solo si ya tiene registro).
+  // Día completo vale 1 y parcial (≥ 50%) 0,5, como el mínimo semanal.
   function habitWeek(h, r) {
     const today = UI.todayKey();
     const born = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
@@ -64,9 +65,10 @@ const WeekSummary = (() => {
     r.days.forEach(dk => {
       if (dk > today || (born && dk < born) || Vacation.isDateInVacation(dk)) return;
       if (!Habits.countsForDate(h, keyDate(dk))) return;
-      if (dk === today && !hist.has(dk)) return;
+      const v = Habits.dayValue(h, dk, hist);
+      if (dk === today && v === 0) return;
       scheduled++;
-      if (hist.has(dk)) done++;
+      done += v;
     });
     return { h, scheduled, done };
   }

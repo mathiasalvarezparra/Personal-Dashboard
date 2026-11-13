@@ -44,12 +44,36 @@ const Habits = (() => {
     });
   }
 
+  // ====== DÍAS PARCIALES ======
+  // 'full'    = día completo (progreso >= dailyTarget; queda en history) → vale 1
+  // 'partial' = progreso >= 50% y < 100% del dailyTarget, solo si dailyTarget > 1
+  //             (un hábito binario no puede ser parcial) → vale 0,5 para el mínimo
+  //             semanal y el cumplimiento; neutro para la racha diaria (ni suma ni rompe)
+  // 'none'    = menos del 50% → 0
+  // Se calcula con dailyProgress existente: no cambia el formato de datos.
+  function dayStatus(h, dk, histSet) {
+    const done = histSet ? histSet.has(dk) : (h.history || []).includes(dk);
+    if (done) return 'full';
+    const target = getDailyTarget(h);
+    if (target > 1 && getDailyProgress(h, dk) * 2 >= target) return 'partial';
+    return 'none';
+  }
+  const DAY_VALUE = { full: 1, partial: 0.5, none: 0 };
+  function dayValue(h, dk, histSet) { return DAY_VALUE[dayStatus(h, dk, histSet)]; }
+  // Número con coma decimal (formato chileno) y sin decimales si es entero: 3,5 · 3
+  function fmtCount(n) { return Number.isInteger(n) ? String(n) : String(n).replace('.', ','); }
+  // ¿Tiene algún registro (completo o parcial)? Para atajos de rachas
+  function hasAnyRecord(h) {
+    return (h.history && h.history.length > 0) || Object.values(h.dailyProgress || {}).some(v => v > 0);
+  }
+
   // Estado de la semana de `ref` para un hábito con mínimo semanal.
-  //  done      = días cumplidos de la semana (history)
+  //  done      = días completos × 1 + días parciales × 0,5
   //  min       = mínimo efectivo: se reduce en proporción a los días disponibles
   //              (sin vacaciones, archivo ni días previos a la creación), ⌊⌋ y ≥ 1;
   //              0 si no hay días disponibles (la semana no rompe ni suma)
-  //  remaining = días en que aparece que quedan (incluido hoy si aún no se cumple)
+  //  remaining = días en que aparece que quedan (incluido hoy si aún no está completo)
+  //  canAdd    = lo que aún pueden sumar esos días: cada uno hasta 1 (hoy parcial: 0,5 más)
   //  state     = 'met' | 'ok' | 'risk' (apenas alcanza) | 'unreachable' | 'none'
   function weekMinInfo(h, ref = new Date()) {
     const base = weeklyMinOf(h);
@@ -58,19 +82,20 @@ const Habits = (() => {
     const todayKey = UI.todayKey();
     const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
     const show = appearDays(h);
-    let scheduled = 0, available = 0, done = 0, remaining = 0;
+    let scheduled = 0, available = 0, done = 0, remaining = 0, canAdd = 0;
     const days = weekKeys(ref).map(k => {
       const dow = new Date(k + 'T12:00:00').getDay();
       const appears = show.includes(dow);
-      const isDone = set.has(k);
-      const blocked = appears && !isDone && (
+      const status = dayStatus(h, k, set);
+      const isDone = status === 'full';
+      const blocked = appears && status === 'none' && (
         (typeof Vacation !== 'undefined' && Vacation.isDateInVacation(k)) ||
         archivedOn(h, k) || (bornKey && k < bornKey));
       if (appears) scheduled++;
       if (appears && !blocked) available++;
-      if (isDone) done++;
-      if (appears && !blocked && !isDone && k >= todayKey) remaining++;
-      return { key: k, dow, appears, done: isDone, blocked };
+      done += DAY_VALUE[status];
+      if (appears && !blocked && !isDone && k >= todayKey) { remaining++; canAdd += 1 - DAY_VALUE[status]; }
+      return { key: k, dow, appears, done: isDone, partial: status === 'partial', blocked };
     });
     const min = available === 0 ? 0
       : (available >= scheduled ? base : Math.max(1, Math.floor(base * available / scheduled)));
@@ -78,9 +103,9 @@ const Habits = (() => {
     let state = 'ok';
     if (min === 0) state = 'none';
     else if (done >= min) state = 'met';
-    else if (missing > remaining) state = 'unreachable';
-    else if (missing === remaining) state = 'risk';
-    return { base, min, done, missing, remaining, state, days };
+    else if (missing > canAdd) state = 'unreachable';
+    else if (missing === canAdd) state = 'risk';
+    return { base, min, done, missing, remaining, canAdd, state, days };
   }
 
   // ====== ARCHIVO ======
@@ -198,6 +223,9 @@ const Habits = (() => {
       h._completedAt[dateKey] = Date.now();
       UI.buzz(20);
       if (!celebrateIfMinReached(h, dateKey, minBefore)) UI.toast(`✓ ${h.name} completado`);
+    } else if (!reached) {
+      // Un día parcial (≥ 50%) también puede asegurar el mínimo semanal
+      celebrateIfMinReached(h, dateKey, minBefore);
     }
 
     // Si tiene meta vinculada, también suma a la meta (propagando a padres)
@@ -269,7 +297,7 @@ const Habits = (() => {
 
   // Racha en semanas consecutivas con el mínimo cumplido (se muestra como "N semanas")
   function weeklyStreak(h) {
-    if (!h.history || h.history.length === 0) return 0;
+    if (!hasAnyRecord(h)) return 0;
     const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : null;
     const base = mondayOf(new Date());
     let streak = 0;
@@ -285,8 +313,8 @@ const Habits = (() => {
   }
 
   function weeklyBestStreak(h) {
-    if (!h.history || h.history.length === 0) return 0;
-    const first = [...h.history].sort()[0];
+    if (!hasAnyRecord(h)) return 0;
+    const first = [...(h.history || []), ...Object.keys(h.dailyProgress || {})].sort()[0];
     const bornKey = h.createdAt ? UI.localDateKey(new Date(h.createdAt)) : first;
     const m = mondayOf(new Date((first < bornKey ? first : bornKey) + 'T12:00:00'));
     const cur = mondayOf(new Date());
@@ -331,8 +359,12 @@ const Habits = (() => {
         continue;
       }
 
-      if (set.has(key)) {
+      const status = dayStatus(h, key, set);
+      if (status === 'full') {
         streak++;
+      } else if (status === 'partial') {
+        // Día parcial (≥ 50%): neutro, no rompe la racha ni la suma
+        continue;
       } else {
         if (key === todayKey) {
           // Hoy aún sin marcar: no rompe la racha
@@ -923,15 +955,15 @@ const Habits = (() => {
     if (!info) return '';
     const todayKey = UI.todayKey();
     const dots = info.days.map(d => `
-          <span class="hab-dot ${d.done ? 'done' : ''} ${d.appears ? 'appears' : 'off'} ${d.key === todayKey ? 'today' : ''}" title="${DAY_NAMES[d.dow]}">
-            <span class="hab-dot-fill" style="height:${d.done ? 100 : 0}%"></span>
+          <span class="hab-dot ${d.done ? 'done' : ''} ${d.partial ? 'partial' : ''} ${d.appears ? 'appears' : 'off'} ${d.key === todayKey ? 'today' : ''}" title="${DAY_NAMES[d.dow]}${d.partial ? ' · parcial' : ''}">
+            <span class="hab-dot-fill" style="height:${d.done || d.partial ? 100 : 0}%"></span>
             <span class="hab-dot-letter">${DOT_LETTERS[d.dow]}</span>
           </span>`).join('');
     // Tono positivo: sin avisos de racha en riesgo (solo puntos y "N/M mín.")
     return `
           <div class="hab-week ${celebrateId === h.id ? 'celebrate' : ''}">
             <div class="hab-dots">${dots}</div>
-            ${info.min > 0 ? `<span class="hab-week-txt ${info.state === 'met' ? 'met' : ''}">${Math.min(info.done, 99)}/${info.min} mín.</span>` : ''}
+            ${info.min > 0 ? `<span class="hab-week-txt ${info.state === 'met' ? 'met' : ''}">${fmtCount(Math.min(info.done, 99))}/${info.min} mín.</span>` : ''}
           </div>`;
   }
 
@@ -1365,7 +1397,7 @@ const Habits = (() => {
         const key = UI.localDateKey(d);
         if (Vacation.isDateInVacation(key)) continue;
         total++;
-        if (set.has(key)) done++;
+        done += dayValue(h, key, set); // completo 1 · parcial 0,5
       }
       return total === 0 ? 0 : Math.round((done / total) * 100);
     };
@@ -1391,14 +1423,16 @@ const Habits = (() => {
       const key = UI.localDateKey(d);
       const applies = isHabitForDate(h, d);
       const onVac = Vacation.isDateInVacation(key);
-      const isDone = set.has(key);
+      const st = dayStatus(h, key, set);
+      const isDone = st === 'full';
       const isToday = i === 0;
       const classes = [];
       if (!applies || onVac) classes.push('notapplies');
       else if (isDone) classes.push('done');
+      else if (st === 'partial') classes.push('partial');
       if (isToday) classes.push('today');
       const dateLabel = d.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
-      const stateLabel = !applies ? (archivedOn(h, key) ? ' (archivado)' : ' (no aplica)') : (onVac ? ' (vacaciones)' : (isDone ? ' · ✓ hecho' : ' · sin marcar'));
+      const stateLabel = !applies ? (archivedOn(h, key) ? ' (archivado)' : ' (no aplica)') : (onVac ? ' (vacaciones)' : (isDone ? ' · ✓ hecho' : (st === 'partial' ? ' · parcial' : ' · sin marcar')));
       heatmapCells.push(`<div class="heatmap-cell ${classes.join(' ')}" title="${dateLabel}${stateLabel}"></div>`);
     }
 
@@ -1640,15 +1674,17 @@ const Habits = (() => {
     if (sortedDates.length === 0) return 0;
     let best = 0, current = 0;
     const firstDate = new Date(sortedDates[0] + 'T12:00:00');
-    const lastDate = new Date(); lastDate.setHours(0, 0, 0, 0);
+    // Hasta el final de hoy (los días se recorren a las 12:00; con 00:00 hoy quedaba fuera)
+    const lastDate = new Date(); lastDate.setHours(23, 59, 59, 999);
     const day = new Date(firstDate);
     while (day <= lastDate) {
       const key = UI.localDateKey(day);
       const applies = isHabitForDate(h, day);
       const onVac = Vacation.isDateInVacation(key);
-      if (!applies || onVac) {
-        // No suma ni rompe
-      } else if (set.has(key)) {
+      const status = (!applies || onVac) ? null : dayStatus(h, key, set);
+      if (!applies || onVac || status === 'partial') {
+        // No suma ni rompe (no aplica, vacaciones o día parcial)
+      } else if (status === 'full') {
         current++;
         if (current > best) best = current;
       } else {
@@ -1683,19 +1719,22 @@ const Habits = (() => {
       const cells = days.map(dk => {
         const dateObj = new Date(dk + 'T12:00:00');
         const applies = isHabitForDate(h, dateObj);
-        const isDone = set.has(dk);
+        const st = dayStatus(h, dk, set);
+        const isDone = st === 'full';
         const isToday = dk === todayKey;
         const classes = [];
         if (!applies) classes.push('notapplies');
         else if (isDone) classes.push('done');
+        else if (st === 'partial') classes.push('partial');
         if (isToday) classes.push('today');
         const dateLabel = dateObj.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
-        const stateLabel = !applies ? ' (no aplica)' : (isDone ? ' · ✓ hecho' : ' · sin marcar');
+        const stateLabel = !applies ? ' (no aplica)' : (isDone ? ' · ✓ hecho' : (st === 'partial' ? ' · parcial' : ' · sin marcar'));
         return `<div class="heatmap-cell ${classes.join(' ')}" title="${dateLabel}${stateLabel}"></div>`;
       }).join('');
       // Solo contar días que SÍ aplicaban
       const applicableDays = days.filter(dk => isHabitForDate(h, new Date(dk + 'T12:00:00')));
-      const completed = applicableDays.filter(dk => set.has(dk)).length;
+      // Cumplimiento: completos × 1 + parciales × 0,5 sobre los días que aplica
+      const completed = applicableDays.reduce((acc, dk) => acc + dayValue(h, dk, set), 0);
       const totalApplicable = applicableDays.length;
       const pct = totalApplicable > 0 ? Math.round((completed / totalApplicable) * 100) : 0;
       const streak = calcStreak(h);
@@ -1708,7 +1747,7 @@ const Habits = (() => {
           </div>
           <div class="heatmap-cells">${cells}</div>
           <div class="heatmap-stats">
-            <span><strong>${completed}</strong>/${totalApplicable} días aplicables</span>
+            <span><strong>${fmtCount(completed)}</strong>/${totalApplicable} días aplicables</span>
             <span><strong>${pct}%</strong> cumplimiento</span>
           </div>
         </div>`;
@@ -1723,5 +1762,5 @@ const Habits = (() => {
     if (label) label.textContent = `${fmt(startD)} → ${fmt(today)} · solo visual`;
   }
 
-  return { findGoalForDate, countsForDate, hasWeeklyMin, weeklyMinOf, weekMinInfo, formatFreq, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
+  return { dayStatus, dayValue, fmtCount, findGoalForDate, countsForDate, hasWeeklyMin, weeklyMinOf, weekMinInfo, formatFreq, archive, unarchive, streakLabel, complianceWindow, calcBestStreak, renderOverview, renderTodayHabits, renderFull, renderHeatmap, openCreateModal, openEditModal, openDetail, renderDetail, openEditFromDetail, isHabitForToday, isHabitForDate, isCompletedToday, calcStreak, maxStreakAcrossAll, toggleHabitOnDate, toggleToday, RETRO_DAYS_LIMIT, isQuant, getDailyProgress, getHabitDayPct, addToHabitProgress, subFromHabitProgress, openQuantModal };
 })();
