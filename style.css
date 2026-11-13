@@ -23,6 +23,8 @@
 
   --primary: var(--accent-yellow);       /* rellenos: barras, anillos, botones */
   --primary-text: var(--accent-yellow);  /* texto, íconos y bordes de acento */
+  --partial-fill: #fdba74;  /* día parcial de hábito: naranjo claro (no es alerta) */
+  --partial-text: #431407;
   --on-primary: #1a1200;                 /* texto sobre relleno amarillo */
 
   /* Espaciados: escala única */
@@ -90,6 +92,8 @@
   --text: #0a0e14;
   --text-dim: #5b6473;
   --text-faint: #8b95a7;
+  --partial-fill: #fed7aa;  /* día parcial: naranjo claro, letra oscura legible */
+  --partial-text: #7c2d12;
   --primary-text: #8a6700;  /* ocre: contraste AA sobre blanco y sobre fondos amarillos tenues */
   --shadow-card: 0 1px 2px rgba(10, 14, 20, 0.04), 0 2px 8px rgba(10, 14, 20, 0.05);
   --shadow-modal: 0 8px 28px rgba(10, 14, 20, 0.12);
@@ -4359,3 +4363,9 @@ border: 1px solid var(--border); border-radius: var(--radius-md); background: va
 .goal-origin-body[hidden], .month-records[hidden] { display: none; }
 .analysis-records-head .analysis-block-title { margin-bottom: 0; }
 .analysis-records-head + .month-records { margin-top: var(--space-2); }
+
+/* Día parcial de un hábito (≥ 50% del objetivo diario): naranjo claro, NO es alerta.
+   Vale 0,5 para el mínimo semanal y es neutro para la racha diaria. */
+.hab-dot.partial .hab-dot-fill { background: var(--partial-fill); }
+.hab-dot.partial .hab-dot-letter { color: var(--partial-text); }
+.heatmap-cell.partial { background: var(--partial-fill); }
