@@ -19,10 +19,14 @@ const Tasks = (() => {
     renderFull();
   }
 
-  // "Próximamente": tarea pendiente sin fecha (date = null). En la gestión vive en su
-  // propio filtro; en Enfoque va a la pestaña Próximamente salvo que tenga subtareas
-  // pendientes con fecha (entonces se ubica según la fecha efectiva).
-  const isSomeday = t => !t.done && !t.date;
+  // Tareas pendientes sin fecha (date = null), según sus subtareas (paso automático):
+  //  · Proyecto: tiene al menos una subtarea → bloque "📁 Proyectos" de Enfoque.
+  //  · Idea: sin subtareas → pestaña "💡 Ideas".
+  // Al asignarles fecha pasan a su pestaña por fecha.
+  const hasSubtasks = t => Array.isArray(t.subtasks) && t.subtasks.length > 0;
+  const isUndated = t => !t.done && !t.date;
+  const isProject = t => isUndated(t) && hasSubtasks(t);
+  const isIdea = t => isUndated(t) && !hasSubtasks(t);
   function tomorrowKey() {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -45,7 +49,7 @@ const Tasks = (() => {
   const daysBetween = (a, b) => Math.round((keyToDate(b) - keyToDate(a)) / 86400000);
 
   // Fecha efectiva: la más próxima entre la fecha de la tarea y las fechas de sus
-  // subtareas pendientes. null = sin fecha (Próximamente).
+  // subtareas pendientes. null = sin fecha (Idea o Proyecto sin subtareas fechadas).
   function effectiveDate(t) {
     let d = t.date || null;
     (Array.isArray(t.subtasks) ? t.subtasks : []).forEach(x => {
@@ -60,6 +64,29 @@ const Tasks = (() => {
       if (!x.done && x.date && x.date < todayKey && (!d || x.date < d)) d = x.date;
     });
     return d;
+  }
+
+  // Próxima subtarea pendiente con fecha (la más temprana, incluidas las vencidas)
+  function nextDatedSubtask(t) {
+    let n = null;
+    (Array.isArray(t.subtasks) ? t.subtasks : []).forEach(x => {
+      if (!x.done && x.date && (!n || x.date < n.date)) n = x;
+    });
+    return n;
+  }
+  // Orden de proyectos: primero con subtareas atrasadas o para hoy, luego por la fecha
+  // de su próxima subtarea y al final los sin fechas, por creación.
+  function sortProjects(list, todayKey) {
+    const rank = t => { const ed = effectiveDate(t); return !ed ? 2 : (ed <= todayKey ? 0 : 1); };
+    return list.slice().sort((a, b) => (rank(a) - rank(b))
+      || (effectiveDate(a) || '').localeCompare(effectiveDate(b) || '')
+      || ((a.createdAt || 0) - (b.createdAt || 0)));
+  }
+  // Fecha corta en minúscula para "Próx:" (hoy · mañana · 18 nov)
+  function shortDay(k) {
+    if (k === UI.todayKey()) return 'hoy';
+    if (k === tomorrowKey()) return 'mañana';
+    return keyToDate(k).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }).replace('.', '');
   }
 
   // ¿La tarea cuenta para el % y los contadores del día? Igual que antes
@@ -78,9 +105,19 @@ const Tasks = (() => {
     ['week', 'Semana', 'Semana libre'],
     ['month', 'Mes', 'Mes despejado'],
     ['later', 'Más adelante', 'Nada más adelante'],
-    ['soon', 'Próximamente', 'Sin ideas pendientes'],
+    ['ideas', '💡 Ideas', 'Sin ideas anotadas'],
   ];
   const TAB_STORE = 'mi_dashboard_task_tab'; // solo sessionStorage: dura la sesión
+  // Bloque Proyectos: abierto por defecto con 3 o menos, colapsado con 4 o más; si el
+  // usuario lo abre o cierra, se recuerda durante la sesión (sessionStorage).
+  const PROJ_STORE = 'mi_dashboard_projects_open';
+  function projectsOpen(n) {
+    try {
+      const v = sessionStorage.getItem(PROJ_STORE);
+      if (v === '1' || v === '0') return v === '1';
+    } catch (e) { /* sin sessionStorage: valor por defecto */ }
+    return n <= 3;
+  }
   let todayTab = 'today';
   try {
     const saved = sessionStorage.getItem(TAB_STORE);
@@ -99,9 +136,16 @@ const Tasks = (() => {
       endMonth: UI.localDateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0, 12)),
     };
   }
+  // Proyectos: viven en su bloque; solo se repiten en Atrasadas (subtarea vencida) u Hoy
+  // (subtarea para hoy), nunca en Semana/Mes/Más adelante (para eso está su "Próx:").
   function bucketOf(t, todayKey, r) {
     const ed = effectiveDate(t);
-    if (!ed) return 'soon';
+    if (isProject(t)) {
+      if (ed && ed < todayKey) return 'overdue';
+      if (ed === todayKey) return 'today';
+      return null;
+    }
+    if (!ed) return 'ideas';
     if (ed < todayKey) return 'overdue';
     if (ed === todayKey) return 'today';
     if (ed <= r.sunday) return 'week';
@@ -252,15 +296,23 @@ const Tasks = (() => {
     renderToday(); renderFull(); App.refreshKPIs();
   }
 
-  // Tarjeta "✅ Tareas" en Enfoque: Atrasadas siempre arriba (fuera de las pestañas)
-  // y debajo pestañas por plazo según la fecha efectiva. Cada tarea aparece una sola vez.
+  // Tarjeta "✅ Tareas" en Enfoque: Atrasadas siempre arriba (fuera de las pestañas),
+  // luego el bloque Proyectos y debajo pestañas por plazo según la fecha efectiva.
+  // Cada tarea aparece una sola vez, salvo los proyectos con una subtarea vencida o para
+  // hoy, que además aparecen en Atrasadas u Hoy.
   function renderToday() {
     const c = document.getElementById('today-tasks');
     if (!isLive(c)) return;
     const todayKey = UI.todayKey();
     const r = tabRanges(todayKey);
-    const groups = { overdue: [], today: [], week: [], month: [], later: [], soon: [] };
-    Storage.get().tasks.forEach(t => { if (!t.done) groups[bucketOf(t, todayKey, r)].push(t); });
+    const groups = { overdue: [], today: [], week: [], month: [], later: [], ideas: [] };
+    const all = Storage.get().tasks;
+    all.forEach(t => {
+      if (t.done) return;
+      const b = bucketOf(t, todayKey, r);
+      if (b) groups[b].push(t);
+    });
+    const projects = sortProjects(all.filter(isProject), todayKey);
 
     const imp = t => (t.important ? 1 : 0);
     // Atrasadas: primero importantes, luego normales. Dentro de cada grupo, las más viejas arriba.
@@ -269,7 +321,8 @@ const Tasks = (() => {
     const byDate = (a, b) => effectiveDate(a).localeCompare(effectiveDate(b))
       || (imp(b) - imp(a)) || ((a.createdAt || 0) - (b.createdAt || 0));
     ['today', 'week', 'month', 'later'].forEach(k => groups[k].sort(byDate));
-    groups.soon.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    // Ideas: más recientes arriba
+    groups.ideas.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
     let html = '';
     if (groups.overdue.length > 0) {
@@ -282,6 +335,20 @@ const Tasks = (() => {
           ${groups.overdue.map(t => renderItem(t, { overdue: true, noActions: true, focus: true })).join('')}
         </div>
       `;
+    }
+
+    if (projects.length > 0) {
+      const open = projectsOpen(projects.length);
+      html += `
+        <div class="proj-section">
+          <button type="button" class="proj-head" data-proj-toggle aria-expanded="${open}">
+            <span class="coll-chev" aria-hidden="true">▸</span>
+            <span class="proj-title">📁 Proyectos · ${projects.length}</span>
+          </button>
+          <div class="proj-list" ${open ? '' : 'hidden'}>
+            ${projects.map(t => renderItem(t, { project: true, noActions: true, focus: true })).join('')}
+          </div>
+        </div>`;
     }
 
     const tab = TASK_TABS.find(([id]) => id === todayTab) || TASK_TABS[0];
@@ -300,6 +367,14 @@ const Tasks = (() => {
     const relLeft = activeTab.getBoundingClientRect().left - tabsEl.getBoundingClientRect().left;
     if (relLeft + activeTab.offsetWidth > tabsEl.clientWidth) tabsEl.scrollLeft = relLeft - 8;
     bindClicks(c);
+    const projToggle = c.querySelector('[data-proj-toggle]');
+    if (projToggle) projToggle.addEventListener('click', () => {
+      const open = projToggle.getAttribute('aria-expanded') !== 'true';
+      try { sessionStorage.setItem(PROJ_STORE, open ? '1' : '0'); } catch (e) { /* solo esta vez */ }
+      projToggle.setAttribute('aria-expanded', String(open));
+      c.querySelector('.proj-list').hidden = !open;
+      if (open && typeof Animate !== 'undefined' && Animate.reveal) Animate.reveal(c.querySelector('.proj-list'));
+    });
     c.querySelectorAll('[data-task-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         todayTab = btn.dataset.taskTab;
@@ -313,10 +388,12 @@ const Tasks = (() => {
     const c = document.getElementById('tasks-full-list');
     if (!isLive(c)) return;
 
-    // Contador del filtro "Próximamente"
-    const somedayCount = Storage.get().tasks.filter(isSomeday).length;
-    const countEl = document.getElementById('someday-count');
-    if (countEl) countEl.textContent = somedayCount ? String(somedayCount) : '';
+    // Contadores de los filtros "Ideas" y "Proyectos"
+    const all = Storage.get().tasks;
+    [['ideas-count', all.filter(isIdea).length], ['projects-count', all.filter(isProject).length]].forEach(([id, n]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = n ? String(n) : '';
+    });
 
     // Archivo: tareas hechas, con agrupación por mes (vista especial)
     if (filter === 'archive') {
@@ -331,24 +408,29 @@ const Tasks = (() => {
     } else if (filter === 'once') {
       // Puntuales = tareas sin recurrencia, activas y con fecha
       list = list.filter(t => !t.done && t.date && (!t.recurrence || t.recurrence === 'none'));
-    } else if (filter === 'someday') {
-      // Próximamente = pendientes sin fecha (orden: importantes, luego por creación)
-      list = list.filter(isSomeday).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    } else if (filter === 'ideas') {
+      // Ideas = pendientes sin fecha y sin subtareas (más recientes arriba)
+      list = list.filter(isIdea).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } else if (filter === 'projects') {
+      // Proyectos = pendientes sin fecha con subtareas (mismo orden que en Enfoque)
+      list = sortProjects(list.filter(isProject), UI.todayKey());
     }
-    list.sort((a, b) => {
-      if ((a.important?1:0) !== (b.important?1:0)) return (b.important?1:0) - (a.important?1:0);
-      return (a.date || '').localeCompare(b.date || '');
-    });
+    if (filter !== 'ideas' && filter !== 'projects') {
+      list.sort((a, b) => {
+        if ((a.important?1:0) !== (b.important?1:0)) return (b.important?1:0) - (a.important?1:0);
+        return (a.date || '').localeCompare(b.date || '');
+      });
+    }
     if (list.length === 0) {
-      const msg = filter === 'scheduled'
-        ? 'Sin tareas recurrentes · crea una y elige que se repita'
-        : (filter === 'someday'
-          ? 'Sin ideas pendientes · guarda aquí lo que quieras hacer sin fecha'
-          : 'Sin tareas puntuales pendientes');
+      const msg = {
+        scheduled: 'Sin tareas recurrentes · crea una y elige que se repita',
+        ideas: 'Sin ideas anotadas',
+        projects: 'Sin proyectos · agrega subtareas a una idea para convertirla en proyecto',
+      }[filter] || 'Sin tareas puntuales pendientes';
       c.innerHTML = `<div class="empty">${msg}</div>`;
       return;
     }
-    c.innerHTML = list.map(t => renderItem(t, { someday: filter === 'someday' })).join('');
+    c.innerHTML = list.map(t => renderItem(t, { idea: filter === 'ideas', project: filter === 'projects' })).join('');
     bindClicks(c);
   }
 
@@ -506,9 +588,11 @@ const Tasks = (() => {
 
   function renderItem(t, opts = {}) {
     const area = Storage.get().areas.find(a => a.id === t.area);
-    // Enfoque limpio (opts.focus): solo fecha/urgencia; sin área, repetición ni "Próximamente"
+    // Enfoque limpio (opts.focus): solo fecha/urgencia; sin área, repetición ni etiqueta Idea/Proyecto
     const focus = !!opts.focus;
-    const dl = t.date ? formatTaskDate(t.date) : (t.done || focus ? '' : '📥 PRÓXIMAMENTE');
+    const project = !!opts.project;
+    const dl = t.date ? formatTaskDate(t.date)
+      : (t.done || focus || project ? '' : (hasSubtasks(t) ? '📁 PROYECTO' : '💡 IDEA'));
     const recLabel = {
       daily: 'DIARIA',
       weekly: 'SEMANAL',
@@ -545,17 +629,19 @@ const Tasks = (() => {
     const sub = subtaskStats(t);
     const showSubtasks = sub.total > 0;
     let subtasksHTML = '';
+    let subToggleHTML = '';
     if (showSubtasks && t.done) {
       subtasksHTML = `<div class="subtask-summary">✓ ${sub.done}/${sub.total} subtareas</div>`;
     } else if (showSubtasks) {
       const open = openSubtasks.has(t.id);
       const pct = Math.round((sub.done / sub.total) * 100);
-      subtasksHTML = `
+      subToggleHTML = `
           <button type="button" class="subtask-toggle ${open ? 'open' : ''}" data-action="subtasks" aria-expanded="${open}">
             <span class="subtask-count">${sub.done}/${sub.total}</span>
             <span class="subtask-bar"><span class="subtask-fill" style="width:${pct}%"></span></span>
             <span class="subtask-chevron">▾</span>
-          </button>
+          </button>`;
+      subtasksHTML = `${project ? '' : subToggleHTML}
           ${open ? `<div class="subtask-list">${sortSubtasks(t.subtasks).map(x => {
             const late = !x.done && x.date && x.date < todayKey;
             return `
@@ -569,31 +655,47 @@ const Tasks = (() => {
     // Todas las subtareas hechas: el checkbox se destaca (lista para cerrarse), sin completarla sola
     const ready = showSubtasks && !t.done && sub.done === sub.total;
 
-    // Filtro "Próximamente" de la gestión: botones rápidos para asignar fecha (solo ahí)
-    const somedayHTML = (opts.someday && !t.done && !t.date) ? `
-          <div class="someday-actions">
-            <button type="button" class="someday-btn" data-action="date-today">Hoy</button>
-            <button type="button" class="someday-btn" data-action="date-tomorrow">Mañana</button>
-            <button type="button" class="someday-btn" data-action="date-pick">Fecha</button>
-            <input type="date" class="someday-date" data-action="date-input" hidden />
+    // Filtro "Ideas" de la gestión: botones rápidos para asignar fecha (solo ahí)
+    const ideaHTML = (opts.idea && !t.done && !t.date) ? `
+          <div class="idea-actions">
+            <button type="button" class="idea-btn" data-action="date-today">Hoy</button>
+            <button type="button" class="idea-btn" data-action="date-tomorrow">Mañana</button>
+            <button type="button" class="idea-btn" data-action="date-pick">Fecha</button>
+            <input type="date" class="idea-date" data-action="date-input" hidden />
           </div>` : '';
 
+    // Proyecto: nombre (abre la edición) y barra de subtareas en una línea; debajo la
+    // próxima subtarea con fecha. Tocar el resto de la fila despliega el checklist.
+    let nameHTML = `<div class="item-name">${escapeHtml(t.name)}${overdueBadge}</div>`;
+    let nextHTML = '';
+    if (project) {
+      nameHTML = `
+          <div class="proj-line">
+            <span class="item-name proj-name" data-action="edit">${escapeHtml(t.name)}</span>
+            ${subToggleHTML}
+          </div>`;
+      const nx = nextDatedSubtask(t);
+      if (nx) nextHTML = `<div class="proj-next ${nx.date < todayKey ? 'late' : ''}">Próx: ${escapeHtml(nx.name)} · ${shortDay(nx.date)}</div>`;
+    }
+    const bodyAction = project ? 'data-action="subtasks"' : (opts.tapEdit ? 'data-action="edit"' : '');
+
     return `
-      <div class="item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-id="${t.id}">
+      <div class="item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${project ? 'proj-item' : ''}" data-id="${t.id}">
         <button class="checkbox ${t.done ? 'checked' : ''} ${ready ? 'ready' : ''}" data-action="toggle" ${ready ? 'aria-label="Subtareas listas: completar tarea"' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
         </button>
         ${t.important ? '<span class="item-icon">⭐</span>' : ''}
-        <div class="item-body ${opts.tapEdit ? 'tap-edit' : ''}" ${opts.tapEdit ? 'data-action="edit"' : ''}>
-          <div class="item-name">${escapeHtml(t.name)}${overdueBadge}</div>
-          ${focus && !dl ? '' : `<div class="item-meta">
+        <div class="item-body ${opts.tapEdit || project ? 'tap-edit' : ''}" ${bodyAction}>
+          ${nameHTML}
+          ${nextHTML}
+          ${(focus || project) && !dl ? '' : `<div class="item-meta">
             ${doneInfo || (dl ? `<span>${dl}</span>` : '')}
             ${area && !focus ? `<span class="area-tag">${area.name}</span>` : ''}
             ${recLabel && !focus ? `<span class="recurrence-badge">🔁 ${recLabel}</span>` : ''}
           </div>`}
           ${noteBlock}
           ${subtasksHTML}
-          ${somedayHTML}
+          ${ideaHTML}
         </div>
         ${opts.noActions ? '' : `
         <div class="item-actions">
@@ -651,7 +753,7 @@ const Tasks = (() => {
         if (a === 'date-today') setTaskDate(id, UI.todayKey());
         if (a === 'date-tomorrow') setTaskDate(id, tomorrowKey());
         if (a === 'date-pick') {
-          const inp = b.parentElement.querySelector('.someday-date');
+          const inp = b.parentElement.querySelector('.idea-date');
           inp.hidden = false;
           inp.focus();
           try { if (inp.showPicker) inp.showPicker(); } catch (err) { /* el input visible basta */ }
@@ -673,7 +775,7 @@ const Tasks = (() => {
     rerender();
   }
 
-  // Asignar fecha a una tarea de "Próximamente" (botones rápidos de la gestión)
+  // Asignar fecha a una Idea (botones rápidos de la gestión)
   function setTaskDate(taskId, dateKey) {
     const t = Storage.get().tasks.find(x => x.id === taskId);
     if (!t || !dateKey) return;
@@ -684,7 +786,7 @@ const Tasks = (() => {
   }
 
   // Modal de tarea (crear desde Enfoque o la gestión, y editar). Nombre primero, chips de
-  // fecha (Hoy · Mañana · Próximamente · Fecha) y el resto bajo "Más opciones".
+  // fecha (Hoy · Mañana · Ideas · Fecha) y el resto bajo "Más opciones".
   function openCreateModal(editId = null) {
     const state = Storage.get();
     const editing = editId ? state.tasks.find(t => t.id === editId) : null;
@@ -717,7 +819,7 @@ const Tasks = (() => {
     // Estado del modal
     const modalState = {
       when: !editing ? 'today'
-        : (!editing.date ? 'someday'
+        : (!editing.date ? 'ideas'
           : (editing.date === today ? 'today'
             : (editing.date === tomorrow ? 'tomorrow' : 'pick'))),
       subtasks: (editing && Array.isArray(editing.subtasks))
@@ -756,7 +858,7 @@ const Tasks = (() => {
         <div class="qe-chips" id="t-when-chips">
           ${whenChip('today', 'Hoy')}
           ${whenChip('tomorrow', 'Mañana')}
-          ${whenChip('someday', '📥 Próximamente')}
+          ${whenChip('ideas', '💡 Ideas')}
           ${whenChip('pick', modalState.when === 'pick' ? pickLabel(pickInit) : '📅 Fecha')}
         </div>
         <input type="date" id="t-date" value="${pickInit}" ${modalState.when === 'pick' ? '' : 'hidden'} />
@@ -810,7 +912,7 @@ const Tasks = (() => {
         const area = document.getElementById('t-area').value;
         const goalId = document.getElementById('t-goal')?.value || null;
         const important = document.getElementById('t-imp').checked;
-        // "Próximamente" no puede repetirse
+        // Sin fecha (Idea o Proyecto) no puede repetirse
         const recurrence = date ? document.getElementById('t-recurrence').value : 'none';
         const subtasks = modalState.subtasks
           .filter(x => x.name.trim())
@@ -843,7 +945,7 @@ const Tasks = (() => {
             done: false, createdAt: Date.now(),
             ...(subtasks.length ? { subtasks } : {}),
           });
-          UI.toast(!date ? 'Guardada en Próximamente' : (recurrence !== 'none' ? `Tarea recurrente creada (${recurrence})` : 'Tarea creada'));
+          UI.toast(!date ? (subtasks.length ? 'Guardada en Proyectos' : 'Guardada en Ideas') : (recurrence !== 'none' ? `Tarea recurrente creada (${recurrence})` : 'Tarea creada'));
         }
         Storage.save();
         rerender();
@@ -857,7 +959,7 @@ const Tasks = (() => {
     function currentTaskDate() {
       if (modalState.when === 'today') return today;
       if (modalState.when === 'tomorrow') return tomorrow;
-      if (modalState.when === 'someday') return null;
+      if (modalState.when === 'ideas') return null;
       return dateInp.value || today;
     }
     const refreshWhen = () => {
@@ -866,10 +968,10 @@ const Tasks = (() => {
         if (btn.dataset.when === 'pick') btn.textContent = modalState.when === 'pick' && dateInp.value ? pickLabel(dateInp.value) : '📅 Fecha';
       });
       dateInp.hidden = modalState.when !== 'pick';
-      const someday = modalState.when === 'someday';
-      recSel.disabled = someday;
-      if (someday) recSel.value = 'none';
-      recHelp.textContent = someday
+      const undated = modalState.when === 'ideas';
+      recSel.disabled = undated;
+      if (undated) recSel.value = 'none';
+      recHelp.textContent = undated
         ? 'Asigna una fecha para repetir'
         : 'Si es recurrente, al completarla se generará automáticamente la próxima ocurrencia.';
       renderSubList();
