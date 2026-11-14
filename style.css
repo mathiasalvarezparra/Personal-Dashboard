@@ -4445,7 +4445,7 @@ border: 1px solid var(--border); border-radius: var(--radius-md); background: va
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-h);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -4472,19 +4472,6 @@ border: 1px solid var(--border); border-radius: var(--radius-md); background: va
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ro-btn {
-  flex-shrink: 0;
-  width: var(--icon-btn);
-  height: var(--icon-btn);
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: var(--fs-card-title);
-}
-.ro-btn:active:not([disabled]) { background: var(--bg-card-hover); }
-.ro-btn[disabled] { opacity: 0.3; }
 .ro-dragging {
   z-index: 450;
   box-shadow: var(--shadow-modal);

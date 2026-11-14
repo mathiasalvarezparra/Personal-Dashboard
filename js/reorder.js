@@ -1,7 +1,7 @@
 /* ============================================
    REORDER — modo ordenar reutilizable
    ============================================
-   Uso:
+   El reordenamiento es solo por arrastre desde ≡. Uso:
      // 1) Activador: mantener presionado (500 ms sin moverse más de 8 px)
      Reorder.onLongPress(root, '.selector', (el, e) => { ... });
      // 2) Modo ordenar sobre una lista
@@ -92,8 +92,6 @@ const Reorder = (() => {
           <span class="ro-handle" aria-label="Arrastrar para mover" role="button">≡</span>
           ${it.icon ? `<span class="ro-icon">${escapeHtml(it.icon)}</span>` : ''}
           <span class="ro-label">${escapeHtml(it.label)}</span>
-          <button type="button" class="ro-btn" data-ro-move="-1" aria-label="Subir">↑</button>
-          <button type="button" class="ro-btn" data-ro-move="1" aria-label="Bajar">↓</button>
         </div>`).join('')}
       </div>`).join('');
 
@@ -110,8 +108,6 @@ const Reorder = (() => {
     document.body.classList.add('ro-active');
 
     session = { container, wrap, doneBtn, onSave };
-    refreshButtons();
-    wrap.addEventListener('click', onWrapClick);
     wrap.addEventListener('pointerdown', onHandleDown);
     doneBtn.addEventListener('click', finish);
 
@@ -138,37 +134,11 @@ const Reorder = (() => {
     if (onSave) onSave(ids);
   }
 
-  // ↑ ↓ deshabilitados en los bordes de cada grupo
-  function refreshButtons() {
-    if (!session) return;
-    session.wrap.querySelectorAll('.ro-group').forEach(g => {
-      const rows = [...g.querySelectorAll('.ro-row')];
-      rows.forEach((r, i) => {
-        r.querySelector('[data-ro-move="-1"]').disabled = i === 0;
-        r.querySelector('[data-ro-move="1"]').disabled = i === rows.length - 1;
-      });
-    });
-  }
-
+  // Reacomodo animado de las filas de un grupo (la arrastrada no se anima)
   function animateMove(group, mutate) {
     const rows = [...group.querySelectorAll('.ro-row:not(.ro-dragging)')];
     if (typeof Animate !== 'undefined' && Animate.flip) Animate.flip(rows, mutate);
     else mutate();
-    refreshButtons();
-  }
-
-  function onWrapClick(e) {
-    const btn = e.target.closest('[data-ro-move]');
-    if (!btn || btn.disabled) return;
-    const row = btn.closest('.ro-row');
-    const group = row.parentElement;
-    const dir = +btn.dataset.roMove;
-    const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
-    if (!sib) return;
-    animateMove(group, () => {
-      if (dir < 0) group.insertBefore(row, sib);
-      else group.insertBefore(sib, row);
-    });
   }
 
   // ---------- Arrastre desde ≡ (pointer events propios) ----------
@@ -245,7 +215,6 @@ const Reorder = (() => {
     };
     if (typeof Animate !== 'undefined' && Animate.flip) Animate.flip([row], land);
     else land();
-    refreshButtons();
   }
 
   return { onLongPress, enable, finish, isActive };
