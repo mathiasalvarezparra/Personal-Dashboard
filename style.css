@@ -3984,7 +3984,7 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
 }
 .habit-detail-actions button { flex: 1; }
 
-/* ============== TAREAS: PESTAÑAS, SUBTAREAS, PRÓXIMAMENTE Y CAPTURA RÁPIDA ============== */
+/* ============== TAREAS: PESTAÑAS, SUBTAREAS, IDEAS Y CAPTURA RÁPIDA ============== */
 /* Todas las subtareas hechas: el checkbox se destaca (lista para cerrarse) */
 .checkbox.ready {
   border-color: var(--accent-green);
@@ -4061,14 +4061,14 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
   color: var(--text-dim);
 }
 
-.someday-actions {
+.idea-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
-.someday-btn {
+.idea-btn {
   padding: var(--space-1) var(--space-3);
   border-radius: 100px;
   border: 1px solid var(--border);
@@ -4077,8 +4077,8 @@ html.kb-open .modal-actions { padding-bottom: var(--space-3); }
   font-size: var(--fs-secondary);
   font-weight: 600;
 }
-.someday-btn:active { transform: scale(0.96); background: var(--bg-card-hover); }
-.someday-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-input) !important; }
+.idea-btn:active { transform: scale(0.96); background: var(--bg-card-hover); }
+.idea-date { width: auto !important; margin-top: 0 !important; padding: var(--space-1) var(--space-2) !important; font-size: var(--fs-input) !important; }
 .chip-count {
   margin-left: var(--space-1);
   font-family: var(--font-mono);
@@ -4369,3 +4369,38 @@ border: 1px solid var(--border); border-radius: var(--radius-md); background: va
 .hab-dot.partial .hab-dot-fill { background: var(--partial-fill); }
 .hab-dot.partial .hab-dot-letter { color: var(--partial-text); }
 .heatmap-cell.partial { background: var(--partial-fill); }
+
+/* Tareas: bloque "📁 Proyectos" de Enfoque (sin fecha y con subtareas) */
+.proj-section {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elev);
+}
+.proj-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.proj-list { margin-top: var(--space-2); }
+.proj-list[hidden] { display: none; }
+.proj-item:last-child { border-bottom: none; }
+.proj-line { display: flex; align-items: center; gap: var(--space-2); }
+.proj-line .proj-name { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.proj-line .subtask-toggle { margin-top: 0; flex-shrink: 0; }
+.proj-next {
+  margin-top: 2px;
+  font-size: var(--fs-secondary);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.proj-next.late { color: var(--accent-red); }

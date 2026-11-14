@@ -130,14 +130,14 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `date` | string\|null | `YYYY-MM-DD`, o `null` = **"Próximamente"** (sin fecha) |
+| `date` | string\|null | `YYYY-MM-DD`, o `null` = sin fecha: **Idea** (sin subtareas) o **Proyecto** (con subtareas) |
 | `goalId` | string\|null | → `goals[].id` (ver Relaciones). El modal solo ofrece metas semanales activas; vínculos antiguos a metas mensuales/anuales se conservan |
 | `recurrence` | string | `'none'` \| `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'` (ver `getNextRecurrenceDate`) |
 | `seriesId` | string\|null | agrupa ocurrencias generadas por la misma tarea recurrente; `null` hasta que se genera la 2ª ocurrencia |
 | `note` | string | opcional, solo en tareas ya completadas (bitácora) |
 | `subtasks` | `{ id, name, done, date }[]`\|undefined | checklist opcional. Ausente o vacío = sin subtareas. `date`: `YYYY-MM-DD` o `null`/ausente (sin fecha) |
 
-**"Próximamente" y subtareas con fecha** — ejemplo:
+**Tarea sin fecha (Proyecto) y subtareas con fecha** — ejemplo:
 
 ```json
 {
@@ -151,9 +151,9 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
 }
 ```
 
-- **Fecha efectiva** (`Tasks.effectiveDate(t)`, no se guarda): la más próxima entre `date` y las `date` de las subtareas **pendientes**. Decide si la tarea va a "⚠ Atrasadas" (< hoy) o a qué pestaña de la tarjeta Tareas (Hoy, Semana, Mes, Más adelante). Sin fecha efectiva → pestaña Próximamente.
-- `date: null` (Próximamente): sin subtareas fechadas pendientes va a la pestaña Próximamente de Enfoque; con alguna, se ubica según esa fecha. En la gestión vive en el filtro "Próximamente". Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
-- `subtasks[].date`: si la tarea tiene fecha, ninguna subtarea puede ser posterior (validación en el modal); si está en Próximamente, cualquier fecha vale. Completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos, `done: false` y las fechas desplazadas los mismos días que la tarea (las sin fecha siguen sin fecha).
+- **Fecha efectiva** (`Tasks.effectiveDate(t)`, no se guarda): la más próxima entre `date` y las `date` de las subtareas **pendientes**. Decide si la tarea va a "⚠ Atrasadas" (< hoy) o a qué pestaña de la tarjeta Tareas (Hoy, Semana, Mes, Más adelante).
+- `date: null` = **Idea o Proyecto según sus subtareas** (se deduce, no hay campo nuevo): **Idea** = sin subtareas → pestaña "💡 Ideas" y filtro Ideas de la gestión; **Proyecto** = al menos una subtarea → bloque "📁 Proyectos" de Enfoque y filtro Proyectos de la gestión. Un proyecto con una subtarea pendiente vencida o para hoy aparece además en "⚠ Atrasadas" u Hoy (su fecha efectiva); nunca en Semana/Mes/Más adelante. Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
+- `subtasks[].date`: si la tarea tiene fecha, ninguna subtarea puede ser posterior (validación en el modal); si no tiene fecha (Idea/Proyecto), cualquier fecha vale. Completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos, `done: false` y las fechas desplazadas los mismos días que la tarea (las sin fecha siguen sin fecha).
 - Todos estos campos son opcionales (subtareas antiguas sin `date` = sin fecha): no hubo migración ni cambio de `version`.
 
 Leído/escrito por: `Tasks` (dueño). Leído por `App` (KPIs y contadores del día vía `Tasks.countsForToday`: fecha = hoy, o pendiente con fecha efectiva hoy), `Stats`.
