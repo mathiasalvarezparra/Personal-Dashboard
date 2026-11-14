@@ -35,6 +35,7 @@ Fuente de verdad: `js/storage.js` (`Storage.defaultState` y `Storage.load()`). T
 | `monthlyBudget` | number\|null | presupuesto de gasto mensual en CLP, **sin contar Ahorro**. `null` = sin presupuesto |
 | `categoryBudgets` | object | `{ [categoryId]: number }` límite mensual en CLP por categoría de gasto (nunca `inversion`). Vacío `{}` = sin límites; una categoría ausente = sin límite |
 | `monthlySavingsGoal` | number\|null | meta de ahorro mensual en CLP (categoría `inversion` / Ahorro). `null` = sin meta |
+| `sectionOrder` | string[] | orden de las secciones de Enfoque, ej. `['tasks','habits','goals','finance']` (ids: `tasks`, `finance`, `habits`, `goals`). Por defecto `['tasks','finance','habits','goals']` (el orden de siempre). Está en `defaultState.settings` y el merge de un nivel lo agrega a los datos existentes (sin migración). `App` lo sanea al leer (descarta ids desconocidos o repetidos y agrega los que falten: ninguna sección se puede ocultar) y lo escribe desde el modo ordenar |
 
 Ejemplo de los campos del plan de Finanzas:
 
@@ -48,7 +49,7 @@ Ejemplo de los campos del plan de Finanzas:
 
 Los tres campos están en `defaultState.settings`; el merge de un nivel de `Storage.load()` se los agrega a los datos existentes (no hizo falta subir `version`). Se editan en Movimientos › Plan y se guardan al salir de cada campo. "Gastado" del mes = gastos registrados (`Finance.isTrackedExpense`) excepto Ahorro; "Ahorrado" = gastos en Ahorro.
 
-Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`; `Finance` lee y escribe `monthlyBudget`, `categoryBudgets` y `monthlySavingsGoal`.
+Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `App` escribe las migraciones; `GoalRollover` escribe `lastPeriodKeys`; `Onboarding` escribe `onboarded`; `Vacation` escribe `vacation`; `Finance` lee y escribe `monthlyBudget`, `categoryBudgets` y `monthlySavingsGoal`; `App` lee y escribe `sectionOrder`.
 
 ### `areas` (array, catálogo fijo editable)
 
@@ -58,6 +59,8 @@ Leído/escrito por: casi todos los módulos leen `settings.theme`/`vacation`; `A
 8 áreas por defecto (`salud`, `finanzas`, `carrera`, `crecimiento`, `relaciones`, `creatividad`, `hogar`, `espiritualidad`). `habit.area` y `goal.area` referencian `area.id`. Leído por `Habits`, `Goals`; escrito solo por la migración `migrateAreas` y por configuración manual (si existe UI para editar áreas, no se encontró — hoy es básicamente de solo lectura en runtime).
 
 ### `habits` (array)
+
+**Orden:** el orden del arreglo `habits` es el orden manual del usuario (modo ordenar de la gestión, `Habits.applyHabitOrder`). Solo se reordena dentro del mismo momento del día (`timeOfDay`; sin valor = "Cualquier momento"): cada momento rellena los mismos lugares que ya ocupaba, y los archivados y los demás momentos no se mueven. Enfoque respeta ese orden dentro de cada grupo.
 
 ```json
 {

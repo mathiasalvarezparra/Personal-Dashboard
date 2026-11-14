@@ -126,32 +126,43 @@ const Habits = (() => {
     return isHabitForDate(h, date);
   }
 
-  // Mover un hábito dentro de su grupo de timeOfDay (entre hábitos activos)
-  // direction: -1 = arriba, +1 = abajo
-  function moveHabit(id, direction) {
+  // ====== ORDEN MANUAL (modo ordenar de la gestión) ======
+  // El orden vive en el propio arreglo state.habits (Enfoque lo respeta dentro de cada
+  // momento del día). Solo se reordena dentro del mismo momento y sin archivados.
+  const momentOf = h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any');
+  // ids = hábitos activos en el nuevo orden: cada momento rellena, en ese orden, los
+  // mismos lugares del arreglo que ya ocupaba (archivados y otros momentos no se mueven)
+  function applyHabitOrder(ids) {
     const state = Storage.get();
-    const habits = state.habits;
-    const pos = habits.findIndex(h => h.id === id);
-    if (pos === -1) return;
-    let newPos = pos + direction;
-    while (newPos >= 0 && newPos < habits.length && habits[newPos].archived) newPos += direction;
-    if (newPos < 0 || newPos >= habits.length) return;
-    [habits[pos], habits[newPos]] = [habits[newPos], habits[pos]];
+    const byId = new Map(state.habits.map(h => [h.id, h]));
+    const queues = {};
+    ids.forEach(id => {
+      const h = byId.get(id);
+      if (h && !h.archived) (queues[momentOf(h)] = queues[momentOf(h)] || []).push(h);
+    });
+    state.habits = state.habits.map(h => {
+      if (h.archived) return h;
+      const q = queues[momentOf(h)];
+      return q && q.length ? q.shift() : h;
+    });
     Storage.save();
-    renderOverview();
-    renderFull();
-    renderHeatmap();
-    UI.buzz(8);
+    renderFull(); renderOverview(); renderTodayHabits(); renderHeatmap();
+    UI.toast('Orden guardado');
   }
-
-  // Indica si el hábito se puede mover en esa dirección (para deshabilitar el botón en los extremos)
-  function canMove(id, direction) {
-    const habits = Storage.get().habits.filter(h => !h.archived);
-    const pos = habits.findIndex(h => h.id === id);
-    if (pos === -1) return false;
-    if (direction === -1) return pos > 0;
-    if (direction === 1) return pos < habits.length - 1;
-    return false;
+  function startHabitReorder() {
+    const c = document.getElementById('habits-full-list');
+    const active = Storage.get().habits.filter(h => !h.archived);
+    if (!c || active.length < 2) return;
+    const order = ['mañana', 'tarde', 'noche', 'any'];
+    const items = order.flatMap(m => active.filter(h => momentOf(h) === m))
+      .map(h => ({ id: h.id, icon: h.icon || '⭐', label: h.name, moment: momentOf(h) }));
+    Reorder.enable({
+      container: c,
+      items,
+      groupBy: it => it.moment,
+      groupLabels: MOMENT_LABELS,
+      onSave: applyHabitOrder,
+    });
   }
 
   // Hoy: ¿entra en el % del día? (ver countsForDate)
@@ -771,9 +782,15 @@ const Habits = (() => {
 
   let archivedOpen = false;
 
+  let reorderBound = false;
   function renderFull() {
     const c = document.getElementById('habits-full-list');
-    if (!isLive(c)) return;
+    if (!isLive(c) || Reorder.isActive(c)) return; // en modo ordenar no se repinta
+    // Mantener presionado un hábito activo → modo ordenar (se liga una sola vez)
+    if (!reorderBound) {
+      reorderBound = true;
+      Reorder.onLongPress(c, '.item:not(.archived-item)', startHabitReorder);
+    }
     const state = Storage.get();
     if (state.habits.length === 0) {
       c.innerHTML = '<div class="empty">No tienes hábitos creados · usa el + de arriba para crear uno</div>';
@@ -781,7 +798,7 @@ const Habits = (() => {
     }
     const active = state.habits.filter(h => !h.archived);
     const archivedList = state.habits.filter(h => h.archived);
-    // Lista plana en el orden de state.habits (el usuario controla con ▲▼)
+    // Lista plana en el orden de state.habits (se cambia con el modo ordenar)
     const activeHTML = active.length
       ? active.map(renderItemFull).join('')
       : '<div class="empty">Sin hábitos activos · usa el + de arriba para crear uno</div>';
@@ -922,7 +939,7 @@ const Habits = (() => {
     c.innerHTML = momentOrder(now).map(m => {
       const items = list.filter(h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any') === m);
       if (!items.length) return '';
-      const pending = items.filter(h => !isDoneForToday(h));   // respeta el orden manual (moveHabit)
+      const pending = items.filter(h => !isDoneForToday(h));   // respeta el orden manual (modo ordenar)
       const done = items.filter(isDoneForToday).sort(byCompletion);
       const allDone = pending.length === 0;
       // Mientras celebra el mínimo semanal, el grupo sigue abierto para ver la animación
@@ -1043,8 +1060,6 @@ const Habits = (() => {
     const linkedGoal = h.linkedGoalId ? state.goals.find(g => g.id === h.linkedGoalId && !g.archived) : null;
     const ft = formatFreq(h.frequency);
     const todayNote = h.notes && h.notes[UI.todayKey()];
-    const canUp = canMove(h.id, -1);
-    const canDown = canMove(h.id, 1);
     const quant = isQuant(h);
     const dailyCur = quant ? getDailyProgress(h) : 0;
     return `
@@ -1062,10 +1077,6 @@ const Habits = (() => {
             <span>${ft}</span>
             ${linkedGoal ? `<span class="goal-link-badge">🎯 ${escapeHtml(linkedGoal.name.length > 18 ? linkedGoal.name.slice(0, 18) + '…' : linkedGoal.name)}</span>` : ''}
           </div>
-        </div>
-        <div class="reorder-actions">
-          <button class="reorder-btn" data-action="up" ${canUp ? '' : 'disabled'} aria-label="Subir">▲</button>
-          <button class="reorder-btn" data-action="down" ${canDown ? '' : 'disabled'} aria-label="Bajar">▼</button>
         </div>
         <div class="item-actions">
           <button class="item-edit" data-action="edit" aria-label="Editar">✎</button>
@@ -1100,8 +1111,6 @@ const Habits = (() => {
         if (a === 'unarchive') unarchive(id);
         if (a === 'edit') openEditModal(id);
         if (a === 'detail') openDetail(id);
-        if (a === 'up') moveHabit(id, -1);
-        if (a === 'down') moveHabit(id, 1);
         if (a === 'quant-quick') {
           const step = parseFloat(b.dataset.step) || 1;
           addToHabitProgress(id, step);

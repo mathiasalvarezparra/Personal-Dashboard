@@ -42,8 +42,11 @@
 
   <!-- ===== PANEL: HOY ===== -->
   <div class="focus-panel active" id="focus-panel-hoy">
+    <!-- Secciones ordenables (settings.sectionOrder): mantener presionado su encabezado
+         activa el modo ordenar. Cada hijo directo lleva data-section. -->
+    <div id="focus-sections">
     <!-- Tareas: Atrasadas + pestañas por plazo -->
-    <div class="section-card">
+    <div class="section-card" data-section="tasks">
       <div class="section-head">
         <div>
           <div class="section-title">✅ Tareas</div>
@@ -58,10 +61,10 @@
     </div>
 
     <!-- Gastos: pendientes por pagar o lo gastado en el mes (siempre visible) -->
-    <div id="today-pending"></div>
+    <div id="today-pending" data-section="finance"></div>
 
     <!-- Hábitos de hoy -->
-    <div class="section-card">
+    <div class="section-card" data-section="habits">
       <div class="section-head">
         <div>
           <div class="section-title">✨ Hábitos de hoy</div>
@@ -73,7 +76,7 @@
     </div>
 
     <!-- Metas (desplegables por horizonte) -->
-    <div class="section-card">
+    <div class="section-card" data-section="goals">
       <div class="section-head">
         <div>
           <div class="section-title">📌 Metas</div>
@@ -83,6 +86,7 @@
       </div>
       <div id="today-goals"></div>
     </div>
+    </div><!-- /#focus-sections -->
 
     <!-- Cierres -->
     <button class="btn-secondary close-day-btn" id="close-day-btn"></button>
@@ -451,6 +455,7 @@
 <script src="js/ui.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/animate.js"></script>
+<script src="js/reorder.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/tasks.js"></script>
 <script src="js/goals.js"></script>
