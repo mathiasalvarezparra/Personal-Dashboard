@@ -312,5 +312,25 @@ const Animate = (() => {
     document.addEventListener('DOMContentLoaded', openEnterWindow);
   }
 
-  return { enter, reveal };
+  // Reacomodo suave (FLIP) para el modo ordenar: registra la posición de cada
+  // elemento, aplica el cambio y los anima desde su lugar anterior.
+  // Duración y easing: --anim-reorder y --anim-ease.
+  function flip(els, mutate) {
+    const before = new Map(els.map(el => [el, el.getBoundingClientRect().top]));
+    mutate();
+    if (reduced) return;
+    els.forEach(el => {
+      if (!el.isConnected) return;
+      const dy = before.get(el) - el.getBoundingClientRect().top;
+      if (!dy) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${dy}px)`;
+      el.getBoundingClientRect(); // fija el punto de partida antes de animar
+      el.style.transition = 'transform var(--anim-reorder) var(--anim-ease)';
+      el.style.transform = '';
+      el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+    });
+  }
+
+  return { enter, reveal, flip };
 })();

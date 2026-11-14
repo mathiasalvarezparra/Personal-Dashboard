@@ -19,6 +19,8 @@ const Storage = (() => {
       monthlyBudget: null,      // tope de gasto mensual en CLP (sin Ahorro) o null
       categoryBudgets: {},      // { categoryId: CLP } límite mensual por categoría
       monthlySavingsGoal: null, // meta de ahorro mensual en CLP o null
+      // Orden de las secciones de Enfoque (modo ordenar). Ninguna se puede ocultar.
+      sectionOrder: ['tasks', 'finance', 'habits', 'goals'],
     },
     areas: [
       { id: 'salud',       name: 'Salud',       icon: '💪', color: '#4ade80' },

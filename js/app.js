@@ -39,6 +39,7 @@ const App = (() => {
     renderBackupReminder();
     Vacation.renderBanner();
     Vacation.renderStatus();
+    applySectionOrder();
     Habits.renderOverview(); Habits.renderFull(); Habits.renderHeatmap();
     Tasks.renderToday(); Tasks.renderFull();
     Goals.renderAll(); Goals.renderWeeklyMini();
@@ -47,6 +48,7 @@ const App = (() => {
     renderCloseDay();
     renderWeekSummaryBtn();
     bindAll();
+    bindSectionReorder();
     Stats.bind();
     renderWeekLabel();
     setupDayRolloverWatcher();
@@ -602,6 +604,58 @@ const App = (() => {
     const saludo = h < 6 ? 'Buenas noches' : h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
     const name = (Storage.get().user.name || '').trim();
     g.textContent = name ? `${saludo}, ${name}` : saludo;
+  }
+
+  // ====== ORDEN DE SECCIONES DE ENFOQUE (modo ordenar) ======
+  // Tareas, Finanzas, Hábitos y Metas son hijos de #focus-sections con data-section.
+  // El calendario, el saludo, los banners y los botones de cierre quedan fijos.
+  const SECTIONS = {
+    tasks:   { icon: '✅', label: 'Tareas' },
+    finance: { icon: '💰', label: 'Finanzas' },
+    habits:  { icon: '✨', label: 'Hábitos' },
+    goals:   { icon: '📌', label: 'Metas' },
+  };
+  const DEFAULT_SECTION_ORDER = ['tasks', 'finance', 'habits', 'goals'];
+  // Orden guardado, saneado: sin desconocidas ni repetidas y con todas presentes
+  function sectionOrder() {
+    const saved = (Storage.get().settings || {}).sectionOrder;
+    const list = (Array.isArray(saved) ? saved : []).filter((id, i, a) => SECTIONS[id] && a.indexOf(id) === i);
+    DEFAULT_SECTION_ORDER.forEach(id => { if (!list.includes(id)) list.push(id); });
+    return list;
+  }
+  function applySectionOrder() {
+    const wrap = document.getElementById('focus-sections');
+    if (!wrap) return;
+    const nodes = {};
+    [...wrap.children].forEach(el => { if (el.dataset.section) nodes[el.dataset.section] = el; });
+    const order = sectionOrder();
+    // Solo mover si cambió (mover nodos re-dispara las animaciones de entrada)
+    const now = [...wrap.children].map(el => el.dataset.section).filter(Boolean);
+    if (now.join() === order.join()) return;
+    order.forEach(id => { if (nodes[id]) wrap.appendChild(nodes[id]); });
+  }
+  // Mantener presionado el encabezado de una sección → modo ordenar
+  function bindSectionReorder() {
+    const wrap = document.getElementById('focus-sections');
+    Reorder.onLongPress(wrap, '.section-head', () => {
+      Reorder.enable({
+        container: wrap,
+        items: sectionOrder().map(id => ({ id, icon: SECTIONS[id].icon, label: SECTIONS[id].label })),
+        onSave: ids => {
+          Storage.get().settings.sectionOrder = ids;
+          Storage.save();
+          applySectionOrder();
+          UI.toast('Orden guardado');
+        },
+      });
+    }, {
+      // Solo el encabezado propio de cada sección (no sus botones ni subtítulos internos)
+      accept: (head, e) => {
+        if (e.target.closest('button')) return false;
+        const sec = head.closest('[data-section]');
+        return !!sec && sec.parentElement === wrap && sec.querySelector('.section-head') === head;
+      },
+    });
   }
 
   // ====== PESO DE LOS DATOS (Configuración) ======
