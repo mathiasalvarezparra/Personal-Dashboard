@@ -4,7 +4,8 @@
 const Storage = (() => {
   const KEY = 'mi_dashboard_v1';
   // v2: frecuencia 'weekly' (X veces por semana) → 'days' + weeklyMin (ver migrate)
-  const VERSION = 2;
+  // v3: pagos trimestrales/anuales con calendario de fechas (recurringExpenses[].schedule)
+  const VERSION = 3;
   const defaultState = {
     version: VERSION,
     user: { name: '' },
@@ -67,6 +68,30 @@ const Storage = (() => {
         const days = [1, 2, 3, 4, 5, 6, 0].filter(d => !sug.length || sug.includes(d));
         const times = Math.max(1, parseInt(f.timesPerWeek, 10) || 1);
         h.frequency = { type: 'days', days, weeklyMin: Math.min(times, days.length) };
+      });
+    }
+    if (v < 3) {
+      // Pagos trimestrales y anuales sin calendario: se genera `schedule` desde su
+      // fecha de referencia (dueDate) o, si es legado, desde dueDay y el mes de creación.
+      // Trimestral = ese mes y cada 3 meses; anual = ese mes. Mismo día, ajustado al
+      // último día del mes cuando no existe. Los pagos (movements) no se tocan.
+      const MAX = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      (data.recurringExpenses || []).forEach(re => {
+        const step = { quarterly: 3, yearly: 12 }[re.recurrence];
+        if (!step || (Array.isArray(re.schedule) && re.schedule.length)) return;
+        let m0, d0;
+        if (re.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(re.dueDate)) {
+          m0 = +re.dueDate.slice(5, 7); d0 = +re.dueDate.slice(8, 10);
+        } else if (re.dueDay) {
+          m0 = new Date(re.createdAt || Date.now()).getMonth() + 1; d0 = +re.dueDay;
+        } else {
+          return; // sin fecha: queda sin calendario (como antes, no genera vencimientos)
+        }
+        const n = 12 / step;
+        re.schedule = Array.from({ length: n }, (_, k) => {
+          const month = ((m0 - 1 + k * step) % 12) + 1;
+          return { month, day: Math.min(d0, MAX[month - 1]) };
+        }).sort((a, b) => a.month - b.month);
       });
     }
     data.version = Math.max(v, VERSION);

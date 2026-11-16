@@ -104,7 +104,7 @@ const Tasks = (() => {
     ['today', 'Hoy', 'Nada para hoy'],
     ['week', 'Semana', 'Semana libre'],
     ['month', 'Mes', 'Mes despejado'],
-    ['later', 'Más adelante', 'Nada más adelante'],
+    ['later', 'Futuro', 'Nada en el futuro'],
     ['ideas', '💡 Ideas', 'Sin ideas anotadas'],
   ];
   const TAB_STORE = 'mi_dashboard_task_tab'; // solo sessionStorage: dura la sesión
@@ -125,7 +125,7 @@ const Tasks = (() => {
   } catch (e) { /* sin sessionStorage: se usa Hoy */ }
 
   // Rangos: Semana = mañana → domingo de esta semana; Mes = lunes siguiente →
-  // último día del mes actual; Más adelante = todo lo posterior.
+  // último día del mes actual; Futuro = todo lo posterior.
   function tabRanges(todayKey) {
     const d = keyToDate(todayKey);
     const dow = d.getDay(); // 0 = domingo
@@ -137,7 +137,7 @@ const Tasks = (() => {
     };
   }
   // Proyectos: viven en su bloque; solo se repiten en Atrasadas (subtarea vencida) u Hoy
-  // (subtarea para hoy), nunca en Semana/Mes/Más adelante (para eso está su "Próx:").
+  // (subtarea para hoy), nunca en Semana/Mes/Futuro (para eso está su "Próx:").
   function bucketOf(t, todayKey, r) {
     const ed = effectiveDate(t);
     if (isProject(t)) {

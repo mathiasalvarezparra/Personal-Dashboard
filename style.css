@@ -4504,3 +4504,17 @@ body.ro-active .ro-done { pointer-events: auto; }
 .ro-on { padding-bottom: calc(var(--space-6) * 2); }
 /* El contenido normal se oculta mientras dura el modo (gana a display: flex/block) */
 .ro-on > [data-ro-hidden] { display: none !important; }
+
+/* Finanzas: chips de fechas de pago (trimestral, semestral, anual) */
+.sched-chips { margin-top: var(--space-2); }
+.sched-chip { font-family: var(--font-mono); }
+.sched-chip.invalid { border-color: var(--accent-red); color: var(--accent-red); }
+.sched-pick[hidden] { display: none; }
+/* Futuro: frecuencia del pago con calendario ("anual") */
+.tp-rec {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
