@@ -8,8 +8,9 @@ Fuente de verdad: `js/storage.js` (`Storage.defaultState` y `Storage.load()`). T
 
 ## Versión y migraciones
 
-- `state.version` (hoy **`2`**) versiona los cambios de esquema incompatibles. `Storage.migrate()` aplica las migraciones pendientes según la versión, tanto al cargar (`Storage.load()`) como al importar un respaldo (`Storage.importJSON()`), ambos vía `Storage.hydrate()`:
+- `state.version` (hoy **`3`**) versiona los cambios de esquema incompatibles. `Storage.migrate()` aplica las migraciones pendientes según la versión, tanto al cargar (`Storage.load()`) como al importar un respaldo (`Storage.importJSON()`), ambos vía `Storage.hydrate()`:
   - **v1 → v2** — hábitos `frequency.type: 'weekly'` ("X veces por semana") pasan a `{ type: 'days', days: suggestedDays (o los 7 días si estaba vacío), weeklyMin: timesPerWeek (sin superar la cantidad de días) }`. `history`, `notes`, `contributions`, `dailyProgress` y `linkedGoalId` no se tocan. El tipo `'weekly'` ya no existe en el resto del código.
+  - **v2 → v3** — pagos programados trimestrales y anuales sin `schedule`: se genera desde su `dueDate` (mes y día) o, si es legado sin `dueDate`, desde `dueDay` y el mes de creación. Trimestral = ese mes y cada 3 meses (4 fechas); anual = ese mes (1 fecha). Mismo día, ajustado al último día del mes si no existe (febrero hasta 29; en años no bisiestos se usa el 28 al calcular). `dueDate`/`dueDay` y los pagos (`movements` con `recurringExpenseId`/`periodMk`) no se tocan. Un respaldo antiguo se migra igual al importarlo.
 - Las migraciones reales que existen hoy son **one-shot basadas en flags dentro de `settings`**, ejecutadas al inicio (`App.init()`), no en `Storage.load()`:
   - `migrateAreas()` (`js/app.js`): agrega el área `espiritualidad` a usuarios existentes. Flag: `settings.areasEspiritualidadAdded`.
   - `migrateRemoveQuarter()` (`js/app.js`): elimina metas con `horizon: 'quarter'` (se descartó ese horizonte) y normaliza `recurrence: 'quarterly'` huérfana a `'none'`. Flag: `settings.quarterRemoved`.
@@ -154,8 +155,8 @@ Leído/escrito por: `Habits` (dueño). Lee `Goals.updateCurrent` al propagar ava
 }
 ```
 
-- **Fecha efectiva** (`Tasks.effectiveDate(t)`, no se guarda): la más próxima entre `date` y las `date` de las subtareas **pendientes**. Decide si la tarea va a "⚠ Atrasadas" (< hoy) o a qué pestaña de la tarjeta Tareas (Hoy, Semana, Mes, Más adelante).
-- `date: null` = **Idea o Proyecto según sus subtareas** (se deduce, no hay campo nuevo): **Idea** = sin subtareas → pestaña "💡 Ideas" y filtro Ideas de la gestión; **Proyecto** = al menos una subtarea → bloque "📁 Proyectos" de Enfoque y filtro Proyectos de la gestión. Un proyecto con una subtarea pendiente vencida o para hoy aparece además en "⚠ Atrasadas" u Hoy (su fecha efectiva); nunca en Semana/Mes/Más adelante. Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
+- **Fecha efectiva** (`Tasks.effectiveDate(t)`, no se guarda): la más próxima entre `date` y las `date` de las subtareas **pendientes**. Decide si la tarea va a "⚠ Atrasadas" (< hoy) o a qué pestaña de la tarjeta Tareas (Hoy, Semana, Mes, Futuro).
+- `date: null` = **Idea o Proyecto según sus subtareas** (se deduce, no hay campo nuevo): **Idea** = sin subtareas → pestaña "💡 Ideas" y filtro Ideas de la gestión; **Proyecto** = al menos una subtarea → bloque "📁 Proyectos" de Enfoque y filtro Proyectos de la gestión. Un proyecto con una subtarea pendiente vencida o para hoy aparece además en "⚠ Atrasadas" u Hoy (su fecha efectiva); nunca en Semana/Mes/Futuro. Siempre con `recurrence: 'none'` (para repetir hace falta fecha). Al completarla pasa a Hechas como cualquier otra.
 - `subtasks[].date`: si la tarea tiene fecha, ninguna subtarea puede ser posterior (validación en el modal); si no tiene fecha (Idea/Proyecto), cualquier fecha vale. Completar todas **no** completa la tarea (solo destaca el checkbox) y la tarea se puede completar con subtareas pendientes. En una recurrente, la siguiente ocurrencia copia el checklist con ids nuevos, `done: false` y las fechas desplazadas los mismos días que la tarea (las sin fecha siguen sin fecha).
 - Todos estos campos son opcionales (subtareas antiguas sin `date` = sin fecha): no hubo migración ni cambio de `version`.
 
@@ -202,12 +203,27 @@ Leído/escrito por: `Goals` (dueño, activas), `GoalArchive` (solo lectura de ar
 }
 ```
 
+Pago con calendario (trimestral):
+
+```json
+{
+  "id": "s9s8", "name": "Seguro auto", "category": "transporte",
+  "recurrence": "quarterly", "defaultAmount": 60000,
+  "dueDate": "2027-03-05", "dueDay": 5,
+  "schedule": [{ "month": 3, "day": 5 }, { "month": 6, "day": 8 }, { "month": 9, "day": 5 }, { "month": 12, "day": 5 }],
+  "note": null, "installmentsTotal": null, "installmentsCurrent": null,
+  "installmentTotalAmount": null, "installmentsDone": false, "createdAt": 1732000000000
+}
+```
+
 | Campo | Tipo | Notas |
 |---|---|---|
 | `category` | string | id de `Finance.EXPENSE_CATEGORIES` (ver `movements` para Ahorro) |
-| `recurrence` | string | `'monthly'` \| `'quarterly'` \| `'yearly'` \| `'once'` (pago programado puntual: vence en `dueDate`; se crea con "No se repite" y fecha futura, y se elimina de la lista al pagarlo, conservando su movimiento) |
+| `recurrence` | string | `'monthly'` \| `'quarterly'` \| `'semiannual'` \| `'yearly'` \| `'once'` (pago programado puntual: vence en `dueDate`; se crea con "No se repite" y fecha futura, y se elimina de la lista al pagarlo, conservando su movimiento) |
 | `defaultAmount` | number | monto estimado por ciclo (o monto de la cuota, si tiene cuotas) |
 | `dueDay` | number\|null | día del mes en que vence (para ordenar "próximos a vencer") |
+| `dueDate` | string\|null | `YYYY-MM-DD`: mensual = fecha de referencia; puntual = vencimiento; trimestral/semestral/anual = **fecha del primer pago** (antes de ese mes no hay vencimientos) |
+| `schedule` | `{ month: 1-12, day: 1-31 }[]` | solo trimestral (4), semestral (2) y anual (1): fechas de pago que se repiten cada año, meses distintos, ordenadas por mes. Los vencimientos de estos tipos salen de aquí (no de `dueDate`/`dueDay`, que se mantienen por compatibilidad). Un pago se considera hecho por período: movimiento con `periodMk` = mes del vencimiento (respaldo legado sin `periodMk`: fechado después del vencimiento anterior y hasta ese mes). Ausente en mensual y puntual |
 | `installmentsTotal/Current/TotalAmount/Done` | number\|null / number\|null / number\|null / boolean | soporte de compras en cuotas |
 
 Leído/escrito por: `Finance` (dueño). No lo lee ningún otro módulo.

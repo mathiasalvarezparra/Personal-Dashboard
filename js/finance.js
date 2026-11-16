@@ -38,8 +38,69 @@ const Finance = (() => {
     { id: 'once',      name: 'Puntual',     short: 'Puntual' },
     { id: 'monthly',   name: 'Mensual',     short: 'Mensual' },
     { id: 'quarterly', name: 'Trimestral',  short: 'Trimestral' },
+    { id: 'semiannual', name: 'Semestral',  short: 'Semestral' },
     { id: 'yearly',    name: 'Anual',       short: 'Anual' },
   ];
+
+  // ---- Pagos con calendario fijo: trimestral, semestral y anual ----
+  // Cada uno guarda `schedule: [{ month: 1-12, day: 1-31 }]` (4, 2 o 1 fechas que se
+  // repiten todos los años). dueDate = fecha del primer pago (antes no hay vencimientos).
+  const SCHEDULED = { quarterly: { n: 4, step: 3 }, semiannual: { n: 2, step: 6 }, yearly: { n: 1, step: 12 } };
+  const isScheduledType = rec => !!SCHEDULED[rec];
+  const MAX_MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
+  // Calendario desde la fecha del primer pago: +3/+6/+9 (trimestral) o +6 (semestral)
+  // meses, mismo día (ajustado al último día del mes si no existe). Ordenado por mes.
+  function buildSchedule(firstKey, rec) {
+    const cfg = SCHEDULED[rec];
+    if (!cfg || !firstKey) return [];
+    const m0 = +firstKey.slice(5, 7), d0 = +firstKey.slice(8, 10);
+    return Array.from({ length: cfg.n }, (_, k) => {
+      const month = ((m0 - 1 + k * cfg.step) % 12) + 1;
+      return { month, day: Math.min(d0, MAX_MONTH_DAYS[month - 1]) };
+    }).sort((a, b) => a.month - b.month);
+  }
+  function scheduleOf(re) {
+    if (Array.isArray(re.schedule) && re.schedule.length) return re.schedule;
+    return re.dueDate ? buildSchedule(re.dueDate, re.recurrence) : [];
+  }
+  // "5 mar · 5 jun · 5 sep · 5 dic" (día ajustado al año en curso, ej. 29 feb → 28)
+  function scheduleText(list, year = new Date().getFullYear()) {
+    return list.map(x => `${Math.min(x.day, daysInMonth(year, x.month))} ${MONTH_SHORT[x.month - 1]}`).join(' · ');
+  }
+  // Mes desde el que hay vencimientos: el del primer pago (o el de creación si no hay)
+  function scheduleStartMk(re) {
+    if (re.dueDate) return re.dueDate.slice(0, 7);
+    const c = new Date(re.createdAt || Date.now());
+    return `${c.getFullYear()}-${String(c.getMonth() + 1).padStart(2, '0')}`;
+  }
+  // Vencimiento en el mes mk ('YYYY-MM-DD') o null si ese mes no le toca
+  function scheduledDueInMonth(re, mk) {
+    if (mk < scheduleStartMk(re)) return null;
+    const y = +mk.slice(0, 4), m = +mk.slice(5, 7);
+    const e = scheduleOf(re).find(x => x.month === m);
+    if (!e) return null;
+    return `${mk}-${String(Math.min(e.day, daysInMonth(y, m))).padStart(2, '0')}`;
+  }
+  // Mes del vencimiento anterior a mk (ventana del respaldo legado sin periodMk)
+  function prevScheduledMk(re, mk) {
+    const months = scheduleOf(re).map(x => x.month);
+    for (let i = 1; i <= 12; i++) {
+      const p = shiftMonth(mk, -i);
+      if (months.includes(+p.slice(5, 7))) return p;
+    }
+    return shiftMonth(mk, -12);
+  }
+  // Próximo vencimiento no pagado posterior al mes `afterMk` (para la pestaña Futuro)
+  function nextScheduledAfter(re, afterMk) {
+    for (let i = 1; i <= 24; i++) {
+      const mk = shiftMonth(afterMk, i);
+      const dueKey = scheduledDueInMonth(re, mk);
+      if (dueKey && !isRecurringPaidInMonth(re, mk)) return { re, mk, dueKey };
+    }
+    return null;
+  }
 
   // Sub-tabs (orden visible)
   const SUB_TABS = [
@@ -188,9 +249,21 @@ const Finance = (() => {
       c.innerHTML = '<div class="empty">Sin pagos programados · toca "+" y usa "Más opciones" para crear uno</div>';
       return;
     }
+    // Días hasta el próximo vencimiento (con calendario: la próxima fecha del schedule)
+    const daysToNext = re => {
+      if (isScheduledType(re.recurrence)) {
+        const today = UI.todayKey();
+        for (let i = 0; i <= 24; i++) {
+          const due = scheduledDueInMonth(re, shiftMonth(getCurrentMonthKey(), i));
+          if (due && due >= today) return keyDiffDays(today, due);
+        }
+        return 9999;
+      }
+      return re.dueDay ? daysUntilDueDay(re.dueDay) : 9999;
+    };
     list.sort((a, b) => {
-      const da = a.dueDay ? daysUntilDueDay(a.dueDay) : 9999;
-      const db = b.dueDay ? daysUntilDueDay(b.dueDay) : 9999;
+      const da = daysToNext(a);
+      const db = daysToNext(b);
       if (da !== db) return da - db;
       return (a.name || '').localeCompare(b.name || '');
     });
@@ -297,6 +370,8 @@ const Finance = (() => {
       : '<span class="re-amount-empty">Variable</span>';
     const dayLabel = (re.recurrence === 'once' && re.dueDate)
       ? `Vence ${new Date(re.dueDate + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '')}`
+      : isScheduledType(re.recurrence) && scheduleOf(re).length
+      ? scheduleText(scheduleOf(re))
       : (re.dueDay
         ? (re.recurrence === 'monthly' ? `Día ${re.dueDay}` : `Día ${re.dueDay} del mes de pago`)
         : 'Sin fecha definida');
@@ -428,7 +503,15 @@ const Finance = (() => {
     const modalState = {
       recurrence: editingRecurring ? editingRecurring.recurrence : 'once',
       category: src ? src.category : null,
+      // Calendario de pagos (trimestral/semestral/anual) y si el usuario ajustó alguna fecha
+      schedule: editingRecurring && isScheduledType(editingRecurring.recurrence)
+        ? scheduleOf(editingRecurring).map(x => ({ ...x })) : [],
+      schedManual: false,
+      schedEdit: -1,
     };
+    if (modalState.schedule.length && editingRecurring.dueDate) {
+      modalState.schedManual = JSON.stringify(modalState.schedule) !== JSON.stringify(buildSchedule(editingRecurring.dueDate, editingRecurring.recurrence));
+    }
 
     const isEditingSomething = !!src;
     const title = isEditingSomething ? 'Editar gasto' : 'Nuevo gasto';
@@ -498,6 +581,11 @@ const Finance = (() => {
             <input type="date" id="mv-due-date"
               value="${editingRecurring && editingRecurring.dueDate ? editingRecurring.dueDate : (editingRecurring && editingRecurring.dueDay ? deriveDueDateFromLegacy(editingRecurring) : UI.todayKey())}" />
             <p id="mv-due-help" class="qe-help"></p>
+            <div id="mv-sched-wrap" hidden>
+              <div class="qe-chips sched-chips" id="mv-sched-chips"></div>
+              <input type="date" id="mv-sched-pick" class="sched-pick" hidden />
+              <p class="qe-error" id="mv-sched-error" hidden></p>
+            </div>
           </div>
 
           <div id="mv-inst-toggle-wrap" hidden>
@@ -580,18 +668,24 @@ const Finance = (() => {
         if (modalState.recurrence === 'monthly') {
           dueLabel.textContent = 'Fecha de referencia';
           dueHelp.textContent = 'Selecciona una fecha. Se repetirá el mismo día cada mes (ej: día 15 cada mes).';
-        } else if (modalState.recurrence === 'quarterly') {
+        } else if (isScheduledType(modalState.recurrence)) {
           dueLabel.textContent = 'Fecha del primer pago';
-          dueHelp.textContent = 'Selecciona una fecha. Se repetirá cada 3 meses a partir de esa fecha.';
-        } else if (modalState.recurrence === 'yearly') {
-          dueLabel.textContent = 'Fecha del pago anual';
-          dueHelp.textContent = 'Selecciona la fecha del año. Se repetirá cada año en ese mismo día y mes.';
+          dueHelp.textContent = modalState.recurrence === 'yearly'
+            ? 'Se repite cada año en esta fecha. Toca la fecha para cambiarla.'
+            : 'Las demás fechas se calculan solas y se repiten cada año. Toca una para cambiarla.';
         }
       } else {
         dateWrap.hidden = false;
         dueWrap.hidden = true;
         amountLabel.textContent = 'Monto (CLP)';
         amountHelp.textContent = '';
+      }
+      // Chips con las fechas de pago (trimestral, semestral, anual)
+      const schedWrap = document.getElementById('mv-sched-wrap');
+      schedWrap.hidden = !isScheduledType(modalState.recurrence);
+      if (!schedWrap.hidden) {
+        if (modalState.schedule.length !== SCHEDULED[modalState.recurrence].n) rebuildSchedule(false);
+        renderSchedule();
       }
       // Puntual con fecha futura → pago programado puntual (no al editar un gasto ya registrado)
       const dateVal = document.getElementById('mv-date').value;
@@ -605,6 +699,66 @@ const Finance = (() => {
         dueHelp.textContent = 'Día en que pagas cada cuota. Se repite el mismo día cada mes.';
       }
     };
+
+    // ---- Chips de fechas de pago ----
+    const schedYear = () => {
+      const v = document.getElementById('mv-due-date').value;
+      return v ? +v.slice(0, 4) : new Date().getFullYear();
+    };
+    // Valida: tantas fechas como pagos y meses distintos (error inline)
+    function validateSchedule() {
+      if (!isScheduledType(modalState.recurrence)) return true;
+      const list = modalState.schedule;
+      const months = new Set(list.map(x => x.month));
+      let msg = '';
+      if (list.length !== SCHEDULED[modalState.recurrence].n) msg = 'Elige la fecha del primer pago';
+      else if (months.size !== list.length) msg = 'Hay dos pagos en el mismo mes · cambia uno de ellos';
+      showFieldError('mv-sched-error', msg);
+      return !msg;
+    }
+    modalState.validateSchedule = validateSchedule;
+    function renderSchedule() {
+      const box = document.getElementById('mv-sched-chips');
+      const y = schedYear();
+      const dup = new Set(modalState.schedule.map(x => x.month).filter((m, i, a) => a.indexOf(m) !== i));
+      box.innerHTML = modalState.schedule.map((x, i) => `
+        <button type="button" class="qe-chip sched-chip ${dup.has(x.month) ? 'invalid' : ''}" data-sched="${i}">📅 ${Math.min(x.day, daysInMonth(y, x.month))} ${MONTH_SHORT[x.month - 1]}</button>`).join('');
+      box.querySelectorAll('[data-sched]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = +btn.dataset.sched;
+          const x = modalState.schedule[i];
+          const pick = document.getElementById('mv-sched-pick');
+          modalState.schedEdit = i;
+          pick.value = `${y}-${String(x.month).padStart(2, '0')}-${String(Math.min(x.day, daysInMonth(y, x.month))).padStart(2, '0')}`;
+          pick.hidden = false;
+          pick.focus();
+          try { if (pick.showPicker) pick.showPicker(); } catch (err) { /* el input visible basta */ }
+        });
+      });
+      validateSchedule();
+    }
+    // Recalcula las fechas desde el primer pago; avisa si se pierden ajustes manuales
+    function rebuildSchedule(warn = true) {
+      if (warn && modalState.schedManual) UI.toast('Fechas recalculadas · se perdieron tus ajustes');
+      modalState.schedule = buildSchedule(document.getElementById('mv-due-date').value, modalState.recurrence);
+      modalState.schedManual = false;
+    }
+    document.getElementById('mv-sched-pick').addEventListener('change', e => {
+      const v = e.target.value;
+      const i = modalState.schedEdit;
+      if (!v || i < 0) return;
+      modalState.schedule[i] = { month: +v.slice(5, 7), day: +v.slice(8, 10) };
+      modalState.schedule.sort((a, b) => a.month - b.month);
+      modalState.schedManual = true;
+      modalState.schedEdit = -1;
+      e.target.hidden = true;
+      renderSchedule();
+    });
+    document.getElementById('mv-due-date').addEventListener('change', () => {
+      if (!isScheduledType(modalState.recurrence)) return;
+      rebuildSchedule(true);
+      renderSchedule();
+    });
 
     // Los elementos ya existen: UI.openModal pinta el HTML de forma síncrona
     const amountEl = document.getElementById('mv-amount');
@@ -644,6 +798,8 @@ const Finance = (() => {
     const recSel = document.getElementById('mv-recurrence');
     recSel.addEventListener('change', () => {
       modalState.recurrence = recSel.value;
+      // Al cambiar de frecuencia, las fechas se recalculan desde el primer pago
+      if (isScheduledType(modalState.recurrence)) rebuildSchedule(true);
       refreshUI();
     });
     const instToggle = document.getElementById('mv-inst-toggle');
@@ -708,10 +864,14 @@ const Finance = (() => {
     const amountBad = !isRecurring && !(amount > 0);
     showFieldError('mv-amount-error', amountBad ? 'Ingresa un monto mayor a $0' : '');
     showFieldError('mv-cat-error', category ? '' : 'Elige una categoría');
-    if (amountBad || !category) {
+    // Fechas de pago (trimestral/semestral/anual): cantidad correcta y meses distintos
+    const schedOk = !isRecurring || !modalState.validateSchedule || modalState.validateSchedule();
+    if (amountBad || !category || !schedOk) {
       if (amountBad) amountEl.focus();
+      else if (!schedOk) UI.revealInModal(document.getElementById('mv-sched-error'), 'center');
       return false;
     }
+    const scheduleToSave = isScheduledType(modalState.recurrence) ? modalState.schedule.map(x => ({ month: x.month, day: x.day })) : null;
 
     // Nombre opcional: si queda vacío, el de la categoría
     const name = capitalizeFirst(document.getElementById('mv-name').value.trim()) || getExpenseCategory(category).name;
@@ -750,6 +910,9 @@ const Finance = (() => {
         editingRecurring.dueDate = null;
         editingRecurring.dueDay = null;
       }
+      // Calendario de pagos solo en trimestral, semestral y anual
+      if (scheduleToSave) editingRecurring.schedule = scheduleToSave;
+      else delete editingRecurring.schedule;
       // Cuotas (cualquier categoría, gasto mensual): total, cuota actual, monto total.
       const instE = readInstallmentsFields();
       editingRecurring.installmentsTotal = instE.total;
@@ -784,6 +947,7 @@ const Finance = (() => {
         // Con cuotas, el monto por pago es la cuota (total ÷ cuotas); si no, el estimado.
         defaultAmount: inst.total ? inst.perCuota : amount,
         dueDate, dueDay,
+        ...(scheduleToSave ? { schedule: scheduleToSave } : {}),
         note,
         installmentsTotal: inst.total,
         installmentsCurrent: inst.current,
@@ -911,26 +1075,15 @@ const Finance = (() => {
         return (m.date || '').startsWith(mk);
       });
     }
-    if (re.recurrence === 'quarterly') {
-      // Si hay periodMk explícito, comparar directo
-      const withPeriod = movs.filter(m => m.periodMk);
-      if (withPeriod.some(m => m.periodMk === mk)) return true;
-      // Fallback por fecha (legacy)
-      const [y, m] = mk.split('-').map(Number);
-      const fromDate = new Date(y, m - 3, 1);
-      const toDate = new Date(y, m, 0);
-      return movs.filter(m => !m.periodMk).some(mv => {
-        if (!mv.date) return false;
-        const d = new Date(mv.date + 'T12:00:00');
-        return d >= fromDate && d <= toDate;
+    if (isScheduledType(re.recurrence)) {
+      // Trimestral, semestral o anual: pagado por período (periodMk = mes del vencimiento)
+      if (movs.some(m => m.periodMk === mk)) return true;
+      // Respaldo legado (pagos sin periodMk): fechado después del vencimiento anterior y hasta este mes
+      const prev = prevScheduledMk(re, mk);
+      return movs.filter(m => !m.periodMk).some(m => {
+        const k = (m.date || '').slice(0, 7);
+        return k > prev && k <= mk;
       });
-    }
-    if (re.recurrence === 'yearly') {
-      const withPeriod = movs.filter(m => m.periodMk);
-      if (withPeriod.some(m => m.periodMk === mk)) return true;
-      // Fallback por fecha (legacy): mismo año
-      const year = mk.split('-')[0];
-      return movs.filter(m => !m.periodMk).some(m => (m.date || '').startsWith(year + '-'));
     }
     return false;
   }
@@ -948,6 +1101,8 @@ const Finance = (() => {
   }
 
   function getDueDateForRecurringInMonth(re, mk) {
+    // Trimestral, semestral y anual: según su calendario (schedule)
+    if (isScheduledType(re.recurrence)) return scheduledDueInMonth(re, mk);
     // Si tiene dueDate (fecha completa de referencia), proyectarla al mes pedido
     // tomando el día y mes según el tipo de recurrencia.
     if (re.dueDate) {
@@ -1021,39 +1176,18 @@ const Finance = (() => {
         periods.forEach(mk => {
           result.push({ recurring: re, periodMk: mk, isFromCurrentMonth: mk === curMk });
         });
-      } else if (re.recurrence === 'quarterly' || re.recurrence === 'yearly') {
-        // Para trimestrales/anuales: aparece como pendiente solo si su fecha de vencimiento
-        // ya llegó este ciclo y aún no se pagó.
-        if (createdMk > curMk) return; // creado en el futuro, ignorar
-        if (isRecurringPaidInMonth(re, curMk)) return; // ya pagado en este ciclo
-
-        // Determinar el "mes objetivo" del próximo vencimiento
-        let targetMk = curMk;
-        if (re.dueDate) {
-          // Buscar el mes en el que cae el vencimiento de este ciclo
-          // Para anual: mes de re.dueDate dentro del año en curso
-          // Para trimestral: el ciclo más cercano hacia atrás (o el actual) que aún no se haya pagado
-          const [refY, refM] = re.dueDate.split('-').map(Number);
-          const [curY, curMonth] = curMk.split('-').map(Number);
-          if (re.recurrence === 'yearly') {
-            targetMk = `${curY}-${String(refM).padStart(2, '0')}`;
-          } else {
-            // trimestral: encontrar el último múltiplo de 3 desde refM hasta antes de hoy
-            const diffMonths = (curY - refY) * 12 + (curMonth - refM);
-            if (diffMonths >= 0) {
-              const cyclesElapsed = Math.floor(diffMonths / 3);
-              const targetMonth = refM + cyclesElapsed * 3;
-              const targetYear = refY + Math.floor((targetMonth - 1) / 12);
-              const adjMonth = ((targetMonth - 1) % 12) + 1;
-              targetMk = `${targetYear}-${String(adjMonth).padStart(2, '0')}`;
-            } else {
-              return; // aún no llega el primer ciclo
-            }
-          }
+      } else if (isScheduledType(re.recurrence)) {
+        // Trimestral, semestral o anual: cada fecha del calendario vence en su mes.
+        // Pendiente = el vencimiento más reciente cuyo mes ya llegó (≤ mes actual), si no
+        // está pagado (como antes: no se acumulan ciclos viejos).
+        const startMk = scheduleStartMk(re);
+        for (let i = 0; i < 12; i++) {
+          const mk = shiftMonth(curMk, -i);
+          if (mk < startMk) break;
+          if (!scheduledDueInMonth(re, mk)) continue;
+          if (!isRecurringPaidInMonth(re, mk)) result.push({ recurring: re, periodMk: mk, isFromCurrentMonth: mk === curMk });
+          break;
         }
-        // Solo mostrar pendiente si el mes objetivo ya llegó o pasó (no si es futuro)
-        if (targetMk > curMk) return;
-        result.push({ recurring: re, periodMk: targetMk, isFromCurrentMonth: targetMk === curMk });
       }
     });
 
@@ -1114,7 +1248,7 @@ const Finance = (() => {
   }
 
   // Pestañas de pagos en Enfoque (mismos rangos que Tareas)
-  const FIN_TABS = [['today', 'Hoy'], ['week', 'Semana'], ['month', 'Mes'], ['later', 'Más adelante']];
+  const FIN_TABS = [['today', 'Hoy'], ['week', 'Semana'], ['month', 'Mes'], ['later', 'Futuro']];
   const FIN_TAB_STORE = 'mi_dashboard_fin_tab'; // sessionStorage: dura la sesión
   let finTab = 'today';
   try {
@@ -1124,7 +1258,8 @@ const Finance = (() => {
 
   // Tarjeta "💰 Finanzas" en Enfoque. Siempre visible. Arriba presupuesto y ahorro;
   // luego "⚠ Atrasados" (uno por pago, el período más antiguo) y las pestañas
-  // Hoy · Semana · Mes · Más adelante (esta última solo con pagos puntuales).
+  // Hoy · Semana · Mes · Futuro (puntuales posteriores al mes y el próximo vencimiento
+  // de cada trimestral/semestral/anual; nunca mensuales ni cuotas).
   function renderTodayPending() {
     const c = document.getElementById('today-pending');
     if (!isLive(c)) return;
@@ -1153,6 +1288,14 @@ const Finance = (() => {
       else if (o.re.recurrence === 'once' && o.dueKey > endMonth) groups.later.push(o);
     });
     groups.overdue = [...overdueByRe.values()].sort((a, b) => b.daysLate - a.daysLate);
+    // Futuro: de cada trimestral, semestral y anual solo su PRÓXIMO vencimiento posterior
+    // al mes actual (una entrada por pago); si cae en esta semana ya está en Semana.
+    (Storage.get().recurringExpenses || []).forEach(re => {
+      if (!isScheduledType(re.recurrence) || re.installmentsDone) return;
+      const nx = nextScheduledAfter(re, curMk);
+      if (nx && nx.dueKey > sunday) groups.later.push({ ...nx, cuota: null });
+    });
+    groups.later.sort((a, b) => a.dueKey.localeCompare(b.dueKey));
 
     const { start, end } = getMonthRange(curMk);
     const monthEx = monthExpenses(start, end);
@@ -1248,12 +1391,16 @@ const Finance = (() => {
       }
       const amount = o.re.defaultAmount ? `~ ${formatCLP(o.re.defaultAmount)}` : 'Monto variable';
       const instTag = o.cuota ? `<span class="tp-inst">Cuota ${o.cuota}/${o.re.installmentsTotal}</span>` : '';
+      // En Futuro se indica la frecuencia de los pagos con calendario ("anual")
+      const recTag = (kind === 'later' && isScheduledType(o.re.recurrence))
+        ? `<span class="tp-rec">${getRecurrence(o.re.recurrence).name.toLowerCase()}</span>` : '';
       return `
         <div class="tp-item ${tagClass}">
           <div class="tp-main">
             <div class="tp-name">${cat.icon} ${escapeHtml(o.re.name)}</div>
             <div class="tp-meta">
               <span class="tp-tag ${tagClass}">${tagText}</span>
+              ${recTag}
               <span class="tp-amount">${amount}</span>
               ${instTag}
             </div>
