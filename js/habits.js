@@ -892,15 +892,8 @@ const Habits = (() => {
   }
 
   // Momento del día actual: mañana < 12:00 · tarde 12:00–18:59 · noche ≥ 19:00
-  function currentMoment(now = new Date()) {
-    const hr = now.getHours();
-    return hr < 12 ? 'mañana' : (hr < 19 ? 'tarde' : 'noche');
-  }
-  // Orden de grupos: el momento actual, los siguientes, "Cualquier momento" y al final los ya pasados
-  function momentOrder(now = new Date()) {
-    const i = MOMENTS.indexOf(currentMoment(now));
-    return [...MOMENTS.slice(i), 'any', ...MOMENTS.slice(0, i)];
-  }
+  // Orden fijo y cronológico de los grupos (no depende de la hora)
+  const GROUP_ORDER = ['mañana', 'tarde', 'noche', 'any'];
 
   // Grupos ya completos que el usuario expandió a mano (se colapsan solos al completarse)
   const expandedGroups = new Set();
@@ -936,7 +929,7 @@ const Habits = (() => {
     }
 
     const byCompletion = (a, b) => ((a._completedAt && a._completedAt[todayKey]) || 0) - ((b._completedAt && b._completedAt[todayKey]) || 0);
-    c.innerHTML = momentOrder(now).map(m => {
+    c.innerHTML = GROUP_ORDER.map(m => {
       const items = list.filter(h => (MOMENTS.includes(h.timeOfDay) ? h.timeOfDay : 'any') === m);
       if (!items.length) return '';
       const pending = items.filter(h => !isDoneForToday(h));   // respeta el orden manual (modo ordenar)
